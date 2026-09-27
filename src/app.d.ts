@@ -10,7 +10,10 @@ declare global {
 		}
 
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			db: import('$lib/server/db').Db;
+			user: import('$lib/server/auth/session').SessionUser | null;
+		}
 		// interface PageData {}
 		// interface PageState {}
 	}

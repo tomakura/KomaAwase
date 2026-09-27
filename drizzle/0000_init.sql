@@ -56,7 +56,7 @@ CREATE TABLE `email_tokens` (
 CREATE TABLE `passkeys` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
-	`public_key` blob NOT NULL,
+	`public_key` text NOT NULL,
 	`counter` integer DEFAULT 0 NOT NULL,
 	`transports` text,
 	`device_type` text,

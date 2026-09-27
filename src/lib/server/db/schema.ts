@@ -1,7 +1,7 @@
 // Tables follow docs/data-model.md. Only account/auth and timetable tables for now;
 // shared courses, notes, friends and groups come with their features.
 import { sql } from 'drizzle-orm';
-import { blob, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 const id = () =>
 	text('id')
@@ -39,7 +39,8 @@ export const passkeys = sqliteTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		publicKey: blob('public_key', { mode: 'buffer' }).notNull(),
+		// base64url; Workers has no Node Buffer for blob columns
+		publicKey: text('public_key').notNull(),
 		counter: integer('counter').notNull().default(0),
 		transports: text('transports', { mode: 'json' }).$type<string[]>(),
 		deviceType: text('device_type'),
