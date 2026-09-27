@@ -9,7 +9,9 @@ export default defineConfig({
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) => filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			// Local secrets for `npm run dev` (see relay/README.md). Not .dev.vars, which
+			// `wrangler types` would read into worker-configuration.d.ts.
+			adapter: adapter({ platformProxy: { envFiles: ['.dev.local.vars'] } })
 		})
 	]
 });

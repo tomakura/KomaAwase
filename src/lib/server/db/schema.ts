@@ -229,6 +229,24 @@ export const courseNotes = sqliteTable(
 	(t) => [index('course_notes_course_idx').on(t.courseId)]
 );
 
+// Files kept with a course. The bytes are on the rental server (relay/files.php) under
+// storage_key; only the Worker can reach them.
+export const courseFiles = sqliteTable(
+	'course_files',
+	{
+		id: id(),
+		courseId: text('course_id')
+			.notNull()
+			.references(() => courses.id, { onDelete: 'cascade' }),
+		storageKey: text('storage_key').notNull().unique(),
+		name: text('name').notNull(),
+		mime: text('mime').notNull(),
+		size: integer('size').notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [index('course_files_course_idx').on(t.courseId)]
+);
+
 // --- shared course data, per university and year ---
 
 export const sharedCourses = sqliteTable(

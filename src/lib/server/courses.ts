@@ -5,6 +5,7 @@ import { COURSE_COLORS, isCourseColor, type Delivery } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
+import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
 import { loadSharedCourse, writeShared } from './shared-courses';
 import { loadShape, titleParts } from './timetable';
@@ -277,8 +278,9 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	};
 }
 
-export async function deleteCourse(db: Db, userId: string, courseId: string) {
+export async function deleteCourse(env: Env, db: Db, userId: string, courseId: string) {
 	if (!(await findOwnedCourse(db, userId, courseId))) return false;
+	await deleteCourseFiles(env, db, courseId);
 	await db.delete(courses).where(eq(courses.id, courseId));
 	return true;
 }

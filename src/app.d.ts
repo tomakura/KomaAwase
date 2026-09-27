@@ -4,6 +4,7 @@ declare global {
 	// Secrets are not in wrangler.jsonc, so `wrangler types` does not know about them.
 	interface Env {
 		RELAY_SECRET?: string;
+		FILES_SECRET?: string;
 	}
 
 	namespace App {

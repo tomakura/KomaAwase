@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		DAY_NAMES,
 		actionHref,
@@ -9,7 +10,8 @@
 		periodLabel,
 		timetableHref
 	} from '$lib/courses';
-	import { addDays, daysBetween, monthDay, weekdayOf } from '$lib/time';
+	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
+	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
 
 	let { data, form } = $props();
 
@@ -54,6 +56,23 @@
 			.toSorted((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
 	);
 
+	let fileInput = $state<HTMLInputElement>();
+	let uploading = $state(false);
+	let uploadErrors = $state<string[]>([]);
+
+	async function upload(files: FileList | null) {
+		if (!files?.length) return;
+		uploading = true;
+		uploadErrors = [];
+		for (const file of files) {
+			const message = await uploadFile(course.id, file);
+			if (message) uploadErrors.push(message);
+		}
+		if (fileInput) fileInput.value = '';
+		await invalidateAll();
+		uploading = false;
+	}
+
 	function dueLabel(due: string) {
 		const days = daysBetween(data.today, due);
 		if (days > 0) return { text: `あと${days}日`, late: false };
@@ -62,10 +81,10 @@
 	}
 </script>
 
-{#snippet removeButton(id: string, label: string)}
+{#snippet removeButton(id: string, label: string, action = 'remove')}
 	<form
 		method="POST"
-		action={actionHref('remove', data.termParam)}
+		action={actionHref(action, data.termParam)}
 		use:enhance={({ cancel }) => {
 			if (!confirm(`${label}を消します`)) cancel();
 		}}
@@ -128,12 +147,16 @@
 				</svg>
 				メモ
 			</button>
-			<!-- Files need R2, which isn't set up yet. -->
-			<button type="button" disabled title="準備中">
+			<button
+				type="button"
+				disabled={!data.filesEnabled || uploading}
+				title={data.filesEnabled ? undefined : '準備中'}
+				onclick={() => fileInput?.click()}
+			>
 				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
 					<path d="M17 8l-7.5 7.5a2.1 2.1 0 0 1-3-3L14 5a3.8 3.8 0 0 1 5.4 5.4l-7.7 7.7a5.4 5.4 0 0 1-7.6-7.6L10.5 4" />
 				</svg>
-				資料
+				{uploading ? '送信中…' : '資料'}
 			</button>
 			<button type="button" aria-pressed={adding === 'task'} onclick={() => (adding = adding === 'task' ? null : 'task')}>
 				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
@@ -153,6 +176,17 @@
 				休講
 			</button>
 		</div>
+
+		<input
+			class="file-input"
+			type="file"
+			multiple
+			accept={FILE_ACCEPT}
+			bind:this={fileInput}
+			onchange={(e) => upload(e.currentTarget.files)}
+		/>
+		{#each uploadErrors as message, i (i)}<p class="error block" role="alert">{message}</p>{/each}
+		{#if form?.message && !adding}<p class="error block" role="alert">{form.message}</p>{/if}
 
 		{#if adding}
 			<form
@@ -230,6 +264,40 @@
 							{@render removeButton(c.id, `${withDay(c.date ?? '')}の休講`)}
 						</div>
 					{/each}
+				</section>
+			{/if}
+
+			{#if data.files.length}
+				<section>
+					<h2>資料</h2>
+					<div class="files">
+						{#each data.files as file (file.id)}
+							{@const badge = fileBadge(file.mime)}
+							<div class="file">
+								<a href="/courses/{course.id}/files/{file.id}" target="_blank" rel="noopener">
+									<span class="file-icon">
+										{#if badge}
+											{badge}
+										{:else}
+											<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+												<rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+												<circle cx="9" cy="10" r="1.8" />
+												<path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" />
+											</svg>
+										{/if}
+									</span>
+									<span class="text">
+										<span class="main">{file.name}</span>
+										<span class="sub">
+											{formatBytes(file.size)} · {monthDay(tokyoTime(file.createdAt.getTime()).date)}
+										</span>
+									</span>
+								</a>
+								{@render removeButton(file.id, `「${file.name}」`, 'removeFile')}
+							</div>
+						{/each}
+					</div>
+					<span class="usage">資料の容量 {formatBytes(data.usedBytes)} / {formatBytes(data.quotaBytes)}（全部の授業で）</span>
 				</section>
 			{/if}
 
@@ -435,6 +503,69 @@
 	.add-buttons button:disabled {
 		color: var(--ink-sub);
 		cursor: default;
+	}
+
+	.file-input {
+		display: none;
+	}
+
+	.error.block {
+		margin: 8px 16px 0;
+	}
+
+	.files {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+	}
+
+	.file {
+		display: flex;
+		align-items: center;
+		padding-right: 4px;
+	}
+
+	.file + .file {
+		border-top: 1px solid var(--slot);
+	}
+
+	.file a {
+		flex-grow: 1;
+		min-width: 0;
+		min-height: 52px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 6px 0 6px 12px;
+		color: var(--ink);
+		text-decoration: none;
+	}
+
+	.file-icon {
+		width: 34px;
+		height: 34px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 8px;
+		background: var(--slot);
+		color: var(--ink-soft);
+		font-size: 10px;
+		font-weight: 700;
+	}
+
+	.file form {
+		display: contents;
+	}
+
+	.usage {
+		padding: 0 2px;
+		font-size: 11px;
+		color: var(--ink-sub);
 	}
 
 	.add-form {

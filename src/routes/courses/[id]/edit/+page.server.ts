@@ -1,4 +1,4 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail, isHttpError, redirect } from '@sveltejs/kit';
 import { courseHref, timetableHref } from '$lib/courses';
 import { deleteCourse, loadCourse, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
 import type { Actions, PageServerLoad } from './$types';
@@ -26,9 +26,18 @@ export const actions: Actions = {
 		});
 		redirect(303, courseHref(params.id, url.searchParams.get('term')));
 	},
-	delete: async ({ locals, params, url }) => {
+	delete: async ({ locals, params, url, platform }) => {
 		if (!locals.user) redirect(303, '/login');
-		if (!(await deleteCourse(locals.db, locals.user.id, params.id))) error(404, '授業が見つかりません');
+		if (!platform) error(500);
+		try {
+			if (!(await deleteCourse(platform.env, locals.db, locals.user.id, params.id))) {
+				error(404, '授業が見つかりません');
+			}
+		} catch (e) {
+			if (isHttpError(e)) throw e;
+			console.error('course delete failed', e);
+			return fail(502, { message: '資料を消せなかったので、授業も消していません。時間をおいてもう一度お試しください' });
+		}
 		redirect(303, timetableHref(url.searchParams.get('term')));
 	}
 };

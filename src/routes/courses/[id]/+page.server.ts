@@ -1,14 +1,27 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { findOwnedCourse, loadCourse } from '$lib/server/courses';
+import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
 import { tokyoTime } from '$lib/time';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, params, url }) => {
+export const load: PageServerLoad = async ({ locals, params, url, platform }) => {
 	if (!locals.user) redirect(303, '/login');
-	const loaded = await loadCourse(locals.db, locals.user.id, params.id);
+	const [loaded, files, used] = await Promise.all([
+		loadCourse(locals.db, locals.user.id, params.id),
+		listFiles(locals.db, params.id),
+		usedBytes(locals.db, locals.user.id)
+	]);
 	if (!loaded) error(404, '授業が見つかりません');
-	return { ...loaded, today: tokyoTime(Date.now()).date, termParam: url.searchParams.get('term') };
+	return {
+		...loaded,
+		files,
+		usedBytes: used,
+		quotaBytes: USER_QUOTA_BYTES,
+		filesEnabled: !!platform && filesEnabled(platform.env),
+		today: tokyoTime(Date.now()).date,
+		termParam: url.searchParams.get('term')
+	};
 };
 
 async function ownCourse({ locals, params }: RequestEvent<{ id: string }>) {
@@ -34,5 +47,16 @@ export const actions: Actions = {
 		const courseId = await ownCourse(event);
 		const form = await event.request.formData();
 		await deleteNote(event.locals.db, courseId, String(form.get('id')));
+	},
+	removeFile: async (event) => {
+		const courseId = await ownCourse(event);
+		if (!event.platform) error(500);
+		const form = await event.request.formData();
+		try {
+			await deleteFile(event.platform.env, event.locals.db, courseId, String(form.get('id')));
+		} catch (e) {
+			console.error('file delete failed', e);
+			return fail(502, { message: '資料を消せませんでした。時間をおいてもう一度お試しください' });
+		}
 	}
 };
