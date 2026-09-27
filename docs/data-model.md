@@ -21,8 +21,8 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `TIMETABLES` | user_id, university_id, year, name, archived | 年度ごとに1つ。古いものは `archived` にして残す |
-| `TERMS` | timetable_id, name, start_date, end_date, sort_order | 前期・Q1 など。大学のひな形からコピーして、本人が変えられる |
+| `TIMETABLES` | user_id, university_id, year, name, archived | 年度ごとに1つ（user_id と year で一意）。古いものは `archived` にして残す。はじめて開いたときに大学のひな形から作る |
+| `TERMS` | timetable_id, name, group_name, start_date, end_date, sort_order | 前期・Q1 など。`group_name` はタブの上に出すまとまり（Q1・Q2 なら前期）。大学のひな形からコピーして、本人が変えられる |
 | `PERIODS` | timetable_id, number, start_time, end_time | 0限や7限もあり得る |
 | `COURSES` | timetable_id, shared_course_id, sync_mode, title, color | `sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ） |
 | `COURSE_TERMS` | course_id, term_id | 授業と学期は多対多。「Q1とQ2」「通年」を表せる |
@@ -45,7 +45,7 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `UNIVERSITIES` | name, email_domains, term_preset, period_preset | `email_domains` は完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期と時限のひな形を持つ |
+| `UNIVERSITIES` | name, email_domains, term_preset, period_preset | `email_domains` は完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期と時限のひな形を持つ。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する） |
 | `SHARED_COURSES` | university_id, year, code, title, term_label, source, version | `code` はシラバスの授業コード。`source` は `syllabus` か `user` |
 | `SHARED_COURSE_SLOTS` | shared_course_id, weekday, period_number, span, room | シラバスに教室がない大学は、みんなの登録で埋める |
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |

@@ -18,7 +18,7 @@
 | Google ログイン | arctic |
 | PWA | `@vite-pwa/sveltekit` |
 | CSS | 素の CSS ＋ CSS 変数 |
-| 授業名の改行 | BudouX |
+| 授業名の改行 | `Intl.Segmenter`（ブラウザと Workers に最初から入っている） |
 | 画像書き出し | ブラウザ内で SVG → PNG |
 
 ## ログイン
