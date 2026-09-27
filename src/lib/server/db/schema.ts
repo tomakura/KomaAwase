@@ -1,5 +1,4 @@
-// Tables follow docs/data-model.md. Only account/auth and timetable tables for now;
-// shared courses, notes, friends and groups come with their features.
+// Tables follow docs/data-model.md. Friends and groups come with their features.
 import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
@@ -149,7 +148,8 @@ export const courses = sqliteTable(
 		timetableId: text('timetable_id')
 			.notNull()
 			.references(() => timetables.id, { onDelete: 'cascade' }),
-		// references shared_courses once that table exists
+		// shared_courses.id. Not a foreign key: adding one would rebuild this table, and shared
+		// courses are never deleted.
 		sharedCourseId: text('shared_course_id'),
 		syncMode: text('sync_mode', { enum: ['synced', 'personal'] })
 			.notNull()
@@ -208,4 +208,78 @@ export const courseTeachers = sqliteTable(
 		sortOrder: integer('sort_order').notNull()
 	},
 	(t) => [index('course_teachers_course_idx').on(t.courseId)]
+);
+
+// --- shared course data, per university and year ---
+
+export const sharedCourses = sqliteTable(
+	'shared_courses',
+	{
+		id: id(),
+		universityId: text('university_id')
+			.notNull()
+			.references(() => universities.id),
+		year: integer('year').notNull(),
+		code: text('code'), // course code in the syllabus
+		title: text('title').notNull(),
+		// Term names such as Q3, set when the course is added; only used to narrow searches
+		terms: text('terms', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+		delivery: text('delivery', { enum: ['ondemand', 'intensive'] }),
+		intensiveFrom: text('intensive_from'),
+		intensiveTo: text('intensive_to'),
+		source: text('source', { enum: ['syllabus', 'user'] }).notNull(),
+		version: integer('version').notNull().default(1),
+		createdAt: createdAt(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.notNull()
+			.default(sql`(unixepoch() * 1000)`)
+	},
+	(t) => [index('shared_courses_university_year_idx').on(t.universityId, t.year)]
+);
+
+export const sharedCourseSlots = sqliteTable(
+	'shared_course_slots',
+	{
+		id: id(),
+		sharedCourseId: text('shared_course_id')
+			.notNull()
+			.references(() => sharedCourses.id, { onDelete: 'cascade' }),
+		weekday: integer('weekday').notNull(),
+		periodNumber: integer('period_number').notNull(),
+		span: integer('span').notNull().default(1),
+		room: text('room')
+	},
+	(t) => [
+		index('shared_course_slots_course_idx').on(t.sharedCourseId),
+		index('shared_course_slots_slot_idx').on(t.weekday, t.periodNumber)
+	]
+);
+
+export const sharedCourseTeachers = sqliteTable(
+	'shared_course_teachers',
+	{
+		id: id(),
+		sharedCourseId: text('shared_course_id')
+			.notNull()
+			.references(() => sharedCourses.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		sortOrder: integer('sort_order').notNull()
+	},
+	(t) => [index('shared_course_teachers_course_idx').on(t.sharedCourseId)]
+);
+
+// Every change with the values before and after, so it can be undone.
+// The user is cleared, not the edit, when their account is deleted.
+export const sharedCourseEdits = sqliteTable(
+	'shared_course_edits',
+	{
+		id: id(),
+		sharedCourseId: text('shared_course_id')
+			.notNull()
+			.references(() => sharedCourses.id, { onDelete: 'cascade' }),
+		userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+		diff: text('diff', { mode: 'json' }).$type<{ before: unknown; after: unknown }>().notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [index('shared_course_edits_course_idx').on(t.sharedCourseId)]
 );

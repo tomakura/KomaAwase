@@ -3,21 +3,31 @@
 	import { COURSE_COLORS, DAY_NAMES, courseColor, periodLabel, type Delivery } from '$lib/courses';
 
 	type Slot = { weekday: number; period: number; span: number; room: string | null };
-	export type CourseValues = {
+	type SharedValues = {
 		title: string;
 		teachers: string[];
-		color: string;
-		termIds: string[];
 		slots: Slot[];
 		delivery: Delivery | null;
 		intensiveFrom: string | null;
 		intensiveTo: string | null;
+	};
+	type CourseValues = SharedValues & {
+		color: string;
+		termIds: string[];
+		syncMode: 'synced' | 'personal';
+	};
+	type Sync = {
+		canSync: boolean;
+		year: number;
+		// The shared course this one is linked to
+		shared: { id: string; source: 'syllabus' | 'user'; values: SharedValues } | null;
 	};
 
 	let {
 		heading,
 		backHref,
 		action,
+		sync,
 		initial,
 		terms,
 		periods,
@@ -26,6 +36,7 @@
 		heading: string;
 		backHref: string;
 		action?: string;
+		sync: Sync;
 		initial: CourseValues;
 		terms: { id: string; name: string }[];
 		periods: { number: number }[];
@@ -45,6 +56,35 @@
 
 	const periodNumbers = $derived(periods.map((p) => p.number));
 	let saving = $state(false);
+
+	// Syncing again shows the shared values, so local edits never overwrite them by accident.
+	function setSync(mode: 'synced' | 'personal') {
+		v.syncMode = mode;
+		const shared = sync.shared?.values;
+		if (mode !== 'synced' || !shared) return;
+		v.title = shared.title;
+		v.teachers = [...shared.teachers];
+		v.slots = shared.slots.map((s) => ({ ...s, room: s.room ?? '' }));
+		v.unscheduled = shared.slots.length === 0 && shared.delivery !== null;
+		v.delivery = shared.delivery ?? 'ondemand';
+		v.intensiveFrom = shared.intensiveFrom ?? '';
+		v.intensiveTo = shared.intensiveTo ?? '';
+	}
+
+	const syncHeading = $derived(
+		!sync.shared
+			? 'この授業を同じ大学のみんなと共有できます'
+			: sync.shared.source === 'syllabus'
+				? 'シラバスの授業とつながっています'
+				: 'みんなの登録の授業とつながっています'
+	);
+	const syncNote = $derived(
+		v.syncMode === 'personal'
+			? '授業名や教室を自分用に変えられます。ほかの人が直しても反映されません。'
+			: sync.shared
+				? '教室の変更などをだれかが直したときに自動で反映されます。コマを重ねたときも、同じ授業としてまとまります。ここで直した内容は、同期しているみんなにも反映されます。'
+				: '同じ大学の人が授業をさがしたときに出てくるようになり、コマを重ねたときも同じ授業としてまとまります。'
+	);
 
 	let teacher = $state('');
 	function addTeacher() {
@@ -99,6 +139,30 @@
 	</header>
 
 	<div class="body">
+		{#if sync.canSync}
+			<div class="sync">
+				<div class="sync-head">
+					<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+						<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+					</svg>
+					<span>{syncHeading}</span>
+					<span class="badge">{sync.year}年度</span>
+				</div>
+				<div class="segmented" role="group" aria-label="同期">
+					<button type="button" aria-pressed={v.syncMode === 'synced'} onclick={() => setSync('synced')}>
+						みんなと同期する
+					</button>
+					<button type="button" aria-pressed={v.syncMode === 'personal'} onclick={() => setSync('personal')}>
+						自分だけで使う
+					</button>
+				</div>
+				<span class="note">{syncNote}</span>
+			</div>
+		{/if}
+		<input type="hidden" name="sync" value={sync.canSync ? v.syncMode : 'personal'} />
+		{#if sync.shared}<input type="hidden" name="shared_id" value={sync.shared.id} />{/if}
+
 		{#if message}<p class="error" role="alert">{message}</p>{/if}
 
 		<label class="field">
@@ -325,6 +389,36 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
+	}
+
+	.sync {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 12px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+
+	.sync-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+		line-height: 1.5;
+	}
+
+	.sync-head span:first-of-type {
+		flex-grow: 1;
+	}
+
+	.badge {
+		flex-shrink: 0;
+		padding: 2px 7px;
+		border-radius: 6px;
+		background: var(--slot);
+		font-size: 11px;
 	}
 
 	.label {

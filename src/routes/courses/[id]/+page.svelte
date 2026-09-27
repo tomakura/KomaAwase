@@ -46,6 +46,14 @@
 				{/each}
 				{#if delivery}<span class="chip"><b>{delivery}</b></span>{/if}
 				{#if termNames}<span class="chip muted">{termNames}</span>{/if}
+				{#if course.syncMode === 'synced' && data.shared}
+					<span class="chip muted synced">
+						<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" />
+						</svg>
+						みんなと同期中
+					</span>
+				{/if}
 			</div>
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
@@ -177,6 +185,16 @@
 	.chip.muted {
 		border-color: transparent;
 		background: var(--slot);
+	}
+
+	.synced {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.synced svg {
+		stroke-width: 2;
 	}
 
 	.teachers {

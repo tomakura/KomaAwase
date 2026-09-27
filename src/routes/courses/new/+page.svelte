@@ -1,6 +1,5 @@
 <script lang="ts">
 	import CourseForm from '$lib/components/CourseForm.svelte';
-	import { timetableHref } from '$lib/courses';
 
 	let { data, form } = $props();
 </script>
@@ -11,7 +10,8 @@
 
 <CourseForm
 	heading="授業を追加"
-	backHref={timetableHref(data.termParam)}
+	backHref={data.backHref}
+	sync={data.sync}
 	initial={data.initial}
 	terms={data.terms}
 	periods={data.periods}

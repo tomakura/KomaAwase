@@ -139,7 +139,7 @@
 					<a
 						class="slot"
 						class:today={day === clock.weekday}
-						href="/courses/new?term={termId}&day={day}&period={p.number}"
+						href="/courses/search?term={termId}&day={day}&period={p.number}"
 						aria-label="{DAY_NAMES[day]}曜{p.number}限に授業を追加"
 						style:grid-row={i + 2}
 						style:grid-column={j + 2}

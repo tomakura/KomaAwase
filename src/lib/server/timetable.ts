@@ -3,13 +3,14 @@ import { and, asc, eq } from 'drizzle-orm';
 import { academicYear, tokyoTime } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables, universities } from './db/schema';
+import { loadSharedCourses } from './shared-courses';
 
 // The only preset so far. Picking a university comes with the setup screen.
 const DEFAULT_UNIVERSITY_ID = 'dhw';
 
 function findTimetable(db: Db, userId: string, year: number) {
 	return db
-		.select({ id: timetables.id, year: timetables.year })
+		.select({ id: timetables.id, year: timetables.year, universityId: timetables.universityId })
 		.from(timetables)
 		.where(and(eq(timetables.userId, userId), eq(timetables.year, year)))
 		.get();
@@ -68,7 +69,7 @@ export async function getOrCreateTimetable(db: Db, userId: string, year: number)
 		if (created) return created;
 		throw e;
 	}
-	return { id: timetableId, year };
+	return { id: timetableId, year, universityId: university.id };
 }
 
 // The timetable for this academic year
@@ -132,7 +133,9 @@ export async function loadTimetable(db: Db, timetableId: string) {
 				color: courses.color,
 				delivery: courses.delivery,
 				intensiveFrom: courses.intensiveFrom,
-				intensiveTo: courses.intensiveTo
+				intensiveTo: courses.intensiveTo,
+				syncMode: courses.syncMode,
+				sharedCourseId: courses.sharedCourseId
 			})
 			.from(courses)
 			.where(eq(courses.timetableId, timetableId))
@@ -155,14 +158,31 @@ export async function loadTimetable(db: Db, timetableId: string) {
 			.where(eq(courses.timetableId, timetableId))
 	]);
 
+	// Synced courses show the shared title, slots and rooms.
+	const shared = await loadSharedCourses(
+		db,
+		courseRows.flatMap((c) => (c.syncMode === 'synced' && c.sharedCourseId ? [c.sharedCourseId] : []))
+	);
+
 	return {
 		terms: termRows,
 		periods: periodRows,
-		courses: courseRows.map((c) => ({
-			...c,
-			titleParts: titleParts(c.title),
-			termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
-			slots: slotRows.filter((s) => s.courseId === c.id).map(({ courseId: _, ...s }) => s)
-		}))
+		courses: courseRows.map(({ syncMode, sharedCourseId, ...c }) => {
+			const synced = syncMode === 'synced' && sharedCourseId ? shared.get(sharedCourseId) : undefined;
+			const values = synced
+				? synced.values
+				: { ...c, slots: slotRows.filter((s) => s.courseId === c.id).map(({ courseId: _, ...s }) => s) };
+			return {
+				id: c.id,
+				color: c.color,
+				title: values.title,
+				titleParts: titleParts(values.title),
+				slots: values.slots,
+				delivery: values.delivery,
+				intensiveFrom: values.intensiveFrom,
+				intensiveTo: values.intensiveTo,
+				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId)
+			};
+		})
 	};
 }

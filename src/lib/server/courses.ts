@@ -1,9 +1,11 @@
+import { error } from '@sveltejs/kit';
 import { and, asc, count, eq } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { COURSE_COLORS, isCourseColor, type Delivery } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
+import { loadSharedCourse, writeShared } from './shared-courses';
 import { loadShape, titleParts } from './timetable';
 
 const TITLE_MAX = 60;
@@ -23,6 +25,8 @@ export type CourseInput = {
 	delivery: Delivery | null;
 	intensiveFrom: string | null;
 	intensiveTo: string | null;
+	syncMode: 'synced' | 'personal';
+	sharedCourseId: string | null; // the shared course it came from, if any
 };
 
 // What a submitted course is checked against
@@ -51,6 +55,11 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		return { message: '開講する学期を選んでください' };
 	}
 
+	const sync = {
+		syncMode: form.get('sync') === 'synced' ? ('synced' as const) : ('personal' as const),
+		sharedCourseId: String(form.get('shared_id') ?? '') || null
+	};
+
 	if (form.get('unscheduled') === 'on') {
 		const delivery = form.get('delivery') === 'intensive' ? 'intensive' : 'ondemand';
 		const from = delivery === 'intensive' ? String(form.get('intensive_from') ?? '') || null : null;
@@ -59,7 +68,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 			return { message: '集中講義の期間を確かめてください' };
 		}
 		return {
-			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to }
+			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to, ...sync }
 		};
 	}
 
@@ -69,7 +78,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		return { message: '曜日・時限を1つ以上入れるか、「曜日・時限がない」にチェックしてください' };
 	}
 	return {
-		input: { title, teachers, color, termIds, slots, delivery: null, intensiveFrom: null, intensiveTo: null }
+		input: { title, teachers, color, termIds, slots, delivery: null, intensiveFrom: null, intensiveTo: null, ...sync }
 	};
 }
 
@@ -110,14 +119,58 @@ export async function nextColor(db: Db, timetableId: string) {
 	return colors[(row?.n ?? 0) % colors.length].id;
 }
 
-export async function saveCourse(db: Db, timetableId: string, courseId: string | null, input: CourseInput) {
+// Saves the course in the timetable. A synced course also adds itself to the shared data, or
+// updates the shared course it is linked to. The local copy is always written, so switching to
+// 自分だけで使う keeps the latest values.
+export async function saveCourse(
+	db: Db,
+	{
+		userId,
+		timetable,
+		terms,
+		courseId,
+		input
+	}: {
+		userId: string;
+		timetable: { id: string; year: number; universityId: string | null };
+		terms: { id: string; name: string }[];
+		courseId: string | null;
+		input: CourseInput;
+	}
+) {
+	const existing = input.sharedCourseId ? await loadSharedCourse(db, input.sharedCourseId) : null;
+	if (
+		input.sharedCourseId &&
+		(existing?.universityId !== timetable.universityId || existing?.year !== timetable.year)
+	) {
+		error(400, 'つながっている授業が見つかりません');
+	}
+
+	let sharedCourseId = existing?.id ?? null;
+	const shared: BatchItem<'sqlite'>[] = [];
+	if (input.syncMode === 'synced') {
+		if (!timetable.universityId) error(400, '大学が決まっていないので同期できません');
+		const written = writeShared(db, {
+			userId,
+			universityId: timetable.universityId,
+			year: timetable.year,
+			termNames: terms.filter((t) => input.termIds.includes(t.id)).map((t) => t.name),
+			existing,
+			values: input
+		});
+		sharedCourseId = written.id;
+		shared.push(...written.statements);
+	}
+
 	const id = courseId ?? crypto.randomUUID();
 	const values = {
 		title: input.title,
 		color: input.color,
 		delivery: input.delivery,
 		intensiveFrom: input.intensiveFrom,
-		intensiveTo: input.intensiveTo
+		intensiveTo: input.intensiveTo,
+		syncMode: input.syncMode,
+		sharedCourseId
 	};
 	const rest: BatchItem<'sqlite'>[] = [];
 	if (courseId) {
@@ -151,7 +204,8 @@ export async function saveCourse(db: Db, timetableId: string, courseId: string |
 	await db.batch([
 		courseId
 			? db.update(courses).set(values).where(eq(courses.id, id))
-			: db.insert(courses).values({ id, timetableId, ...values }),
+			: db.insert(courses).values({ id, timetableId: timetable.id, ...values }),
+		...shared,
 		...rest
 	]);
 	return id;
@@ -173,8 +227,10 @@ function findOwnedCourse(db: Db, userId: string, courseId: string) {
 export async function loadCourse(db: Db, userId: string, courseId: string) {
 	const row = await findOwnedCourse(db, userId, courseId);
 	if (!row) return null;
-	const [shape, [termLinks, slotRows, teacherRows]] = await Promise.all([
+	const { course } = row;
+	const [shape, shared, [termLinks, slotRows, teacherRows]] = await Promise.all([
 		loadShape(db, row.timetable.id),
+		course.sharedCourseId ? loadSharedCourse(db, course.sharedCourseId) : null,
 		db.batch([
 			db.select({ termId: courseTerms.termId }).from(courseTerms).where(eq(courseTerms.courseId, courseId)),
 			db
@@ -194,22 +250,27 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 				.orderBy(asc(courseTeachers.sortOrder))
 		])
 	]);
-	const { course } = row;
+	const local = {
+		title: course.title,
+		teachers: teacherRows.map((t) => t.name),
+		slots: slotRows,
+		delivery: course.delivery,
+		intensiveFrom: course.intensiveFrom,
+		intensiveTo: course.intensiveTo
+	};
+	const values = course.syncMode === 'synced' && shared ? shared.values : local;
 	return {
 		timetable: row.timetable,
 		...shape,
 		course: {
 			id: course.id,
-			title: course.title,
-			titleParts: titleParts(course.title),
+			...values,
+			titleParts: titleParts(values.title),
 			color: course.color,
-			teachers: teacherRows.map((t) => t.name),
 			termIds: termLinks.map((l) => l.termId),
-			slots: slotRows,
-			delivery: course.delivery,
-			intensiveFrom: course.intensiveFrom,
-			intensiveTo: course.intensiveTo
-		}
+			syncMode: course.syncMode
+		},
+		shared: shared && { id: shared.id, source: shared.source, values: shared.values }
 	};
 }
 
