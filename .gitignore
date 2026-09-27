@@ -22,5 +22,10 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Mail relay secret (see relay/)
+# Rental server secrets (see relay/)
 relay/koma-relay-secret.php
+relay/koma-files-secret.php
+
+# Local Worker secrets for npm run dev
+.dev.local.vars
+.dev.vars

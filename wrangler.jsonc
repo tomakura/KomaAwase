@@ -11,9 +11,11 @@
 		"directory": ".svelte-kit/cloudflare"
 	},
 	// Sign-in mail goes through relay/send.php on シンレンタルサーバー (Workers can't reach its SMTP).
-	// The shared HMAC key is a secret: `npx wrangler secret put RELAY_SECRET`.
+	// Course files are kept there too, through relay/files.php.
+	// The HMAC keys are secrets: `npx wrangler secret put RELAY_SECRET` and `FILES_SECRET`.
 	"vars": {
-		"RELAY_URL": "https://tomakura.com/koma-relay/send.php"
+		"RELAY_URL": "https://tomakura.com/koma-relay/send.php",
+		"FILES_URL": "https://tomakura.com/koma-files/files.php"
 	},
 	// The app lives at koma.tomakura.com. Passkeys are bound to this hostname.
 	"routes": [{ "pattern": "koma.tomakura.com", "custom_domain": true }],

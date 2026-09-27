@@ -8,6 +8,55 @@
       "when": 1790500738143,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790513713287,
+      "tag": "0001_timetable_year",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790513715468,
+      "tag": "0002_dhw_preset",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790515032406,
+      "tag": "0003_course_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790515829323,
+      "tag": "0004_shared_courses",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790531067360,
+      "tag": "0005_course_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790531886661,
+      "tag": "0006_course_files",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790533506541,
+      "tag": "0007_courses_shared_idx",
+      "breakpoints": true
     }
   ]
 }

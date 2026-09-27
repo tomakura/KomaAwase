@@ -2,6 +2,7 @@ import { dev } from '$app/environment';
 import { and, count, eq, gt, lt } from 'drizzle-orm';
 import type { Db } from '$lib/server/db';
 import { emailTokens } from '$lib/server/db/schema';
+import { hmacSha256Hex } from '$lib/server/hmac';
 import { generateToken, hashToken } from './token';
 
 const TOKEN_LIFETIME = 15 * 60 * 1000;
@@ -66,11 +67,4 @@ export async function sendSignInEmail(env: Env, to: string, link: string) {
 		signal: AbortSignal.timeout(10_000)
 	});
 	if (!res.ok) throw new Error(`Mail relay responded ${res.status}: ${await res.text()}`);
-}
-
-async function hmacSha256Hex(secret: string, message: string): Promise<string> {
-	const enc = new TextEncoder();
-	const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-	const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
-	return [...sig].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

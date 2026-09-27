@@ -21,5 +21,6 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 ```
 
 - 開発中はログイン用のリンクが `npm run dev` のコンソールに出る。本番はシンレンタルサーバーの `relay/send.php` 経由で送る（置き方は [relay/README.md](relay/README.md)）
+- 授業の資料はシンの `relay/files.php` に保存する。手元で試すときは [relay/README.md](relay/README.md#手元で試すとき) のとおり PHP を動かし、`.dev.local.vars` を作る
 - パスキーは `localhost` で試せる。スマホで試すときは HTTPS が必要
 - 本番に出す前に `wrangler d1 create komaawase` でデータベースを作り、表示された ID を `wrangler.jsonc` の `database_id` に入れる

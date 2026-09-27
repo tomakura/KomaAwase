@@ -3,12 +3,19 @@
 	--bg: #f6f2ea;
 	--surface: #fffdf8;
 	--ink: #2b2824;
+	--ink-soft: #4a443c;
 	--ink-sub: #6b645a;
 	--line: #e4ddcf;
+	--line-strong: #d8d0c0;
+	--line-bold: #b8ae9c;
+	--scrim: #8f887d;
 	--slot: #ede7da;
+	--slot-today: #e6dac4;
+	--now-text: #7a3016;
 	--shu: #d9653b;
 	--ai: #3569a8;
 	--accent-text: #b9502b;
+	--logo-blend: multiply;
 
 	--course-red: #f8dcdc;
 	--course-orange: #fbe3d6;
@@ -21,6 +28,12 @@
 	--course-purple: #efe3f3;
 	--course-gray: #ede7da;
 
+	/* The course in session fills with a deeper shade of its color: oklch(from color l+dl c+dc h) */
+	--live-fill-dl: -0.07;
+	--live-fill-dc: 0.045;
+	--live-text-l: 0.4;
+	--live-text-dc: 0.03;
+
 	--font-display: 'Zen Maru Gothic', sans-serif;
 	--font-body: 'Zen Kaku Gothic New', sans-serif;
 
@@ -32,12 +45,19 @@
 		--bg: #1c1a18;
 		--surface: #2a2724;
 		--ink: #eee7da;
+		--ink-soft: #c9c1b3;
 		--ink-sub: #a39b8e;
 		--line: #3a3531;
+		--line-strong: #4a443d;
+		--line-bold: #5e564d;
+		--scrim: #0e0d0c;
 		--slot: #2e2a26;
+		--slot-today: #3a3329;
+		--now-text: #f4c3a9;
 		--shu: #e27a52;
 		--ai: #5b8bc7;
 		--accent-text: #ee9670;
+		--logo-blend: screen;
 
 		--course-red: #4e2b2e;
 		--course-orange: #4d3024;
@@ -50,6 +70,11 @@
 		--course-purple: #3b2d44;
 		--course-gray: #3d3934;
 
+		--live-fill-dl: 0.12;
+		--live-fill-dc: 0.025;
+		--live-text-l: 0.9;
+		--live-text-dc: 0.04;
+
 		color-scheme: dark;
 	}
 }
@@ -58,12 +83,19 @@
 	--bg: #1c1a18;
 	--surface: #2a2724;
 	--ink: #eee7da;
+	--ink-soft: #c9c1b3;
 	--ink-sub: #a39b8e;
 	--line: #3a3531;
+	--line-strong: #4a443d;
+	--line-bold: #5e564d;
+	--scrim: #0e0d0c;
 	--slot: #2e2a26;
+	--slot-today: #3a3329;
+	--now-text: #f4c3a9;
 	--shu: #e27a52;
 	--ai: #5b8bc7;
 	--accent-text: #ee9670;
+	--logo-blend: screen;
 
 	--course-red: #4e2b2e;
 	--course-orange: #4d3024;
@@ -75,6 +107,11 @@
 	--course-indigo: #2f3154;
 	--course-purple: #3b2d44;
 	--course-gray: #3d3934;
+
+	--live-fill-dl: 0.12;
+	--live-fill-dc: 0.025;
+	--live-text-l: 0.9;
+	--live-text-dc: 0.04;
 
 	color-scheme: dark;
 }
@@ -89,6 +126,15 @@ body {
 
 a {
 	color: var(--accent-text);
+}
+
+/* A page with the bottom menu */
+.screen {
+	max-width: 480px;
+	min-height: 100svh;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
 }
 
 .btn {

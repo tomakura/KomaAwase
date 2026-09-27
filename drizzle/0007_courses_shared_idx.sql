@@ -1,0 +1,1 @@
+CREATE INDEX `courses_shared_course_idx` ON `courses` (`shared_course_id`);

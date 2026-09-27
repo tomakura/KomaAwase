@@ -18,7 +18,6 @@ const MAX_AGE_SECONDS = 300;
 const FROM_ADDRESS = 'noreply@koma.tomakura.com';
 const FROM_NAME = 'コマあわせ';
 const ALLOWED_LINK_PREFIXES = [
-	'https://komaawase.tomakura.workers.dev/auth/email/',
 	'https://koma.tomakura.com/auth/email/',
 ];
 
