@@ -23,5 +23,7 @@ export const actions: Actions = {
 			return fail(400, { message: `ニックネームは1〜${NICKNAME_MAX}文字で入れてください` });
 		}
 		await locals.db.update(users).set({ nickname }).where(eq(users.id, locals.user.id));
+		// locals.user is from before the update; a fresh request reads the saved nickname.
+		redirect(303, '/welcome');
 	}
 };

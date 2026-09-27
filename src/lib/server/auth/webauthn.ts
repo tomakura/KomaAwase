@@ -1,5 +1,5 @@
 import type { Cookies } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, lt } from 'drizzle-orm';
 import type { Db } from '$lib/server/db';
 import { authChallenges } from '$lib/server/db/schema';
 
@@ -14,6 +14,8 @@ export function relyingParty(url: URL) {
 }
 
 export async function saveChallenge(db: Db, cookies: Cookies, challenge: string, userId: string | null) {
+	// Abandoned challenges are never taken, so sweep expired ones here.
+	await db.delete(authChallenges).where(lt(authChallenges.expiresAt, new Date()));
 	const row = await db
 		.insert(authChallenges)
 		.values({ challenge, userId, expiresAt: new Date(Date.now() + CHALLENGE_LIFETIME) })

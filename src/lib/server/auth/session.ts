@@ -1,5 +1,5 @@
 import type { Cookies } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, lt } from 'drizzle-orm';
 import type { Db } from '$lib/server/db';
 import { sessions, users } from '$lib/server/db/schema';
 import { generateToken, hashToken } from './token';
@@ -14,6 +14,8 @@ export const SESSION_COOKIE = 'session';
 export type SessionUser = typeof users.$inferSelect;
 
 export async function createSession(db: Db, userId: string) {
+	// Sessions that expire without being visited again are removed here.
+	await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
 	const token = generateToken();
 	const expiresAt = new Date(Date.now() + SESSION_LIFETIME);
 	await db.insert(sessions).values({ id: await hashToken(token), userId, expiresAt });

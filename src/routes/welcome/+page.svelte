@@ -10,10 +10,13 @@
 	async function onPasskey() {
 		busy = true;
 		passkeyError = null;
-		const result = await registerPasskey();
-		busy = false;
-		if (result.ok) await goto('/', { invalidateAll: true });
-		else passkeyError = result.message;
+		try {
+			const result = await registerPasskey();
+			if (result.ok) await goto('/', { invalidateAll: true });
+			else passkeyError = result.message;
+		} finally {
+			busy = false;
+		}
 	}
 </script>
 
