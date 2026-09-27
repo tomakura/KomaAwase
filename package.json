@@ -28,7 +28,6 @@
 	"dependencies": {
 		"@simplewebauthn/browser": "^14.0.0",
 		"@simplewebauthn/server": "^14.0.3",
-		"drizzle-orm": "^0.45.3",
-		"worker-mailer": "^1.2.1"
+		"drizzle-orm": "^0.45.3"
 	}
 }

@@ -42,41 +42,35 @@ export async function consumeEmailToken(db: Db, token: string): Promise<string |
 	return row.email;
 }
 
+/**
+ * Sends the sign-in link through the relay on the rental server (relay/send.php).
+ * Workers can't reach its SMTP ports, so the relay sends from the server itself.
+ */
 export async function sendSignInEmail(env: Env, to: string, link: string) {
-	// `npm run dev` runs on Node, where cloudflare:sockets (SMTP) doesn't exist.
 	if (dev) {
 		console.log(`[dev] sign-in link for ${to}: ${link}`);
 		return;
 	}
-	if (!env.SMTP_HOST || !env.SMTP_PASSWORD) throw new Error('SMTP is not configured');
+	if (!env.RELAY_URL || !env.RELAY_SECRET) throw new Error('Mail relay is not configured');
 
-	// Imported lazily so the Node dev server never loads cloudflare:sockets.
-	const { WorkerMailer } = await import('worker-mailer');
-	const port = Number(env.SMTP_PORT);
-	await WorkerMailer.send(
-		{
-			host: env.SMTP_HOST,
-			port,
-			// 465 is TLS from the start; 587 upgrades with STARTTLS.
-			secure: port === 465,
-			startTls: true,
-			socketTimeoutMs: 10_000,
-			responseTimeoutMs: 10_000,
-			credentials: { username: env.MAIL_FROM, password: env.SMTP_PASSWORD },
-			authType: ['plain', 'login']
+	const body = JSON.stringify({ to, link });
+	const timestamp = String(Math.floor(Date.now() / 1000));
+	const res = await fetch(env.RELAY_URL, {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			'x-koma-timestamp': timestamp,
+			'x-koma-signature': await hmacSha256Hex(env.RELAY_SECRET, `${timestamp}.${body}`)
 		},
-		{
-			from: { name: 'コマあわせ', email: env.MAIL_FROM },
-			to,
-			subject: 'コマあわせのログイン用リンク',
-			text: [
-				'コマあわせにログインするには、下のリンクを開いてください。',
-				'',
-				link,
-				'',
-				'リンクは15分間、1回だけ使えます。',
-				'このメールに心当たりがない場合は、何もせずに削除してください。'
-			].join('\n')
-		}
-	);
+		body,
+		signal: AbortSignal.timeout(10_000)
+	});
+	if (!res.ok) throw new Error(`Mail relay responded ${res.status}: ${await res.text()}`);
+}
+
+async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+	const enc = new TextEncoder();
+	const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
+	return [...sig].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

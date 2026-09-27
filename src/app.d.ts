@@ -3,7 +3,7 @@
 declare global {
 	// Secrets are not in wrangler.jsonc, so `wrangler types` does not know about them.
 	interface Env {
-		SMTP_PASSWORD?: string;
+		RELAY_SECRET?: string;
 	}
 
 	namespace App {
