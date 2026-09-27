@@ -3,7 +3,9 @@
 	"compilerOptions": {
 		"rewriteRelativeImportExtensions": true,
 		"allowJs": true,
-		"checkJs": true,
+		// worker-configuration.d.ts imports the built .svelte-kit/cloudflare/_worker.js,
+		// so checkJs would type-check build output after `npm run build`. Our code is TS.
+		"checkJs": false,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true,
