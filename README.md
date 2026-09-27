@@ -1,6 +1,8 @@
 # KomaAwase
 時間割を友達と共有できるアプリ
 
+公開先：https://koma.tomakura.com
+
 設計メモは [docs/](docs/README.md) にある。
 
 ## 開発

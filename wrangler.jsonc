@@ -15,7 +15,9 @@
 	"vars": {
 		"RELAY_URL": "https://tomakura.com/koma-relay/send.php"
 	},
-	"workers_dev": true,
+	// The app lives at koma.tomakura.com. Passkeys are bound to this hostname.
+	"routes": [{ "pattern": "koma.tomakura.com", "custom_domain": true }],
+	"workers_dev": false,
 	// Preview versions would share the production D1 and secrets, and the mail relay only
 	// accepts production sign-in links, so previews stay off.
 	"preview_urls": false,

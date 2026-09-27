@@ -30,7 +30,7 @@
 | 学期 | 2学期制に固定しない。4学期制（クォーター）などを大学ごとに設定できる |
 | 授業データ | 大学ごとに共有。各授業は「みんなと同期」か「自分だけ」を選べる |
 | スクショ読み取り | Groq をメイン、Workers AI を予備にする。学習にデータを使われないサービスだけを使う |
-| ホスティング | Cloudflare Workers（静的アセット配信）＋ D1 / R2 / Queues |
+| ホスティング | Cloudflare Workers（静的アセット配信）＋ D1 / R2 / Queues。公開先は `koma.tomakura.com`（`tomakura.com` の DNS は Cloudflare） |
 | 最初の対象校 | デジタルハリウッド大学 |
 
 ## まだ決まっていないこと
