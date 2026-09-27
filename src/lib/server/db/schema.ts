@@ -87,7 +87,10 @@ export const universities = sqliteTable('universities', {
 	name: text('name').notNull(),
 	// matched exactly or as dot-separated subdomains, never by plain suffix
 	emailDomains: text('email_domains', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
-	termPreset: text('term_preset', { mode: 'json' }).$type<{ name: string }[]>(),
+	// Dates are for one academic year and are copied only into a timetable of that year.
+	termPreset: text('term_preset', { mode: 'json' }).$type<
+		{ name: string; group?: string; start?: string; end?: string }[]
+	>(),
 	periodPreset: text('period_preset', { mode: 'json' }).$type<{ number: number; start: string; end: string }[]>()
 });
 
@@ -104,7 +107,8 @@ export const timetables = sqliteTable(
 		archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
 		createdAt: createdAt()
 	},
-	(t) => [index('timetables_user_idx').on(t.userId)]
+	// One timetable per academic year
+	(t) => [uniqueIndex('timetables_user_year_idx').on(t.userId, t.year)]
 );
 
 export const terms = sqliteTable(
@@ -115,6 +119,8 @@ export const terms = sqliteTable(
 			.notNull()
 			.references(() => timetables.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
+		// 前期 / 後期 for quarters; shown above the term tabs
+		groupName: text('group_name'),
 		startDate: text('start_date'), // YYYY-MM-DD
 		endDate: text('end_date'),
 		sortOrder: integer('sort_order').notNull()
