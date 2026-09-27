@@ -42,11 +42,36 @@ export async function consumeEmailToken(db: Db, token: string): Promise<string |
 	return row.email;
 }
 
-export async function sendSignInEmail(to: string, link: string) {
-	// The mail provider is not decided yet (docs/README.md). In dev the link goes to the console.
+export async function sendSignInEmail(env: Env, to: string, link: string) {
+	// `npm run dev` runs on Node, where cloudflare:sockets (SMTP) doesn't exist.
 	if (dev) {
 		console.log(`[dev] sign-in link for ${to}: ${link}`);
 		return;
 	}
-	throw new Error('Email sending is not configured');
+	if (!env.SMTP_HOST || !env.SMTP_PASSWORD) throw new Error('SMTP is not configured');
+
+	// Imported lazily so the Node dev server never loads cloudflare:sockets.
+	const { WorkerMailer } = await import('worker-mailer');
+	await WorkerMailer.send(
+		{
+			host: env.SMTP_HOST,
+			port: Number(env.SMTP_PORT),
+			secure: true,
+			credentials: { username: env.MAIL_FROM, password: env.SMTP_PASSWORD },
+			authType: ['plain', 'login']
+		},
+		{
+			from: { name: 'コマあわせ', email: env.MAIL_FROM },
+			to,
+			subject: 'コマあわせのログイン用リンク',
+			text: [
+				'コマあわせにログインするには、下のリンクを開いてください。',
+				'',
+				link,
+				'',
+				'リンクは15分間、1回だけ使えます。',
+				'このメールに心当たりがない場合は、何もせずに削除してください。'
+			].join('\n')
+		}
+	);
 }

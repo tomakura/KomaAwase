@@ -3,12 +3,20 @@
 	"name": "komaawase",
 	"compatibility_date": "2026-09-27",
 	"compatibility_flags": [
-		"nodejs_als"
+		// worker-mailer needs nodejs_compat (which also covers AsyncLocalStorage)
+		"nodejs_compat"
 	],
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
+	},
+	// Sign-in mail goes out through the シンレンタルサーバー SMTP server.
+	// The password is a secret: `npx wrangler secret put SMTP_PASSWORD`.
+	"vars": {
+		"SMTP_HOST": "",
+		"SMTP_PORT": "465",
+		"MAIL_FROM": "noreply@koma.tomakura.com"
 	},
 	"workers_dev": true,
 	"preview_urls": true,
@@ -16,9 +24,7 @@
 		{
 			"binding": "DB",
 			"database_name": "komaawase",
-			// Replace with the id printed by `wrangler d1 create komaawase` before deploying.
-			// Local dev (`--local`) works with this placeholder.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "693c8fe0-bd52-44a2-9307-567ad7c42be2",
 			"migrations_dir": "drizzle"
 		}
 	],

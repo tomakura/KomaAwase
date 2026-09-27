@@ -1,6 +1,11 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
+	// Secrets are not in wrangler.jsonc, so `wrangler types` does not know about them.
+	interface Env {
+		SMTP_PASSWORD?: string;
+	}
+
 	namespace App {
 		interface Platform {
 			env: Env;
