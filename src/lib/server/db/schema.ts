@@ -156,6 +156,10 @@ export const courses = sqliteTable(
 			.default('personal'),
 		title: text('title').notNull(),
 		color: text('color').notNull().default('gray'),
+		// Only for courses without slots
+		delivery: text('delivery', { enum: ['ondemand', 'intensive'] }),
+		intensiveFrom: text('intensive_from'), // YYYY-MM-DD
+		intensiveTo: text('intensive_to'),
 		createdAt: createdAt()
 	},
 	(t) => [index('courses_timetable_idx').on(t.timetableId)]

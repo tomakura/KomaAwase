@@ -39,3 +39,32 @@ export function toMinutes(hhmm: string) {
 	const [h, m] = hhmm.split(':').map(Number);
 	return h * 60 + m;
 }
+
+// Calendar dates (YYYY-MM-DD) carry no time zone, so they are handled as UTC midnight.
+const calendar = (date: string) => new Date(`${date}T00:00:00Z`);
+
+export function isDate(value: string) {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+	const d = calendar(value);
+	return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(value);
+}
+
+export function addDays(date: string, days: number) {
+	const d = calendar(date);
+	d.setUTCDate(d.getUTCDate() + days);
+	return d.toISOString().slice(0, 10);
+}
+
+export function daysBetween(from: string, to: string) {
+	return Math.round((calendar(to).getTime() - calendar(from).getTime()) / 86_400_000);
+}
+
+// 1 = Monday ... 7 = Sunday
+export function weekdayOf(date: string) {
+	return calendar(date).getUTCDay() || 7;
+}
+
+// 10/2
+export function monthDay(date: string) {
+	return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+}

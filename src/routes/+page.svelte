@@ -1,16 +1,17 @@
 <script lang="ts">
+	import { replaceState } from '$app/navigation';
 	import BottomNav from '$lib/components/BottomNav.svelte';
-	import { courseColor } from '$lib/courses';
+	import { DAY_NAMES, courseColor, courseHref, deliveryLabel, timetableHref } from '$lib/courses';
 	import { toMinutes, tokyoTime } from '$lib/time';
 
 	let { data } = $props();
 
-	const DAY_NAMES = ['', '月', '火', '水', '木', '金', '土', '日'];
-
-	// Open on the term that is on now, or during a break the next one to start.
+	// Open on the term in the URL (coming back from a course), else the term that is on now,
+	// or during a break the next one to start.
 	function initialTerm() {
 		const today = tokyoTime(data.now).date;
 		const term =
+			data.terms.find((t) => t.id === data.termParam) ??
 			data.terms.find((t) => t.startDate && t.endDate && t.startDate <= today && today <= t.endDate) ??
 			data.terms.find((t) => t.startDate && today < t.startDate) ??
 			data.terms[0];
@@ -19,6 +20,11 @@
 
 	let termId = $state(initialTerm());
 	const term = $derived(data.terms.find((t) => t.id === termId));
+
+	function selectTerm(id: string) {
+		termId = id;
+		replaceState(timetableHref(id), {});
+	}
 
 	// Starts at the server's time so hydration matches, then follows the browser's clock.
 	// svelte-ignore state_referenced_locally
@@ -105,7 +111,7 @@
 			</div>
 			<div class="tabs" role="group" aria-label="学期">
 				{#each data.terms as t (t.id)}
-					<button type="button" aria-pressed={t.id === termId} onclick={() => (termId = t.id)}>
+					<button type="button" aria-pressed={t.id === termId} onclick={() => selectTerm(t.id)}>
 						{t.name}
 					</button>
 				{/each}
@@ -130,19 +136,22 @@
 					<span class="end">{time(p.end)}</span>
 				</div>
 				{#each days as day, j (day)}
-					<div
+					<a
 						class="slot"
 						class:today={day === clock.weekday}
+						href="/courses/new?term={termId}&day={day}&period={p.number}"
+						aria-label="{DAY_NAMES[day]}曜{p.number}限に授業を追加"
 						style:grid-row={i + 2}
 						style:grid-column={j + 2}
-					></div>
+					></a>
 				{/each}
 			{/each}
 
 			{#each cells as { course, slot, row, col, span, live } (`${course.id}-${slot.weekday}-${slot.period}`)}
-				<div
+				<a
 					class="course"
 					class:live
+					href={courseHref(course.id, termId ?? null)}
 					style:grid-row="{row} / span {span}"
 					style:grid-column={col}
 					style:--c={courseColor(course.color)}
@@ -153,7 +162,7 @@
 					</span>
 					{#if live}<span class="left">あと{live.left}分</span>{/if}
 					{#if slot.room}<span class="room">{slot.room}</span>{/if}
-				</div>
+				</a>
 			{/each}
 		</div>
 
@@ -162,9 +171,11 @@
 				<h2>曜日・時限なし</h2>
 				<div class="cards">
 					{#each unscheduled as course (course.id)}
-						<div class="card" style:--c={courseColor(course.color)}>
-							{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}
-						</div>
+						{@const label = deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo)}
+						<a class="card" href={courseHref(course.id, termId ?? null)} style:--c={courseColor(course.color)}>
+							<span>{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}</span>
+							{#if label}<span class="delivery">{label}</span>{/if}
+						</a>
 					{/each}
 				</div>
 			</section>
@@ -344,6 +355,12 @@
 		background: var(--slot);
 	}
 
+	.course,
+	.card {
+		color: var(--ink);
+		text-decoration: none;
+	}
+
 	.slot.today {
 		background: var(--slot-today);
 	}
@@ -423,6 +440,10 @@
 	}
 
 	.card {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 6px;
 		padding: 7px 8px;
 		border-radius: 8px;
 		background: var(--c);
@@ -430,5 +451,15 @@
 		font-weight: 700;
 		word-break: keep-all;
 		overflow-wrap: anywhere;
+	}
+
+	.delivery {
+		flex-shrink: 0;
+		padding: 1px 6px;
+		border-radius: 5px;
+		background: var(--surface);
+		font-size: 10px;
+		font-weight: 400;
+		white-space: nowrap;
 	}
 </style>

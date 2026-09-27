@@ -1,6 +1,6 @@
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, eq } from 'drizzle-orm';
-import { academicYear } from '$lib/time';
+import { academicYear, tokyoTime } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables, universities } from './db/schema';
 
@@ -71,13 +71,44 @@ export async function getOrCreateTimetable(db: Db, userId: string, year: number)
 	return { id: timetableId, year };
 }
 
+// The timetable for this academic year
+export function currentTimetable(db: Db, userId: string) {
+	return getOrCreateTimetable(db, userId, academicYear(tokyoTime(Date.now()).date));
+}
+
+const termsQuery = (db: Db, timetableId: string) =>
+	db
+		.select({
+			id: terms.id,
+			name: terms.name,
+			groupName: terms.groupName,
+			startDate: terms.startDate,
+			endDate: terms.endDate
+		})
+		.from(terms)
+		.where(eq(terms.timetableId, timetableId))
+		.orderBy(asc(terms.sortOrder));
+
+const periodsQuery = (db: Db, timetableId: string) =>
+	db
+		.select({ number: periods.number, start: periods.startTime, end: periods.endTime })
+		.from(periods)
+		.where(eq(periods.timetableId, timetableId))
+		.orderBy(asc(periods.number));
+
+// Terms and periods, for forms that place a course in the timetable
+export async function loadShape(db: Db, timetableId: string) {
+	const [termRows, periodRows] = await db.batch([termsQuery(db, timetableId), periodsQuery(db, timetableId)]);
+	return { terms: termRows, periods: periodRows };
+}
+
 const words = new Intl.Segmenter('ja', { granularity: 'word' });
 const OPENING_BRACKET = /[（(「『【［\[〈《〔]$/u;
 
 // Where a course title may wrap: between words, with one-character pieces (学, Ⅱ, A, ）)
 // kept on the word before and opening brackets on the word after,
 // e.g. 統計学|入門, 線形|代数Ⅱ, 映像|表現論|（前半）. BudouX keeps such compounds whole.
-function titleParts(title: string) {
+export function titleParts(title: string) {
 	const parts: string[] = [];
 	for (const { segment } of words.segment(title)) {
 		const prev = parts.at(-1);
@@ -92,24 +123,17 @@ function titleParts(title: string) {
 
 export async function loadTimetable(db: Db, timetableId: string) {
 	const [termRows, periodRows, courseRows, termLinks, slotRows] = await db.batch([
+		termsQuery(db, timetableId),
+		periodsQuery(db, timetableId),
 		db
 			.select({
-				id: terms.id,
-				name: terms.name,
-				groupName: terms.groupName,
-				startDate: terms.startDate,
-				endDate: terms.endDate
+				id: courses.id,
+				title: courses.title,
+				color: courses.color,
+				delivery: courses.delivery,
+				intensiveFrom: courses.intensiveFrom,
+				intensiveTo: courses.intensiveTo
 			})
-			.from(terms)
-			.where(eq(terms.timetableId, timetableId))
-			.orderBy(asc(terms.sortOrder)),
-		db
-			.select({ number: periods.number, start: periods.startTime, end: periods.endTime })
-			.from(periods)
-			.where(eq(periods.timetableId, timetableId))
-			.orderBy(asc(periods.number)),
-		db
-			.select({ id: courses.id, title: courses.title, color: courses.color })
 			.from(courses)
 			.where(eq(courses.timetableId, timetableId))
 			.orderBy(asc(courses.createdAt)),
