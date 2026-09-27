@@ -14,7 +14,7 @@
 	// Sign-in mail goes out through the シンレンタルサーバー SMTP server.
 	// The password is a secret: `npx wrangler secret put SMTP_PASSWORD`.
 	"vars": {
-		"SMTP_HOST": "",
+		"SMTP_HOST": "sv3021.wpx.ne.jp",
 		"SMTP_PORT": "465",
 		"MAIL_FROM": "noreply@koma.tomakura.com"
 	},
