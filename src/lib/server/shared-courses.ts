@@ -116,7 +116,9 @@ function insertDetails(db: Db, sharedCourseId: string, v: SharedValues): BatchIt
 }
 
 // Statements that add the course to the shared data, or bring the shared course up to date
-// and record the change. Nothing is written when the values are unchanged.
+// and record the change. Nothing is written when the values are unchanged (`changed` is false).
+// An update only applies to the version that was read; if someone saved in between, the batch
+// fails at the guard below and D1 rolls all of it back.
 export function writeShared(
 	db: Db,
 	{
@@ -134,7 +136,7 @@ export function writeShared(
 		existing: SharedCourse | null;
 		values: SharedValues;
 	}
-): { id: string; statements: BatchItem<'sqlite'>[] } {
+): { id: string; changed: boolean; statements: BatchItem<'sqlite'>[] } {
 	const after = normalize(values);
 	const fields = {
 		title: after.title,
@@ -144,14 +146,19 @@ export function writeShared(
 	};
 
 	if (existing) {
-		if (JSON.stringify(existing.values) === JSON.stringify(after)) return { id: existing.id, statements: [] };
+		if (JSON.stringify(existing.values) === JSON.stringify(after)) {
+			return { id: existing.id, changed: false, statements: [] };
+		}
 		return {
 			id: existing.id,
+			changed: true,
 			statements: [
 				db
 					.update(sharedCourses)
 					.set({ ...fields, version: existing.version + 1, updatedAt: new Date() })
-					.where(eq(sharedCourses.id, existing.id)),
+					.where(and(eq(sharedCourses.id, existing.id), eq(sharedCourses.version, existing.version))),
+				// SQLite has no RAISE outside triggers; json() on bad input is an error that stops the batch.
+				db.run(sql`select json(case when changes() = 1 then 'true' else 'version conflict' end)`),
 				db.delete(sharedCourseSlots).where(eq(sharedCourseSlots.sharedCourseId, existing.id)),
 				db.delete(sharedCourseTeachers).where(eq(sharedCourseTeachers.sharedCourseId, existing.id)),
 				...insertDetails(db, existing.id, after),
@@ -165,6 +172,7 @@ export function writeShared(
 	const id = crypto.randomUUID();
 	return {
 		id,
+		changed: true,
 		statements: [
 			db
 				.insert(sharedCourses)

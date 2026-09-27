@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		sync: {
 			canSync: !!timetable.universityId,
 			year: timetable.year,
-			shared: shared && { id: shared.id, source: shared.source, values: shared.values }
+			shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values }
 		},
 		initial: {
 			...values,
@@ -62,13 +62,14 @@ export const actions: Actions = {
 		const shape = await loadShape(locals.db, timetable.id);
 		const parsed = parseCourseForm(await request.formData(), shapeOf(shape));
 		if ('message' in parsed) return fail(400, { message: parsed.message });
-		await saveCourse(locals.db, {
+		const saved = await saveCourse(locals.db, {
 			userId: locals.user.id,
 			timetable,
 			terms: shape.terms,
 			courseId: null,
 			input: parsed.input
 		});
+		if ('message' in saved) return fail(409, { message: saved.message });
 		redirect(303, timetableHref(url.searchParams.get('term')));
 	}
 };

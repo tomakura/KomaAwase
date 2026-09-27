@@ -162,7 +162,10 @@ export const courses = sqliteTable(
 		intensiveTo: text('intensive_to'),
 		createdAt: createdAt()
 	},
-	(t) => [index('courses_timetable_idx').on(t.timetableId)]
+	(t) => [
+		index('courses_timetable_idx').on(t.timetableId),
+		index('courses_shared_course_idx').on(t.sharedCourseId)
+	]
 );
 
 export const courseTerms = sqliteTable(

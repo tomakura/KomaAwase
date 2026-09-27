@@ -17,13 +17,14 @@ export const actions: Actions = {
 		if (!loaded) error(404, '授業が見つかりません');
 		const parsed = parseCourseForm(await request.formData(), shapeOf(loaded));
 		if ('message' in parsed) return fail(400, { message: parsed.message });
-		await saveCourse(locals.db, {
+		const saved = await saveCourse(locals.db, {
 			userId: locals.user.id,
 			timetable: loaded.timetable,
 			terms: loaded.terms,
 			courseId: params.id,
 			input: parsed.input
 		});
+		if ('message' in saved) return fail(409, { message: saved.message });
 		redirect(303, courseHref(params.id, url.searchParams.get('term')));
 	},
 	delete: async ({ locals, params, url, platform }) => {

@@ -20,7 +20,7 @@
 		canSync: boolean;
 		year: number;
 		// The shared course this one is linked to
-		shared: { id: string; source: 'syllabus' | 'user'; values: SharedValues } | null;
+		shared: { id: string; source: 'syllabus' | 'user'; version: number; values: SharedValues } | null;
 	};
 
 	let {
@@ -161,7 +161,10 @@
 			</div>
 		{/if}
 		<input type="hidden" name="sync" value={sync.canSync ? v.syncMode : 'personal'} />
-		{#if sync.shared}<input type="hidden" name="shared_id" value={sync.shared.id} />{/if}
+		{#if sync.shared}
+			<input type="hidden" name="shared_id" value={sync.shared.id} />
+			<input type="hidden" name="shared_version" value={sync.shared.version} />
+		{/if}
 
 		{#if message}<p class="error" role="alert">{message}</p>{/if}
 

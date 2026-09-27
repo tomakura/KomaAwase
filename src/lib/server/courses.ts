@@ -29,6 +29,7 @@ export type CourseInput = {
 	intensiveTo: string | null;
 	syncMode: 'synced' | 'personal';
 	sharedCourseId: string | null; // the shared course it came from, if any
+	sharedVersion: number | null; // the version of it the form showed
 };
 
 // What a submitted course is checked against
@@ -57,9 +58,11 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		return { message: '開講する学期を選んでください' };
 	}
 
+	const version = Number(form.get('shared_version'));
 	const sync = {
 		syncMode: form.get('sync') === 'synced' ? ('synced' as const) : ('personal' as const),
-		sharedCourseId: String(form.get('shared_id') ?? '') || null
+		sharedCourseId: String(form.get('shared_id') ?? '') || null,
+		sharedVersion: Number.isInteger(version) && version > 0 ? version : null
 	};
 
 	if (form.get('unscheduled') === 'on') {
@@ -121,9 +124,13 @@ export async function nextColor(db: Db, timetableId: string) {
 	return colors[(row?.n ?? 0) % colors.length].id;
 }
 
+const CONFLICT =
+	'ほかの人が先にこの授業を直しました。画面を読み込み直すと最新の内容になるので、もう一度直して保存してください';
+
 // Saves the course in the timetable. A synced course also adds itself to the shared data, or
 // updates the shared course it is linked to. The local copy is always written, so switching to
-// 自分だけで使う keeps the latest values.
+// 自分だけで使う keeps the latest values. Returns a message instead when the shared course
+// changed after the form was opened, so nobody overwrites an edit they haven't seen.
 export async function saveCourse(
 	db: Db,
 	{
@@ -160,6 +167,9 @@ export async function saveCourse(
 			existing,
 			values: input
 		});
+		if (written.changed && existing && input.sharedVersion !== null && input.sharedVersion !== existing.version) {
+			return { message: CONFLICT };
+		}
 		sharedCourseId = written.id;
 		shared.push(...written.statements);
 	}
@@ -203,14 +213,21 @@ export async function saveCourse(
 				.values(input.teachers.map((name, sortOrder) => ({ courseId: id, name, sortOrder })))
 		);
 	}
-	await db.batch([
-		courseId
-			? db.update(courses).set(values).where(eq(courses.id, id))
-			: db.insert(courses).values({ id, timetableId: timetable.id, ...values }),
-		...shared,
-		...rest
-	]);
-	return id;
+	try {
+		await db.batch([
+			courseId
+				? db.update(courses).set(values).where(eq(courses.id, id))
+				: db.insert(courses).values({ id, timetableId: timetable.id, ...values }),
+			...shared,
+			...rest
+		]);
+	} catch (e) {
+		// Someone saved the shared course between reading it and writing (the batch was rolled back).
+		const now = existing && (await loadSharedCourse(db, existing.id));
+		if (now && now.version !== existing.version) return { message: CONFLICT };
+		throw e;
+	}
+	return { id };
 }
 
 // The course, only if it is in one of the user's timetables
@@ -273,7 +290,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 			termIds: termLinks.map((l) => l.termId),
 			syncMode: course.syncMode
 		},
-		shared: shared && { id: shared.id, source: shared.source, values: shared.values },
+		shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values },
 		notes
 	};
 }
