@@ -44,7 +44,7 @@
 
 - Groq の画像は1枚2,048トークン。指示文と出力を足して1回3,000〜4,000トークンくらい
 - Workers AI は小さいモデルなので日本語の精度は要確認。**実際のスクショを10枚くらい集めて読み比べてから決める**
-- Workers AI の `llama-3.2-11b-vision-instruct` は、Meta License と Acceptable Use Policy への同意が必要。**本番で予備として使う前に、`"prompt": "agree"` のリクエストを1回送って同意を済ませておく**（[モデルのページ](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/)）
+- Workers AI の `llama-3.2-11b-vision-instruct` は、Meta License と Acceptable Use Policy への同意が必要。**本番で予備として使う前に、`"prompt": "agree"` のリクエストを1回送って同意を済ませておく**（[モデルのページ](https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/)）。同意していないアカウントではモデルの呼び出しがエラーになり、予備として働かない
 - Groq はダッシュボードの Data Controls でゼロデータ保持（ZDR）を有効にして使う。本番の前に有効になっていることを確認する
 - 使わないもの：Mistral の無料枠（評価・試作用で、初期設定だと学習に使われる）、GitHub Models（試作用で本番利用は規約違反）、Gemini と OpenAI の無料枠（学習に使われる）
 
