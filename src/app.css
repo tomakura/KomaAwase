@@ -8,6 +8,8 @@
 	--line: #e4ddcf;
 	--line-strong: #d8d0c0;
 	--slot: #ede7da;
+	--slot-today: #e6dac4;
+	--now-text: #7a3016;
 	--shu: #d9653b;
 	--ai: #3569a8;
 	--accent-text: #b9502b;
@@ -23,6 +25,12 @@
 	--course-indigo: #e0e1f4;
 	--course-purple: #efe3f3;
 	--course-gray: #ede7da;
+
+	/* The course in session fills with a deeper shade of its color: oklch(from color l+dl c+dc h) */
+	--live-fill-dl: -0.07;
+	--live-fill-dc: 0.045;
+	--live-text-l: 0.4;
+	--live-text-dc: 0.03;
 
 	--font-display: 'Zen Maru Gothic', sans-serif;
 	--font-body: 'Zen Kaku Gothic New', sans-serif;
@@ -40,6 +48,8 @@
 		--line: #3a3531;
 		--line-strong: #4a443d;
 		--slot: #2e2a26;
+		--slot-today: #3a3329;
+		--now-text: #f4c3a9;
 		--shu: #e27a52;
 		--ai: #5b8bc7;
 		--accent-text: #ee9670;
@@ -56,6 +66,11 @@
 		--course-purple: #3b2d44;
 		--course-gray: #3d3934;
 
+		--live-fill-dl: 0.12;
+		--live-fill-dc: 0.025;
+		--live-text-l: 0.9;
+		--live-text-dc: 0.04;
+
 		color-scheme: dark;
 	}
 }
@@ -69,6 +84,8 @@
 	--line: #3a3531;
 	--line-strong: #4a443d;
 	--slot: #2e2a26;
+	--slot-today: #3a3329;
+	--now-text: #f4c3a9;
 	--shu: #e27a52;
 	--ai: #5b8bc7;
 	--accent-text: #ee9670;
@@ -84,6 +101,11 @@
 	--course-indigo: #2f3154;
 	--course-purple: #3b2d44;
 	--course-gray: #3d3934;
+
+	--live-fill-dl: 0.12;
+	--live-fill-dc: 0.025;
+	--live-text-l: 0.9;
+	--live-text-dc: 0.04;
 
 	color-scheme: dark;
 }

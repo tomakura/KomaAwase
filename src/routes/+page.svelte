@@ -1,7 +1,7 @@
 <script lang="ts">
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { courseColor } from '$lib/courses';
-	import { tokyoTime } from '$lib/time';
+	import { toMinutes, tokyoTime } from '$lib/time';
 
 	let { data } = $props();
 
@@ -20,10 +20,43 @@
 	let termId = $state(initialTerm());
 	const term = $derived(data.terms.find((t) => t.id === termId));
 
+	// Starts at the server's time so hydration matches, then follows the browser's clock.
+	// svelte-ignore state_referenced_locally
+	let now = $state(data.now);
+	$effect(() => {
+		const tick = () => (now = Date.now());
+		tick();
+		const timer = setInterval(tick, 30_000);
+		document.addEventListener('visibilitychange', tick);
+		return () => {
+			clearInterval(timer);
+			document.removeEventListener('visibilitychange', tick);
+		};
+	});
+	const clock = $derived(tokyoTime(now));
+	// Classes are only on in a term that includes today; a term without dates always is.
+	const termIsOn = $derived(
+		!!term &&
+			(!term.startDate || !term.endDate || (term.startDate <= clock.date && clock.date <= term.endDate))
+	);
+
 	const days = $derived(data.days.toSorted((a, b) => a - b));
 	const rowOf = $derived(new Map(data.periods.map((p, i) => [p.number, i + 2])));
 	const colOf = $derived(new Map(days.map((d, i) => [d, i + 2])));
 	const lastRow = $derived(data.periods.length + 1);
+	const todayShown = $derived(colOf.has(clock.weekday));
+	const isNow = (start: string, end: string) =>
+		toMinutes(start) <= clock.minutes && clock.minutes < toMinutes(end);
+
+	// Progress (0-1) and minutes left while a slot is in session, from its first period's
+	// start to its last period's end.
+	function session(weekday: number, row: number, span: number) {
+		if (!termIsOn || weekday !== clock.weekday) return null;
+		const start = toMinutes(data.periods[row - 2].start);
+		const end = toMinutes(data.periods[row - 2 + span - 1].end);
+		if (clock.minutes < start || clock.minutes >= end) return null;
+		return { progress: (clock.minutes - start) / (end - start), left: Math.ceil(end - clock.minutes) };
+	}
 
 	const termCourses = $derived(data.courses.filter((c) => termId && c.termIds.includes(termId)));
 	const cells = $derived(
@@ -32,14 +65,15 @@
 				const row = rowOf.get(slot.period);
 				const col = colOf.get(slot.weekday);
 				if (!row || !col) return [];
-				return [{ course, slot, row, col, span: Math.min(slot.span, lastRow - row + 1) }];
+				const span = Math.min(slot.span, lastRow - row + 1);
+				return [{ course, slot, row, col, span, live: session(slot.weekday, row, span) }];
 			})
 		)
 	);
 	const unscheduled = $derived(termCourses.filter((c) => c.slots.length === 0));
 
 	// 8:40, not 08:40
-	const clock = (hhmm: string) => hhmm.replace(/^0/, '');
+	const time = (hhmm: string) => hhmm.replace(/^0/, '');
 </script>
 
 <svelte:head>
@@ -80,30 +114,44 @@
 
 		<div class="grid" style:--days={days.length} style:--periods={data.periods.length}>
 			{#each days as day, i (day)}
-				<div class="day" style:grid-column={i + 2}>{DAY_NAMES[day]}</div>
+				<div class="day" style:grid-column={i + 2}>
+					{#if day === clock.weekday}
+						<span class="today-mark" aria-label="{DAY_NAMES[day]}曜日（今日）">{DAY_NAMES[day]}</span>
+					{:else}
+						{DAY_NAMES[day]}
+					{/if}
+				</div>
 			{/each}
 
 			{#each data.periods as p, i (p.number)}
-				<div class="period" style:grid-row={i + 2}>
+				<div class="period" class:now={todayShown && isNow(p.start, p.end)} style:grid-row={i + 2}>
 					<span class="number">{p.number}</span>
-					<span class="start">{clock(p.start)}</span>
-					<span class="end">{clock(p.end)}</span>
+					<span class="start">{time(p.start)}</span>
+					<span class="end">{time(p.end)}</span>
 				</div>
 				{#each days as day, j (day)}
-					<div class="slot" style:grid-row={i + 2} style:grid-column={j + 2}></div>
+					<div
+						class="slot"
+						class:today={day === clock.weekday}
+						style:grid-row={i + 2}
+						style:grid-column={j + 2}
+					></div>
 				{/each}
 			{/each}
 
-			{#each cells as { course, slot, row, col, span } (`${course.id}-${slot.weekday}-${slot.period}`)}
+			{#each cells as { course, slot, row, col, span, live } (`${course.id}-${slot.weekday}-${slot.period}`)}
 				<div
 					class="course"
+					class:live
 					style:grid-row="{row} / span {span}"
 					style:grid-column={col}
 					style:--c={courseColor(course.color)}
+					style:--progress={live ? `${live.progress * 100}%` : undefined}
 				>
 					<span class="title">
 						{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}
 					</span>
+					{#if live}<span class="left">あと{live.left}分</span>{/if}
 					{#if slot.room}<span class="room">{slot.room}</span>{/if}
 				</div>
 			{/each}
@@ -270,9 +318,34 @@
 		color: var(--ink-sub);
 	}
 
+	.period.now {
+		background: var(--course-orange);
+		color: var(--now-text);
+	}
+
+	.period.now span {
+		color: inherit;
+	}
+
+	.today-mark {
+		width: 24px;
+		height: 24px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 12px;
+		background: var(--ink);
+		color: var(--surface);
+		font-weight: 700;
+	}
+
 	.slot {
 		border-radius: 8px;
 		background: var(--slot);
+	}
+
+	.slot.today {
+		background: var(--slot-today);
 	}
 
 	.course {
@@ -285,6 +358,21 @@
 		border-radius: 8px;
 		background: var(--c);
 		overflow: hidden;
+	}
+
+	/* The cell itself is the progress bar, filling from the top. */
+	.course.live {
+		--fill: oklch(from var(--c) calc(l + var(--live-fill-dl)) calc(c + var(--live-fill-dc)) h);
+		background-image: linear-gradient(to bottom, var(--fill) var(--progress), var(--c) var(--progress));
+		box-shadow: inset 0 0 0 2px var(--ink);
+	}
+
+	.left {
+		flex-shrink: 0;
+		align-self: center;
+		font-size: 10px;
+		font-weight: 700;
+		color: oklch(from var(--c) var(--live-text-l) calc(c + var(--live-text-dc)) h);
 	}
 
 	/* A long title is cut off rather than pushing the room out of the cell. */
