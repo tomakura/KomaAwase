@@ -81,6 +81,20 @@ Queues のメッセージは24時間で消えるので、再挑戦は Queues に
 
 AI の読み取りは間違えることがある。画面と規約の両方で、保存前に見直すよう明記する。
 
+## 回数制限
+
+| どこで | 何を | 上限 |
+|---|---|---|
+| Cloudflare WAF（Rate limiting rules） | `koma.tomakura.com` への `POST /login` と `POST /api/passkey/login/options` | IP ごとに10秒で10回。超えたら10秒ブロック（429） |
+| D1 | 同じメールアドレスの未使用ログインリンク | 3つまで |
+| Workers の Rate Limiting バインディング | 上と同じ入口（IP ごと） | 設定はしているが、本番では効いていなかった（同じ IP・拠点から25回送っても全部 success）。WAF のルールで代わりに守っている |
+
+WAF のルールはダッシュボードで設定していて、リポジトリには入っていない。条件式は次のとおり。
+
+```text
+(http.host eq "koma.tomakura.com" and http.request.uri.path in {"/api/passkey/login/options" "/login"} and http.request.method eq "POST")
+```
+
 ## プライバシー
 
 - 時間割は初期状態で非公開。承認した友だちと、見せると選んだグループだけに見える
