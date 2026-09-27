@@ -11,6 +11,8 @@ Cloudflare Workers からはシンレンタルサーバーの SMTP に接続で�
 
 - `koma-relay-secret.php` は Git に入れない。`koma-relay-secret.example.php` を元に作り、中身は Worker の `RELAY_SECRET` と同じ値にする
 - PHP 8 以上と mbstring が必要（シンは標準で入っている）
+- 中継は `send.php` の `ALLOWED_LINK_PREFIXES` にある本番の URL のリンクしか受け付けない。Cloudflare のプレビュー URL は本番の D1 と鍵を共有してしまうので、`wrangler.jsonc` で無効にしている
+- アプリの URL を増やしたり変えたりしたときは、`ALLOWED_LINK_PREFIXES` も直してアップロードし直す
 
 ## 鍵を作り直すとき
 

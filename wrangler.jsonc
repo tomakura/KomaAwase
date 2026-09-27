@@ -16,7 +16,9 @@
 		"RELAY_URL": "https://tomakura.com/koma-relay/send.php"
 	},
 	"workers_dev": true,
-	"preview_urls": true,
+	// Preview versions would share the production D1 and secrets, and the mail relay only
+	// accepts production sign-in links, so previews stay off.
+	"preview_urls": false,
 	"d1_databases": [
 		{
 			"binding": "DB",
