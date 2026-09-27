@@ -24,14 +24,19 @@ erDiagram
 | `TIMETABLES` | user_id, university_id, year, name, archived | 年度ごとに1つ（user_id と year で一意）。古いものは `archived` にして残す。はじめて開いたときに大学のひな形から作る |
 | `TERMS` | timetable_id, name, group_name, start_date, end_date, sort_order | 前期・Q1 など。`group_name` はタブの上に出すまとまり（Q1・Q2 なら前期）。大学のひな形からコピーして、本人が変えられる |
 | `PERIODS` | timetable_id, number, start_time, end_time | 0限や7限もあり得る |
-| `COURSES` | timetable_id, shared_course_id, sync_mode, title, color | `sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ） |
+| `COURSES` | timetable_id, shared_course_id, sync_mode, title, color, delivery, intensive_from, intensive_to | `sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ）。`delivery` は枠のない授業の形（`ondemand` か `intensive`）で、集中講義は期間も持てる。`shared_course_id` は外部キーにしていない（あとから足すとテーブルを作り直すことになるうえ、共有授業は消さないので） |
 | `COURSE_TERMS` | course_id, term_id | 授業と学期は多対多。「Q1とQ2」「通年」を表せる |
 | `COURSE_SLOTS` | course_id, weekday, period_number, span, week_pattern, room | 週2回なら2行。`span` は連続コマ数、`week_pattern` は毎週・奇数週・偶数週。**教室は枠ごと**。枠が0行の授業はオンデマンド・集中講義 |
 | `COURSE_TEACHERS` | course_id, name, sort_order | 先生は何人でも |
-| `COURSE_NOTES` | course_id, kind, date, body, due, done | `kind` はメモ・課題・休講。授業につながるので、どの枠から開いても同じ |
+| `COURSE_NOTES` | course_id, kind, date, body, due, done | `kind` は `memo`・`task`・`cancel`。`date` はメモの日付か休講の日、`due` は課題の締切。授業につながるので、どの枠から開いても同じ |
 | `COURSE_FILES` | course_id, r2_key, name, size | 資料。実体は R2 |
 
-同期している授業（`synced`）は、授業名・先生・曜日時限・教室を `SHARED_COURSES` から読む。色・メモ・資料・課題は本人のもの。
+同期している授業（`synced`）は、授業名・先生・曜日時限・教室・授業の形を `SHARED_COURSES` から読む。色・取る学期・メモ・資料・課題は本人のもの。
+
+- 保存するときは、自分の行（`COURSES` など）にも必ず同じ内容を書く。あとで「自分だけで使う」に切り替えても、最後に見ていた内容が残る
+- 同期中に保存すると、中身が変わったときだけ共有授業を更新し、`version` を1つ上げて `SHARED_COURSE_EDITS` に前後の値を残す
+- 「自分だけで使う」から同期に戻すと、フォームは共有授業の値に戻る。自分用に変えた内容で共有データを上書きしないため
+- 自分で入力した授業も、初期値は「みんなと同期する」。同じ大学の人が「授業をさがす」で選べるようになる
 
 ## 共有授業データ
 
@@ -46,12 +51,14 @@ erDiagram
 | テーブル | 主な列 | メモ |
 |---|---|---|
 | `UNIVERSITIES` | name, email_domains, term_preset, period_preset | `email_domains` は完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期と時限のひな形を持つ。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する） |
-| `SHARED_COURSES` | university_id, year, code, title, term_label, source, version | `code` はシラバスの授業コード。`source` は `syllabus` か `user` |
+| `SHARED_COURSES` | university_id, year, code, title, terms, delivery, intensive_from, intensive_to, source, version | `code` はシラバスの授業コード。`source` は `syllabus` か `user`。`terms` は開講する学期の名前（Q3 など）で、登録したときの値のまま変えない（Q3 だけ取る人の保存で「Q3・Q4 の授業」が書き換わらないように）。「授業をさがす」で学期をしぼるのに使う |
 | `SHARED_COURSE_SLOTS` | shared_course_id, weekday, period_number, span, room | シラバスに教室がない大学は、みんなの登録で埋める |
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |
 | `SHARED_COURSE_EDITS` | shared_course_id, user_id, diff, created_at | 変更履歴。元に戻せるようにする |
 
-共有データを直せるのは、その大学の在籍確認バッジを持つ人だけにする予定（細かいルールは未決）。
+共有データを直せるのは、その大学の在籍確認バッジを持つ人だけにする予定（細かいルールは未決）。在籍確認ができるまでは、その大学の時間割を持つ人ならだれでも直せる。変更はすべて `SHARED_COURSE_EDITS` に残るので、荒らされても戻せる。
+
+「授業をさがす」は、同じ大学・年度の共有授業から、タップした曜日・時限にあって選んでいる学期に開講するものを出す（名前で検索したときは学期でしぼらない）。自分の時間割にもう入れた授業は出さない。D1 は1つのクエリに値を100個までしか渡せないので、候補は60件までにしている。
 
 ## アカウント・友だち
 
