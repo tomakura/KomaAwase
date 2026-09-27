@@ -52,11 +52,16 @@ export async function sendSignInEmail(env: Env, to: string, link: string) {
 
 	// Imported lazily so the Node dev server never loads cloudflare:sockets.
 	const { WorkerMailer } = await import('worker-mailer');
+	const port = Number(env.SMTP_PORT);
 	await WorkerMailer.send(
 		{
 			host: env.SMTP_HOST,
-			port: Number(env.SMTP_PORT),
-			secure: true,
+			port,
+			// 465 is TLS from the start; 587 upgrades with STARTTLS.
+			secure: port === 465,
+			startTls: true,
+			socketTimeoutMs: 10_000,
+			responseTimeoutMs: 10_000,
 			credentials: { username: env.MAIL_FROM, password: env.SMTP_PASSWORD },
 			authType: ['plain', 'login']
 		},
