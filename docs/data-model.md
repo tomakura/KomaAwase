@@ -29,7 +29,7 @@ erDiagram
 | `COURSE_SLOTS` | course_id, weekday, period_number, span, week_pattern, room | 週2回なら2行。`span` は連続コマ数、`week_pattern` は毎週・奇数週・偶数週。**教室は枠ごと**。枠が0行の授業はオンデマンド・集中講義 |
 | `COURSE_TEACHERS` | course_id, name, sort_order | 先生は何人でも |
 | `COURSE_NOTES` | course_id, kind, date, body, due, done | `kind` は `memo`・`task`・`cancel`。`date` はメモの日付か休講の日、`due` は課題の締切。授業につながるので、どの枠から開いても同じ |
-| `COURSE_FILES` | course_id, r2_key, name, size | 資料。実体は R2 |
+| `COURSE_FILES` | course_id, storage_key, name, mime, size | 資料。実体はシンレンタルサーバー（`relay/files.php`）に `storage_key` の名前で置く。本人しか見られない |
 
 同期している授業（`synced`）は、授業名・先生・曜日時限・教室・授業の形を `SHARED_COURSES` から読む。色・取る学期・メモ・資料・課題は本人のもの。
 
@@ -96,7 +96,7 @@ erDiagram
 | データ | 扱い |
 |---|---|
 | アカウント、パスキー、在籍確認 | 消す |
-| 時間割、授業、メモ・資料・課題、R2 のファイル | 消す |
+| 時間割、授業、メモ・資料・課題、シンに置いた資料のファイル | 消す。ファイルは D1 の行より先に消す |
 | 友だち、ブロック、グループの所属 | 消す。自分が持ち主のグループは、ほかのメンバーに引き継ぐか、いなければ消す |
 | 通報・フィードバック | 送った人の情報を外して残す |
 | 共有授業データ（`SHARED_COURSES`） | ほかの人も使っているので**消さない** |
