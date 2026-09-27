@@ -1,8 +1,8 @@
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { academicYear } from '$lib/time';
 import type { Db } from './db';
-import { periods, terms, timetables, universities } from './db/schema';
+import { courseSlots, courseTerms, courses, periods, terms, timetables, universities } from './db/schema';
 
 // The only preset so far. Picking a university comes with the setup screen.
 const DEFAULT_UNIVERSITY_ID = 'dhw';
@@ -69,4 +69,76 @@ export async function getOrCreateTimetable(db: Db, userId: string, year: number)
 		throw e;
 	}
 	return { id: timetableId, year };
+}
+
+const words = new Intl.Segmenter('ja', { granularity: 'word' });
+const OPENING_BRACKET = /[（(「『【［\[〈《〔]$/u;
+
+// Where a course title may wrap: between words, with one-character pieces (学, Ⅱ, A, ）)
+// kept on the word before and opening brackets on the word after,
+// e.g. 統計学|入門, 線形|代数Ⅱ, 映像|表現論|（前半）. BudouX keeps such compounds whole.
+function titleParts(title: string) {
+	const parts: string[] = [];
+	for (const { segment } of words.segment(title)) {
+		const prev = parts.at(-1);
+		const joins =
+			prev !== undefined &&
+			(OPENING_BRACKET.test(prev) || ([...segment].length === 1 && !OPENING_BRACKET.test(segment)));
+		if (joins) parts[parts.length - 1] += segment;
+		else parts.push(segment);
+	}
+	return parts;
+}
+
+export async function loadTimetable(db: Db, timetableId: string) {
+	const [termRows, periodRows, courseRows, termLinks, slotRows] = await db.batch([
+		db
+			.select({
+				id: terms.id,
+				name: terms.name,
+				groupName: terms.groupName,
+				startDate: terms.startDate,
+				endDate: terms.endDate
+			})
+			.from(terms)
+			.where(eq(terms.timetableId, timetableId))
+			.orderBy(asc(terms.sortOrder)),
+		db
+			.select({ number: periods.number, start: periods.startTime, end: periods.endTime })
+			.from(periods)
+			.where(eq(periods.timetableId, timetableId))
+			.orderBy(asc(periods.number)),
+		db
+			.select({ id: courses.id, title: courses.title, color: courses.color })
+			.from(courses)
+			.where(eq(courses.timetableId, timetableId))
+			.orderBy(asc(courses.createdAt)),
+		db
+			.select({ courseId: courseTerms.courseId, termId: courseTerms.termId })
+			.from(courseTerms)
+			.innerJoin(courses, eq(courseTerms.courseId, courses.id))
+			.where(eq(courses.timetableId, timetableId)),
+		db
+			.select({
+				courseId: courseSlots.courseId,
+				weekday: courseSlots.weekday,
+				period: courseSlots.periodNumber,
+				span: courseSlots.span,
+				room: courseSlots.room
+			})
+			.from(courseSlots)
+			.innerJoin(courses, eq(courseSlots.courseId, courses.id))
+			.where(eq(courses.timetableId, timetableId))
+	]);
+
+	return {
+		terms: termRows,
+		periods: periodRows,
+		courses: courseRows.map((c) => ({
+			...c,
+			titleParts: titleParts(c.title),
+			termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
+			slots: slotRows.filter((s) => s.courseId === c.id).map(({ courseId: _, ...s }) => s)
+		}))
+	};
 }

@@ -3,12 +3,15 @@
 	--bg: #f6f2ea;
 	--surface: #fffdf8;
 	--ink: #2b2824;
+	--ink-soft: #4a443c;
 	--ink-sub: #6b645a;
 	--line: #e4ddcf;
+	--line-strong: #d8d0c0;
 	--slot: #ede7da;
 	--shu: #d9653b;
 	--ai: #3569a8;
 	--accent-text: #b9502b;
+	--logo-blend: multiply;
 
 	--course-red: #f8dcdc;
 	--course-orange: #fbe3d6;
@@ -32,12 +35,15 @@
 		--bg: #1c1a18;
 		--surface: #2a2724;
 		--ink: #eee7da;
+		--ink-soft: #c9c1b3;
 		--ink-sub: #a39b8e;
 		--line: #3a3531;
+		--line-strong: #4a443d;
 		--slot: #2e2a26;
 		--shu: #e27a52;
 		--ai: #5b8bc7;
 		--accent-text: #ee9670;
+		--logo-blend: screen;
 
 		--course-red: #4e2b2e;
 		--course-orange: #4d3024;
@@ -58,12 +64,15 @@
 	--bg: #1c1a18;
 	--surface: #2a2724;
 	--ink: #eee7da;
+	--ink-soft: #c9c1b3;
 	--ink-sub: #a39b8e;
 	--line: #3a3531;
+	--line-strong: #4a443d;
 	--slot: #2e2a26;
 	--shu: #e27a52;
 	--ai: #5b8bc7;
 	--accent-text: #ee9670;
+	--logo-blend: screen;
 
 	--course-red: #4e2b2e;
 	--course-orange: #4d3024;
@@ -89,6 +98,15 @@ body {
 
 a {
 	color: var(--accent-text);
+}
+
+/* A page with the bottom menu */
+.screen {
+	max-width: 480px;
+	min-height: 100svh;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
 }
 
 .btn {
