@@ -210,6 +210,25 @@ export const courseTeachers = sqliteTable(
 	(t) => [index('course_teachers_course_idx').on(t.courseId)]
 );
 
+// Memos, tasks and cancellations. They belong to the course, so every slot shows the same ones.
+export const courseNotes = sqliteTable(
+	'course_notes',
+	{
+		id: id(),
+		courseId: text('course_id')
+			.notNull()
+			.references(() => courses.id, { onDelete: 'cascade' }),
+		kind: text('kind', { enum: ['memo', 'task', 'cancel'] }).notNull(),
+		// memo: the day it is about; cancel: the day the class is cancelled (YYYY-MM-DD)
+		date: text('date'),
+		body: text('body').notNull().default(''),
+		due: text('due'), // task, YYYY-MM-DD
+		done: integer('done', { mode: 'boolean' }).notNull().default(false),
+		createdAt: createdAt()
+	},
+	(t) => [index('course_notes_course_idx').on(t.courseId)]
+);
+
 // --- shared course data, per university and year ---
 
 export const sharedCourses = sqliteTable(

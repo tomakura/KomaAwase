@@ -8,16 +8,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user.nickname) redirect(303, '/welcome');
 	// Passed down so the first render in the browser matches the server's.
 	const now = Date.now();
-	const timetable = await getOrCreateTimetable(
-		locals.db,
-		locals.user.id,
-		academicYear(tokyoTime(now).date)
-	);
+	const today = tokyoTime(now).date;
+	const timetable = await getOrCreateTimetable(locals.db, locals.user.id, academicYear(today));
 	return {
 		now,
 		termParam: url.searchParams.get('term'),
 		year: timetable.year,
 		days: locals.user.daysShown,
-		...(await loadTimetable(locals.db, timetable.id))
+		...(await loadTimetable(locals.db, timetable.id, today))
 	};
 };

@@ -5,6 +5,7 @@ import { COURSE_COLORS, isCourseColor, type Delivery } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
+import { loadNotes } from './notes';
 import { loadSharedCourse, writeShared } from './shared-courses';
 import { loadShape, titleParts } from './timetable';
 
@@ -212,7 +213,7 @@ export async function saveCourse(
 }
 
 // The course, only if it is in one of the user's timetables
-function findOwnedCourse(db: Db, userId: string, courseId: string) {
+export function findOwnedCourse(db: Db, userId: string, courseId: string) {
 	return db
 		.select({
 			course: courses,
@@ -228,9 +229,10 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	const row = await findOwnedCourse(db, userId, courseId);
 	if (!row) return null;
 	const { course } = row;
-	const [shape, shared, [termLinks, slotRows, teacherRows]] = await Promise.all([
+	const [shape, shared, notes, [termLinks, slotRows, teacherRows]] = await Promise.all([
 		loadShape(db, row.timetable.id),
 		course.sharedCourseId ? loadSharedCourse(db, course.sharedCourseId) : null,
+		loadNotes(db, courseId),
 		db.batch([
 			db.select({ termId: courseTerms.termId }).from(courseTerms).where(eq(courseTerms.courseId, courseId)),
 			db
@@ -270,7 +272,8 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 			termIds: termLinks.map((l) => l.termId),
 			syncMode: course.syncMode
 		},
-		shared: shared && { id: shared.id, source: shared.source, values: shared.values }
+		shared: shared && { id: shared.id, source: shared.source, values: shared.values },
+		notes
 	};
 }
 

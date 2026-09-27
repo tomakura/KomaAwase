@@ -1,7 +1,17 @@
 <script lang="ts">
-	import { DAY_NAMES, courseColor, courseHref, deliveryLabel, periodLabel, timetableHref } from '$lib/courses';
+	import { enhance } from '$app/forms';
+	import {
+		DAY_NAMES,
+		actionHref,
+		courseColor,
+		courseHref,
+		deliveryLabel,
+		periodLabel,
+		timetableHref
+	} from '$lib/courses';
+	import { addDays, daysBetween, monthDay, weekdayOf } from '$lib/time';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const course = $derived(data.course);
 	const periodNumbers = $derived(data.periods.map((p) => p.number));
@@ -15,7 +25,57 @@
 			.join('・')
 	);
 	const delivery = $derived(deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo));
+
+	let adding = $state<'memo' | 'task' | 'cancel' | null>(null);
+
+	// 10/2（金）
+	const withDay = (date: string) => `${monthDay(date)}（${DAY_NAMES[weekdayOf(date)]}）`;
+
+	// The next day this course meets, as the default day to mark cancelled
+	const nextClassDay = $derived(
+		[0, 1, 2, 3, 4, 5, 6]
+			.map((n) => addDays(data.today, n))
+			.find((d) => course.slots.some((s) => s.weekday === weekdayOf(d))) ?? data.today
+	);
+
+	const tasks = $derived(
+		data.notes
+			.filter((n) => n.kind === 'task')
+			.toSorted((a, b) => Number(a.done) - Number(b.done) || (a.due ?? '9').localeCompare(b.due ?? '9'))
+	);
+	const cancels = $derived(
+		data.notes
+			.filter((n) => n.kind === 'cancel' && n.date)
+			.toSorted((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+	);
+	const memos = $derived(
+		data.notes
+			.filter((n) => n.kind === 'memo')
+			.toSorted((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+	);
+
+	function dueLabel(due: string) {
+		const days = daysBetween(data.today, due);
+		if (days > 0) return { text: `あと${days}日`, late: false };
+		if (days === 0) return { text: '今日まで', late: false };
+		return { text: `${-days}日過ぎ`, late: true };
+	}
 </script>
+
+{#snippet removeButton(id: string, label: string)}
+	<form
+		method="POST"
+		action={actionHref('remove', data.termParam)}
+		use:enhance={({ cancel }) => {
+			if (!confirm(`${label}を消します`)) cancel();
+		}}
+	>
+		<input type="hidden" name="id" value={id} />
+		<button class="remove" type="submit" aria-label="{label}を消す">
+			<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+		</button>
+	</form>
+{/snippet}
 
 <svelte:head>
 	<title>{course.title} · コマあわせ</title>
@@ -57,6 +117,135 @@
 			</div>
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
+			{/if}
+		</div>
+
+		<h2 class="add-heading">追加する</h2>
+		<div class="add-buttons">
+			<button type="button" aria-pressed={adding === 'memo'} onclick={() => (adding = adding === 'memo' ? null : 'memo')}>
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M5 4.5h10l4 4v11H5z" /><path d="M14.5 4.5v4h4M8 12.5h8M8 16h5" />
+				</svg>
+				メモ
+			</button>
+			<!-- Files need R2, which isn't set up yet. -->
+			<button type="button" disabled title="準備中">
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M17 8l-7.5 7.5a2.1 2.1 0 0 1-3-3L14 5a3.8 3.8 0 0 1 5.4 5.4l-7.7 7.7a5.4 5.4 0 0 1-7.6-7.6L10.5 4" />
+				</svg>
+				資料
+			</button>
+			<button type="button" aria-pressed={adding === 'task'} onclick={() => (adding = adding === 'task' ? null : 'task')}>
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8.5 12.2l2.5 2.5 4.8-5" />
+				</svg>
+				課題
+			</button>
+			<button
+				type="button"
+				aria-pressed={adding === 'cancel'}
+				onclick={() => (adding = adding === 'cancel' ? null : 'cancel')}
+			>
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+					<path d="M3.5 9.5h17M8 3v4M16 3v4M10 12.5l4 4M14 12.5l-4 4" />
+				</svg>
+				休講
+			</button>
+		</div>
+
+		{#if adding}
+			<form
+				class="add-form"
+				method="POST"
+				action={actionHref('note', data.termParam)}
+				use:enhance={() =>
+					async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') adding = null;
+					}}
+			>
+				<input type="hidden" name="kind" value={adding} />
+				{#if adding === 'memo'}
+					<label class="field">日付<input type="date" name="date" value={data.today} required /></label>
+					<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required></textarea></label>
+				{:else if adding === 'task'}
+					<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
+					<label class="field">締切（なくてもOK）<input type="date" name="due" /></label>
+				{:else}
+					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
+					<label class="field">
+						メモ（補講の日など・なくてもOK）
+						<input name="body" maxlength="100" autocomplete="off" />
+					</label>
+				{/if}
+				{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
+				<div class="form-actions">
+					<button class="btn" type="button" onclick={() => (adding = null)}>やめる</button>
+					<button class="btn btn-primary" type="submit">追加</button>
+				</div>
+			</form>
+		{/if}
+
+		<div class="lists">
+			{#if tasks.length}
+				<section>
+					<h2>課題</h2>
+					{#each tasks as task (task.id)}
+						<div class="item" class:done={task.done}>
+							<form method="POST" action={actionHref('done', data.termParam)} use:enhance>
+								<input type="hidden" name="id" value={task.id} />
+								<input
+									class="check"
+									type="checkbox"
+									name="done"
+									checked={task.done}
+									aria-label="{task.body}を終わったことにする"
+									onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								/>
+							</form>
+							<span class="text">
+								<span class="main">{task.body}</span>
+								{#if task.due}<span class="sub">{withDay(task.due)}まで</span>{/if}
+							</span>
+							{#if task.due && !task.done}
+								{@const due = dueLabel(task.due)}
+								<span class="due" class:late={due.late}>{due.text}</span>
+							{/if}
+							{@render removeButton(task.id, `課題「${task.body}」`)}
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			{#if cancels.length}
+				<section>
+					<h2>休講</h2>
+					{#each cancels as c (c.id)}
+						<div class="item" class:done={(c.date ?? '') < data.today}>
+							<span class="text">
+								<span class="main">{withDay(c.date ?? '')} 休講</span>
+								{#if c.body}<span class="sub">{c.body}</span>{/if}
+							</span>
+							{@render removeButton(c.id, `${withDay(c.date ?? '')}の休講`)}
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			{#if memos.length}
+				<section>
+					<h2>メモ</h2>
+					{#each memos as memo (memo.id)}
+						<div class="item memo">
+							<span class="text">
+								{#if memo.date}<span class="sub">{withDay(memo.date)}</span>{/if}
+								<span class="body">{memo.body}</span>
+							</span>
+							{@render removeButton(memo.id, 'このメモ')}
+						</div>
+					{/each}
+				</section>
 			{/if}
 		</div>
 
@@ -200,6 +389,194 @@
 	.teachers {
 		font-size: 13px;
 		color: var(--ink-soft);
+	}
+
+	.add-heading,
+	section h2 {
+		margin: 0;
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+
+	.add-heading {
+		padding: 0 16px 6px;
+	}
+
+	.add-buttons {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 8px;
+		padding: 0 16px;
+	}
+
+	.add-buttons button {
+		height: 68px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 5px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 12px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.add-buttons button[aria-pressed='true'] {
+		border-color: var(--ink);
+		box-shadow: inset 0 0 0 1px var(--ink);
+	}
+
+	.add-buttons button:disabled {
+		color: var(--ink-sub);
+		cursor: default;
+	}
+
+	.add-form {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin: 12px 16px 0;
+		padding: 12px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+
+	.add-form textarea {
+		box-sizing: border-box;
+		padding: 10px 12px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 16px;
+		line-height: 1.6;
+		resize: vertical;
+	}
+
+	.add-form .field input {
+		background: var(--bg);
+	}
+
+	.form-actions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+
+	.form-actions .btn {
+		min-height: 44px;
+	}
+
+	.lists {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		padding: 14px 16px 0;
+	}
+
+	section {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.item {
+		min-height: 52px;
+		box-sizing: border-box;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 6px 4px 6px 12px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+	}
+
+	.item.memo {
+		align-items: flex-start;
+		padding-top: 10px;
+		padding-bottom: 10px;
+	}
+
+	.item.done .main {
+		color: var(--ink-sub);
+		text-decoration: line-through;
+	}
+
+	.item form {
+		display: contents;
+	}
+
+	.check {
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		margin: 0;
+		accent-color: var(--ink);
+	}
+
+	.text {
+		flex-grow: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.main {
+		font-size: 14px;
+		overflow-wrap: anywhere;
+	}
+
+	.sub {
+		font-size: 12px;
+		color: var(--ink-sub);
+	}
+
+	.body {
+		margin-top: 3px;
+		font-size: 14px;
+		line-height: 1.6;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
+	.due {
+		flex-shrink: 0;
+		padding: 2px 8px;
+		border-radius: 6px;
+		background: var(--course-orange);
+		color: var(--now-text);
+		font-size: 11px;
+		font-weight: 700;
+	}
+
+	.due.late {
+		background: var(--ink);
+		color: var(--surface);
+	}
+
+	.remove {
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: none;
+		border-radius: 9px;
+		background: transparent;
+		color: var(--ink-sub);
+		cursor: pointer;
 	}
 
 	.note {

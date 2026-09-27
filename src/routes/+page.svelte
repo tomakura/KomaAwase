@@ -2,7 +2,7 @@
 	import { replaceState } from '$app/navigation';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import { DAY_NAMES, courseColor, courseHref, deliveryLabel, timetableHref } from '$lib/courses';
-	import { toMinutes, tokyoTime } from '$lib/time';
+	import { addDays, monthDay, toMinutes, tokyoTime, weekdayOf } from '$lib/time';
 
 	let { data } = $props();
 
@@ -72,7 +72,13 @@
 				const col = colOf.get(slot.weekday);
 				if (!row || !col) return [];
 				const span = Math.min(slot.span, lastRow - row + 1);
-				return [{ course, slot, row, col, span, live: session(slot.weekday, row, span) }];
+				// A cancellation for this weekday within the coming week; a cancelled class isn't in session.
+				const cancel =
+					course.cancels
+						.filter((d) => weekdayOf(d) === slot.weekday && d >= clock.date && d <= addDays(clock.date, 6))
+						.sort()[0] ?? null;
+				const live = cancel === clock.date ? null : session(slot.weekday, row, span);
+				return [{ course, slot, row, col, span, live, cancel }];
 			})
 		)
 	);
@@ -147,7 +153,7 @@
 				{/each}
 			{/each}
 
-			{#each cells as { course, slot, row, col, span, live } (`${course.id}-${slot.weekday}-${slot.period}`)}
+			{#each cells as { course, slot, row, col, span, live, cancel } (`${course.id}-${slot.weekday}-${slot.period}`)}
 				<a
 					class="course"
 					class:live
@@ -161,6 +167,7 @@
 						{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}
 					</span>
 					{#if live}<span class="left">あと{live.left}分</span>{/if}
+					{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{/if}
 					{#if slot.room}<span class="room">{slot.room}</span>{/if}
 				</a>
 			{/each}
@@ -403,6 +410,19 @@
 		overflow-wrap: anywhere;
 	}
 
+	.cancel {
+		flex-shrink: 0;
+		margin-top: auto;
+		align-self: center;
+		padding: 1px 5px;
+		border-radius: 5px;
+		background: var(--ink);
+		color: var(--surface);
+		font-size: 10px;
+		font-weight: 700;
+		white-space: nowrap;
+	}
+
 	.room {
 		flex-shrink: 0;
 		margin-top: auto;
@@ -416,6 +436,10 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.cancel + .room {
+		margin-top: 0;
 	}
 
 	.unscheduled {
@@ -439,8 +463,10 @@
 		gap: 6px;
 	}
 
+	/* The label moves under a title that needs the whole width. */
 	.card {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
 		gap: 6px;

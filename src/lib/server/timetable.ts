@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { academicYear, tokyoTime } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables, universities } from './db/schema';
+import { upcomingCancellations } from './notes';
 import { loadSharedCourses } from './shared-courses';
 
 // The only preset so far. Picking a university comes with the setup screen.
@@ -122,8 +123,9 @@ export function titleParts(title: string) {
 	return parts;
 }
 
-export async function loadTimetable(db: Db, timetableId: string) {
-	const [termRows, periodRows, courseRows, termLinks, slotRows] = await db.batch([
+// `today` (YYYY-MM-DD) picks the cancellations still to come.
+export async function loadTimetable(db: Db, timetableId: string, today: string) {
+	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows] = await db.batch([
 		termsQuery(db, timetableId),
 		periodsQuery(db, timetableId),
 		db
@@ -155,7 +157,8 @@ export async function loadTimetable(db: Db, timetableId: string) {
 			})
 			.from(courseSlots)
 			.innerJoin(courses, eq(courseSlots.courseId, courses.id))
-			.where(eq(courses.timetableId, timetableId))
+			.where(eq(courses.timetableId, timetableId)),
+		upcomingCancellations(db, timetableId, today)
 	]);
 
 	// Synced courses show the shared title, slots and rooms.
@@ -181,7 +184,8 @@ export async function loadTimetable(db: Db, timetableId: string) {
 				delivery: values.delivery,
 				intensiveFrom: values.intensiveFrom,
 				intensiveTo: values.intensiveTo,
-				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId)
+				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
+				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : []))
 			};
 		})
 	};
