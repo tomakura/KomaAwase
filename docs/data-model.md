@@ -45,7 +45,7 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `UNIVERSITIES` | name, email_domains, term_preset, period_preset | `email_domains` は末尾一致で判定する。学期と時限のひな形を持つ |
+| `UNIVERSITIES` | name, email_domains, term_preset, period_preset | `email_domains` は完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期と時限のひな形を持つ |
 | `SHARED_COURSES` | university_id, year, code, title, term_label, source, version | `code` はシラバスの授業コード。`source` は `syllabus` か `user` |
 | `SHARED_COURSE_SLOTS` | shared_course_id, weekday, period_number, span, room | シラバスに教室がない大学は、みんなの登録で埋める |
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |
@@ -81,8 +81,19 @@ erDiagram
 | テーブル | 主な列 | メモ |
 |---|---|---|
 | `REPORTS` | reporter_id, target_type, target_id, reason, status | ユーザーや共有授業データへの通報 |
-| `IMPORT_JOBS` | user_id, status, provider, r2_key, result, error | スクショ読み取りの順番待ち。画像は読み取り後に消す |
+| `IMPORT_JOBS` | user_id, status, provider, r2_key, result, error, retry_at | スクショ読み取りの順番待ちの正本。「翌日に再挑戦」は Cron で Queues に積み直す。画像は読み取り後か3日後に消す |
 | `FEEDBACK` | user_id, kind, body, env | 不具合・要望 |
+
+## 退会したとき
+
+| データ | 扱い |
+|---|---|
+| アカウント、パスキー、在籍確認 | 消す |
+| 時間割、授業、メモ・資料・課題、R2 のファイル | 消す |
+| 友だち、ブロック、グループの所属 | 消す。自分が持ち主のグループは、ほかのメンバーに引き継ぐか、いなければ消す |
+| 通報・フィードバック | 送った人の情報を外して残す |
+| 共有授業データ（`SHARED_COURSES`） | ほかの人も使っているので**消さない** |
+| 共有授業データの変更履歴（`SHARED_COURSE_EDITS`） | `user_id` を外して匿名にして残す |
 
 ## 重ね表示の判定
 
