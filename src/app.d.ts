@@ -1,6 +1,11 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
+	// Secrets are not in wrangler.jsonc, so `wrangler types` does not know about them.
+	interface Env {
+		RELAY_SECRET?: string;
+	}
+
 	namespace App {
 		interface Platform {
 			env: Env;

@@ -42,11 +42,35 @@ export async function consumeEmailToken(db: Db, token: string): Promise<string |
 	return row.email;
 }
 
-export async function sendSignInEmail(to: string, link: string) {
-	// The mail provider is not decided yet (docs/README.md). In dev the link goes to the console.
+/**
+ * Sends the sign-in link through the relay on the rental server (relay/send.php).
+ * Workers can't reach its SMTP ports, so the relay sends from the server itself.
+ */
+export async function sendSignInEmail(env: Env, to: string, link: string) {
 	if (dev) {
 		console.log(`[dev] sign-in link for ${to}: ${link}`);
 		return;
 	}
-	throw new Error('Email sending is not configured');
+	if (!env.RELAY_URL || !env.RELAY_SECRET) throw new Error('Mail relay is not configured');
+
+	const body = JSON.stringify({ to, link });
+	const timestamp = String(Math.floor(Date.now() / 1000));
+	const res = await fetch(env.RELAY_URL, {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			'x-koma-timestamp': timestamp,
+			'x-koma-signature': await hmacSha256Hex(env.RELAY_SECRET, `${timestamp}.${body}`)
+		},
+		body,
+		signal: AbortSignal.timeout(10_000)
+	});
+	if (!res.ok) throw new Error(`Mail relay responded ${res.status}: ${await res.text()}`);
+}
+
+async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+	const enc = new TextEncoder();
+	const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
+	return [...sig].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

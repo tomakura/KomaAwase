@@ -10,15 +10,20 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
+	// Sign-in mail goes through relay/send.php on シンレンタルサーバー (Workers can't reach its SMTP).
+	// The shared HMAC key is a secret: `npx wrangler secret put RELAY_SECRET`.
+	"vars": {
+		"RELAY_URL": "https://tomakura.com/koma-relay/send.php"
+	},
 	"workers_dev": true,
-	"preview_urls": true,
+	// Preview versions would share the production D1 and secrets, and the mail relay only
+	// accepts production sign-in links, so previews stay off.
+	"preview_urls": false,
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "komaawase",
-			// Replace with the id printed by `wrangler d1 create komaawase` before deploying.
-			// Local dev (`--local`) works with this placeholder.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "693c8fe0-bd52-44a2-9307-567ad7c42be2",
 			"migrations_dir": "drizzle"
 		}
 	],

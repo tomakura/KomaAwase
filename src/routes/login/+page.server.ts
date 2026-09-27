@@ -1,5 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { createEmailToken, normalizeEmail, sendSignInEmail } from '$lib/server/auth/email';
+import { consumeEmailToken, createEmailToken, normalizeEmail, sendSignInEmail } from '$lib/server/auth/email';
 import { RATE_LIMITED_MESSAGE, isRateLimited } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -23,7 +23,14 @@ export const actions: Actions = {
 		if (!token) {
 			return fail(429, { message: 'このアドレスにはリンクを送ったばかりです。届いたメールを確認してください' });
 		}
-		await sendSignInEmail(email, `${url.origin}/auth/email/${token}`);
+		try {
+			await sendSignInEmail(platform.env, email, `${url.origin}/auth/email/${token}`);
+		} catch (e) {
+			console.error('sign-in mail failed', e);
+			// Drop the unsent link so it doesn't count toward the per-address limit.
+			await consumeEmailToken(locals.db, token);
+			return fail(502, { message: 'メールを送れませんでした。時間をおいてもう一度お試しください' });
+		}
 		return { sentTo: email };
 	}
 };

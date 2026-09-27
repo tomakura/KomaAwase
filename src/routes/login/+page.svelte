@@ -6,6 +6,7 @@
 
 	let { form } = $props();
 	let busy = $state(false);
+	let sending = $state(false);
 	let passkeyError = $state<string | null>(null);
 
 	async function onPasskey() {
@@ -45,13 +46,25 @@
 				{form.sentTo} にログイン用のリンクを送りました。15分以内に開いてください。
 			</p>
 		{:else}
-			<form method="POST" action="?/email" use:enhance>
+			<form
+				method="POST"
+				action="?/email"
+				use:enhance={() => {
+					sending = true;
+					return async ({ update }) => {
+						await update();
+						sending = false;
+					};
+				}}
+			>
 				<label class="field">
 					メールアドレス
 					<input name="email" type="email" autocomplete="email" required />
 				</label>
 				{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-				<button class="btn" type="submit">メールでログイン・登録</button>
+				<button class="btn" type="submit" disabled={sending}>
+					{sending ? '送信中…' : 'メールでログイン・登録'}
+				</button>
 			</form>
 		{/if}
 	</div>
