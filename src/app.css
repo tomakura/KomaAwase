@@ -1,0 +1,88 @@
+/* Design tokens: see docs/design.md */
+:root {
+	--bg: #f6f2ea;
+	--surface: #fffdf8;
+	--ink: #2b2824;
+	--ink-sub: #6b645a;
+	--line: #e4ddcf;
+	--slot: #ede7da;
+	--shu: #d9653b;
+	--ai: #3569a8;
+	--accent-text: #b9502b;
+
+	--course-red: #f8dcdc;
+	--course-orange: #fbe3d6;
+	--course-yellow: #fff0c7;
+	--course-lime: #eef2cf;
+	--course-green: #e6efd9;
+	--course-mint: #d8eee8;
+	--course-blue: #dce8f5;
+	--course-indigo: #e0e1f4;
+	--course-purple: #efe3f3;
+	--course-gray: #ede7da;
+
+	--font-display: 'Zen Maru Gothic', sans-serif;
+	--font-body: 'Zen Kaku Gothic New', sans-serif;
+
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg: #1c1a18;
+		--surface: #2a2724;
+		--ink: #eee7da;
+		--ink-sub: #a39b8e;
+		--line: #3a3531;
+		--slot: #2e2a26;
+		--shu: #e27a52;
+		--ai: #5b8bc7;
+		--accent-text: #ee9670;
+
+		--course-red: #4e2b2e;
+		--course-orange: #4d3024;
+		--course-yellow: #433817;
+		--course-lime: #3b4020;
+		--course-green: #2c3b27;
+		--course-mint: #1f3d37;
+		--course-blue: #243850;
+		--course-indigo: #2f3154;
+		--course-purple: #3b2d44;
+		--course-gray: #3d3934;
+
+		color-scheme: dark;
+	}
+}
+
+:root[data-theme='dark'] {
+	--bg: #1c1a18;
+	--surface: #2a2724;
+	--ink: #eee7da;
+	--ink-sub: #a39b8e;
+	--line: #3a3531;
+	--slot: #2e2a26;
+	--shu: #e27a52;
+	--ai: #5b8bc7;
+	--accent-text: #ee9670;
+
+	--course-red: #4e2b2e;
+	--course-orange: #4d3024;
+	--course-yellow: #433817;
+	--course-lime: #3b4020;
+	--course-green: #2c3b27;
+	--course-mint: #1f3d37;
+	--course-blue: #243850;
+	--course-indigo: #2f3154;
+	--course-purple: #3b2d44;
+	--course-gray: #3d3934;
+
+	color-scheme: dark;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-body);
+	-webkit-text-size-adjust: 100%;
+}
