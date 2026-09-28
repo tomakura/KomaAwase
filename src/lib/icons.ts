@@ -49,10 +49,23 @@ function colorFor(id: string) {
 	return ICON_COLORS[hash % ICON_COLORS.length];
 }
 
-export type IconSource = { id: string; nickname: string | null; icon: { color: string; text: string } | null };
+export type IconSource = {
+	id: string;
+	nickname: string | null;
+	icon: { color: string; text: string; photo?: number } | null;
+};
 
+/** The icon's color and text, and the photo's address when there is one (the text stays for when it can't load). */
 export function iconOf(user: IconSource) {
 	const color = user.icon && isIconColor(user.icon.color) ? ICON_COLORS.find((c) => c.id === user.icon!.color)! : colorFor(user.id);
 	const text = user.icon?.text || splitGraphemes(user.nickname?.trim() || '?')[0];
-	return { hex: color.hex, text };
+	const photo = user.icon?.photo ? photoUrl(user.id, user.icon.photo) : null;
+	return { color: color.id, hex: color.hex, text, photo };
 }
+
+// Versioned, so the browser keeps it until the photo changes
+export const photoUrl = (userId: string, version: number) => `/icons/${userId}?v=${version}`;
+
+// Made in the browser: square, this many pixels a side, as JPEG
+export const PHOTO_SIZE = 256;
+export const PHOTO_MAX_BYTES = 80_000;

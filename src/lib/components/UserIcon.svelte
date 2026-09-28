@@ -7,13 +7,17 @@
 	const text = $derived(short ? splitGraphemes(icon.text)[0] : icon.text);
 </script>
 
-<span
-	class="icon"
-	style:--size="{size}px"
-	style:background={icon.hex}
-	style:font-size="{Math.round(size * (splitGraphemes(text).length > 1 ? 0.4 : 0.5))}px"
-	aria-hidden="true">{text}</span
->
+{#if icon.photo}
+	<img class="icon" style:--size="{size}px" style:background={icon.hex} src={icon.photo} alt="" width={size} height={size} loading="lazy" decoding="async" />
+{:else}
+	<span
+		class="icon"
+		style:--size="{size}px"
+		style:background={icon.hex}
+		style:font-size="{Math.round(size * (splitGraphemes(text).length > 1 ? 0.4 : 0.5))}px"
+		aria-hidden="true">{text}</span
+	>
+{/if}
 
 <style>
 	.icon {
@@ -29,5 +33,9 @@
 		font-weight: 700;
 		line-height: 1;
 		white-space: nowrap;
+	}
+
+	img.icon {
+		object-fit: cover;
 	}
 </style>

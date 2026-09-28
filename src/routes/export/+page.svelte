@@ -40,12 +40,23 @@
 		}
 	});
 
+	// The icon photo, loaded before it can be drawn
+	let iconImage = $state<HTMLImageElement>();
+	$effect(() => {
+		const url = iconOf(data.me).photo;
+		iconImage = undefined;
+		if (!url) return;
+		const img = new Image();
+		img.onload = () => (iconImage = img);
+		img.src = url;
+	});
+
 	const exportData = $derived.by((): ExportData => {
 		const courses = data.courses.filter((c) => termId && c.termIds.includes(termId));
 		const days = [...new Set([...data.days, ...courses.flatMap((c) => c.slots.map((s) => s.weekday))])].sort((a, b) => a - b);
 		return {
 			title: `${data.me.nickname ?? ''}の時間割`,
-			icon: iconOf(data.me),
+			icon: { ...iconOf(data.me), image: iconImage },
 			termLabel: [String(data.year), term?.groupName, term?.name].filter(Boolean).join(' '),
 			days,
 			periods: data.periods,
