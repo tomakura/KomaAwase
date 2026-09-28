@@ -5,6 +5,8 @@
 
 const CLOSE_DISTANCE = 110;
 const CLOSE_SPEED = 0.6; // px per ms
+// A quick flick closes only after this much, so a tiny fast twitch springs back
+const FLICK_DISTANCE = 32;
 
 // Anything between the finger and the sheet that has been scrolled down, and the page too
 // when the sheet is part of it (a dialog scrolls on its own)
@@ -54,7 +56,7 @@ export function swipeDown(sheet: HTMLElement, onclose: () => unknown) {
 		if (!dragging) return;
 		dragging = false;
 		const speed = distance / Math.max(1, e.timeStamp - startAt);
-		const closing = distance > CLOSE_DISTANCE || speed > CLOSE_SPEED;
+		const closing = distance > CLOSE_DISTANCE || (distance > FLICK_DISTANCE && speed > CLOSE_SPEED);
 		sheet.style.transition = reduced.matches ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
 		if (closing) {
 			sheet.style.transform = 'translateY(100%)';
@@ -73,10 +75,18 @@ export function swipeDown(sheet: HTMLElement, onclose: () => unknown) {
 		}
 	}
 
+	// The system took the touch away (a call, a gesture of its own): back in place, never closed
+	function cancel() {
+		if (!dragging) return;
+		dragging = false;
+		sheet.style.transition = reduced.matches ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+		sheet.style.transform = '';
+	}
+
 	sheet.addEventListener('touchstart', start, { passive: true });
 	sheet.addEventListener('touchmove', move, { passive: false });
 	sheet.addEventListener('touchend', end);
-	sheet.addEventListener('touchcancel', end);
+	sheet.addEventListener('touchcancel', cancel);
 	return {
 		update(next: () => unknown) {
 			close = next;
@@ -85,7 +95,7 @@ export function swipeDown(sheet: HTMLElement, onclose: () => unknown) {
 			sheet.removeEventListener('touchstart', start);
 			sheet.removeEventListener('touchmove', move);
 			sheet.removeEventListener('touchend', end);
-			sheet.removeEventListener('touchcancel', end);
+			sheet.removeEventListener('touchcancel', cancel);
 		}
 	};
 }
