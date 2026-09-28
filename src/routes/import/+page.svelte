@@ -161,7 +161,7 @@
 				<div class="item">
 					<span class="num">2</span>
 					<span>
-						画像は読み取りのためにGroq・Cloudflareへ送られます。AIの学習には使われず、読み取りが終わるとすぐに削除します。
+						画像は読み取りのためにGroq・Cloudflareへ送られます。AIの学習には使われず、読み取りが終わるとすぐに削除します（読み取れなかったときも3日で削除します）。
 					</span>
 				</div>
 				<div class="item">
