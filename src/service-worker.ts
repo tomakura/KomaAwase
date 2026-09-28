@@ -103,15 +103,22 @@ sw.addEventListener('push', (event) => {
 
 sw.addEventListener('notificationclick', (event) => {
 	event.notification.close();
-	const path = String(event.notification.data?.url ?? '/');
-	// Only pages of this app
-	const url = new URL(path.startsWith('/') && !path.startsWith('//') ? path : '/', sw.location.origin).href;
+	// Only pages of this app, judged after the address is read (\ counts as / there)
+	let url = new URL('/', sw.location.origin).href;
+	try {
+		const target = new URL(String(event.notification.data?.url ?? '/'), sw.location.origin);
+		if (target.origin === sw.location.origin) url = target.href;
+	} catch {
+		// Keep the top page
+	}
 	event.waitUntil(
 		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
 			const open = windows.find((w) => new URL(w.url).origin === sw.location.origin);
 			if (open) {
 				await open.focus();
-				return open.navigate(url);
+				// A window this worker doesn't control yet can't be moved; open a new one then
+				const moved = await open.navigate(url).catch(() => null);
+				if (moved) return moved;
 			}
 			return sw.clients.openWindow(url);
 		})
