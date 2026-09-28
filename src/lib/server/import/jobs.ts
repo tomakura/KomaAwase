@@ -78,7 +78,27 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 		.where(and(eq(importJobs.id, jobId), inArray(importJobs.status, ['queued', 'retry'])))
 		.returning()
 		.get();
-	if (!job) return { status: 'skipped' };
+	if (!job) {
+		// Still being read (a second delivery of the message): look again later, so the message
+		// isn't dropped while the job could yet be put back. Otherwise it's finished.
+		const now = await db.select({ status: importJobs.status }).from(importJobs).where(eq(importJobs.id, jobId)).get();
+		return now?.status === 'processing' ? { status: 'busy', seconds: 60 } : { status: 'skipped' };
+	}
+	try {
+		return await readJob(env, db, job);
+	} catch (e) {
+		// Something other than the AIs failed (D1, say): back in line, and the message is retried.
+		await db
+			.update(importJobs)
+			.set({ status: 'queued' })
+			.where(and(eq(importJobs.id, jobId), eq(importJobs.status, 'processing')))
+			.catch(() => {});
+		throw e;
+	}
+}
+
+async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): Promise<Outcome> {
+	const jobId = job.id;
 	const attempts = job.attempts + 1;
 
 	const finish = (values: Partial<typeof importJobs.$inferInsert>) =>
@@ -94,13 +114,9 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 	if (env.AI) providers.push({ name: 'workers-ai', read: () => readWithWorkersAi(env.AI, job.image!) });
 
 	for (const provider of providers) {
+		let courses;
 		try {
-			const courses = readImport(await provider.read());
-			if (courses) {
-				await finish({ status: 'done', provider: provider.name, result: courses, image: null, error: null, finishedAt: new Date() });
-				return { status: 'done' };
-			}
-			errors.push(`${provider.name}: unexpected answer`);
+			courses = readImport(await provider.read());
 		} catch (e) {
 			// A short wait is worth it for Groq, which reads Japanese better.
 			if (e instanceof Busy && provider.name === 'groq') {
@@ -109,7 +125,14 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 				return { status: 'busy', seconds: e.seconds };
 			}
 			errors.push(`${provider.name}: ${e instanceof OutOfQuota ? 'out of quota' : e instanceof Error ? e.message : e}`);
+			continue;
 		}
+		// Outside the try, so a failed write isn't taken for the AI failing.
+		if (courses) {
+			await finish({ status: 'done', provider: provider.name, result: courses, image: null, error: null, finishedAt: new Date() });
+			return { status: 'done' };
+		}
+		errors.push(`${provider.name}: unexpected answer`);
 	}
 
 	const tooOld = Date.now() - job.createdAt.getTime() > KEEP_DAYS * DAY;
