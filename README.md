@@ -34,14 +34,13 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 
 はじめて使うものがあるときの準備：
 
-1. D1 にマイグレーションを当てる：`npx wrangler d1 migrations apply DB --remote`（前に Time Travel の時刻を控えておく）
-2. スクショ読み取りの順番待ちを作る：`npx wrangler queues create koma-import`
-3. 秘密の値を入れる：`npx wrangler secret put <名前>`
+1. はじめての本番なら、データベースを `npx wrangler d1 create komaawase` で作り、表示された ID を `wrangler.jsonc` の `database_id` に入れる
+2. D1 にマイグレーションを当てる：`npx wrangler d1 migrations apply DB --remote`（前に Time Travel の時刻を控えておく）
+3. スクショ読み取りの順番待ちを作る：`npx wrangler queues create koma-import`
+4. 秘密の値を入れる：`npx wrangler secret put <名前>`
    - `RELAY_SECRET`、`FILES_SECRET`（メール中継と資料）
    - `GROQ_API_KEY`（任意。Groq のダッシュボードの Data Controls でゼロデータ保持を有効にしてから）
    - `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（任意。Google Cloud の OAuth クライアントで、リダイレクト先を `https://koma.tomakura.com/login/google/callback` にする）
-4. 「開発を応援する」を出すなら、`wrangler.jsonc` の `vars` に `SUPPORT_URL` を足す
-5. `relay/send.php` を変えたときは、シンの `public_html/koma-relay/send.php` に上書きする
-6. 運営の画面（`/admin`）を使う人は、D1 で `update users set role = 'admin' where email = '…'`
-
-はじめての本番のデータベースは `wrangler d1 create komaawase` で作り、表示された ID を `wrangler.jsonc` の `database_id` に入れる。
+5. 「開発を応援する」を出すなら、`wrangler.jsonc` の `vars` に `SUPPORT_URL` を足す
+6. `relay/send.php` を変えたときは、シンの `public_html/koma-relay/send.php` に上書きする
+7. 運営の画面（`/admin`）を使う人は、D1 で `update users set role = 'admin' where email = '…'`
