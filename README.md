@@ -14,13 +14,34 @@ npm install
 npm run db:migrate:local   # ローカルの D1 にテーブルを作る（初回とスキーマ変更後）
 npm run dev       # 開発サーバー
 npm run check     # 型チェック
+npm test          # テスト（Vitest）
 npm run build     # ビルド
-npm run preview   # Workers と同じ環境（wrangler dev）で動かす
+npm run preview   # Workers と同じ環境（wrangler dev）で動かす。順番待ちと Cron も動く
 npm run gen       # wrangler.jsonc を変えたあと、Worker の型を作り直す
 npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、マイグレーションを作る
 ```
 
-- 開発中はログイン用のリンクが `npm run dev` のコンソールに出る。本番はシンレンタルサーバーの `relay/send.php` 経由で送る（置き方は [relay/README.md](relay/README.md)）
+- 開発中はログイン用・在籍確認用のリンクが `npm run dev` のコンソールに出る。本番はシンレンタルサーバーの `relay/send.php` 経由で送る（置き方は [relay/README.md](relay/README.md)）
 - 授業の資料はシンの `relay/files.php` に保存する。手元で試すときは [relay/README.md](relay/README.md#手元で試すとき) のとおり PHP を動かし、`.dev.local.vars` を作る
 - パスキーは `localhost` で試せる。スマホで試すときは HTTPS が必要
-- 本番に出す前に `wrangler d1 create komaawase` でデータベースを作り、表示された ID を `wrangler.jsonc` の `database_id` に入れる
+- スクショの読み取りは、手元でも Workers AI（本物）につながる。`npm run dev` では順番待ちを通さずにその場で読む。Cron は `npx wrangler dev --test-scheduled` で開き、`/__scheduled` を呼ぶと動く
+- Worker の入口は `worker/entry.js`（SvelteKit の Worker に順番待ちと Cron を足したもの）。アダプターは `svelte-kit.wrangler.jsonc` を読む（[docs/architecture.md](docs/architecture.md#worker-の入口)）
+- アイコンを作り直すときは `node scripts/make-icons.mjs static`
+
+## 本番に出すとき
+
+デプロイは手元から `npm run build && npx wrangler deploy`。GitHub Actions は型チェック・テスト・ビルドだけ行う。
+
+はじめて使うものがあるときの準備：
+
+1. D1 にマイグレーションを当てる：`npx wrangler d1 migrations apply DB --remote`（前に Time Travel の時刻を控えておく）
+2. スクショ読み取りの順番待ちを作る：`npx wrangler queues create koma-import`
+3. 秘密の値を入れる：`npx wrangler secret put <名前>`
+   - `RELAY_SECRET`、`FILES_SECRET`（メール中継と資料）
+   - `GROQ_API_KEY`（任意。Groq のダッシュボードの Data Controls でゼロデータ保持を有効にしてから）
+   - `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（任意。Google Cloud の OAuth クライアントで、リダイレクト先を `https://koma.tomakura.com/login/google/callback` にする）
+4. 「開発を応援する」を出すなら、`wrangler.jsonc` の `vars` に `SUPPORT_URL` を足す
+5. `relay/send.php` を変えたときは、シンの `public_html/koma-relay/send.php` に上書きする
+6. 運営の画面（`/admin`）を使う人は、D1 で `update users set role = 'admin' where email = '…'`
+
+はじめての本番のデータベースは `wrangler d1 create komaawase` で作り、表示された ID を `wrangler.jsonc` の `database_id` に入れる。
