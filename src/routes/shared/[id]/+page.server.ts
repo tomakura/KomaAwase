@@ -25,8 +25,10 @@ async function usable(db: App.Locals['db'], user: NonNullable<App.Locals['user']
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const me = requireUser(locals, url);
 	const course = await usable(locals.db, me, params.id);
-	const [edits, users, university] = await Promise.all([
-		loadEdits(locals.db, course.id),
+	// Older changes come a page at a time
+	const page = Math.min(Math.max(Math.floor(Number(url.searchParams.get('page'))) || 1, 1), 1000);
+	const [history, users, university] = await Promise.all([
+		loadEdits(locals.db, course.id, page),
 		syncedCount(locals.db, course.id),
 		locals.db.select({ name: universities.name }).from(universities).where(eq(universities.id, course.universityId)).get()
 	]);
@@ -42,7 +44,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			values: course.values
 		},
 		users,
-		edits: edits.map((e) => ({ id: e.id, createdAt: e.createdAt, diff: e.diff })),
+		edits: history.edits.map((e) => ({ id: e.id, createdAt: e.createdAt, diff: e.diff })),
+		page,
+		more: history.more,
 		reportReasons: REPORT_REASONS.shared_course
 	};
 };

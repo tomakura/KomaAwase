@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import ReportForm from '$lib/components/ReportForm.svelte';
@@ -43,6 +44,13 @@
 	};
 
 	const current = $derived(fields(data.course.values));
+	// The same page with another page of the history (keeps ?back=)
+	function historyPage(n: number) {
+		const url = new URL(page.url);
+		if (n > 1) url.searchParams.set('page', String(n));
+		else url.searchParams.delete('page');
+		return url.pathname + url.search;
+	}
 	let reporting = $state(false);
 </script>
 
@@ -85,12 +93,12 @@
 				<div class="edit">
 					<div class="edit-head">
 						<span class="date">{when(edit.createdAt)}</span>
-						{#if i === 0}<span class="now">いまの内容</span>{/if}
+						{#if data.page === 1 && i === 0}<span class="now">いまの内容</span>{/if}
 					</div>
 					{#each changes(edit.diff) as change (change.label)}
 						<p class="change"><b>{change.label}</b>{change.text}</p>
 					{/each}
-					{#if i > 0}
+					{#if data.page > 1 || i > 0}
 						<form
 							method="POST"
 							action="?/restore"
@@ -106,6 +114,12 @@
 				</div>
 			{/each}
 		</div>
+		{#if data.page > 1 || data.more}
+			<nav class="pages" aria-label="履歴のページ">
+				{#if data.page > 1}<a href={historyPage(data.page - 1)}>新しい変更へ</a>{/if}
+				{#if data.more}<a class="older" href={historyPage(data.page + 1)}>もっと前の変更</a>{/if}
+			</nav>
+		{/if}
 		<p class="ui-note">だれが直したかは表示しません。</p>
 	</section>
 </div>
@@ -115,6 +129,21 @@
 </Sheet>
 
 <style>
+	.pages {
+		display: flex;
+		gap: 12px;
+		padding: 10px 2px 0;
+		font-size: 14px;
+	}
+
+	.pages a {
+		color: var(--accent-text);
+	}
+
+	.older {
+		margin-left: auto;
+	}
+
 	.card {
 		display: flex;
 		flex-direction: column;

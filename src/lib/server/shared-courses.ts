@@ -275,14 +275,19 @@ export async function searchSharedCourses(
 		.slice(0, 30);
 }
 
-/** The course's changes, newest first. Who made them is never shown. */
-export function loadEdits(db: Db, sharedCourseId: string) {
-	return db
+export const EDITS_PAGE = 50;
+
+/** One page of the course's changes, newest first, and whether older ones follow. Who made them is never shown. */
+export async function loadEdits(db: Db, sharedCourseId: string, page = 1) {
+	const rows = await db
 		.select({ id: sharedCourseEdits.id, diff: sharedCourseEdits.diff, createdAt: sharedCourseEdits.createdAt })
 		.from(sharedCourseEdits)
 		.where(eq(sharedCourseEdits.sharedCourseId, sharedCourseId))
-		.orderBy(desc(sharedCourseEdits.createdAt))
-		.limit(50);
+		// Times are to the second; rowid keeps edits within one second in the order they were saved.
+		.orderBy(desc(sharedCourseEdits.createdAt), desc(sql`rowid`))
+		.limit(EDITS_PAGE + 1)
+		.offset((page - 1) * EDITS_PAGE);
+	return { edits: rows.slice(0, EDITS_PAGE), more: rows.length > EDITS_PAGE };
 }
 
 /**
