@@ -1,18 +1,8 @@
 // Class times are the university's local time, so "today" and "now" are always Japan time,
-// on the server and in the browser alike.
-const formatter = new Intl.DateTimeFormat('en-US', {
-	timeZone: 'Asia/Tokyo',
-	year: 'numeric',
-	month: '2-digit',
-	day: '2-digit',
-	weekday: 'short',
-	hour: '2-digit',
-	minute: '2-digit',
-	second: '2-digit',
-	hourCycle: 'h23'
-});
-
-const WEEKDAYS: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+// on the server and in the browser alike. Japan keeps UTC+9 all year (no daylight saving),
+// so it is plain arithmetic: an Intl.DateTimeFormat with a time zone took over 10ms to set up
+// in a Worker that had just started.
+const JST = 9 * 60 * 60 * 1000;
 
 export type TokyoTime = {
 	date: string; // YYYY-MM-DD
@@ -21,11 +11,11 @@ export type TokyoTime = {
 };
 
 export function tokyoTime(ms: number): TokyoTime {
-	const parts = Object.fromEntries(formatter.formatToParts(ms).map((p) => [p.type, p.value]));
+	const t = new Date(Math.floor(ms / 1000) * 1000 + JST);
 	return {
-		date: `${parts.year}-${parts.month}-${parts.day}`,
-		weekday: WEEKDAYS[parts.weekday],
-		minutes: Number(parts.hour) * 60 + Number(parts.minute) + Number(parts.second) / 60
+		date: t.toISOString().slice(0, 10),
+		weekday: t.getUTCDay() || 7,
+		minutes: t.getUTCHours() * 60 + t.getUTCMinutes() + t.getUTCSeconds() / 60
 	};
 }
 

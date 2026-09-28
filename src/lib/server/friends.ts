@@ -1,5 +1,6 @@
 import { and, count, eq, inArray, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
+import { compareJa } from '$lib/sort';
 import type { Db } from './db';
 import { blocks, courses, friendships, groupMembers, timetables, universities, users } from './db/schema';
 
@@ -177,7 +178,7 @@ export async function listFriendships(db: Db, meId: string) {
 	const people = (list: typeof rows) =>
 		list
 			.map(({ requesterId: _, status: __, createdAt: ___, ...p }) => p)
-			.sort((a, b) => (a.nickname ?? '').localeCompare(b.nickname ?? '', 'ja'));
+			.sort((a, b) => compareJa(a.nickname ?? '', b.nickname ?? ''));
 	return {
 		friends: people(rows.filter((r) => r.status === 'accepted')),
 		incoming: people(rows.filter((r) => r.status === 'pending' && r.requesterId !== meId)),

@@ -16,9 +16,15 @@ export type IconColor = (typeof ICON_COLORS)[number]['id'];
 export const ICON_TEXT_MAX = 2;
 export const NICKNAME_MAX = 20;
 
-const graphemes = new Intl.Segmenter('ja', { granularity: 'grapheme' });
+// Characters as people see them. Text with nothing that joins characters together (emoji
+// sequences, flags, combining marks, CR LF) splits by code point; the segmenter, which takes
+// about 9ms of a fresh Worker to set up, is made only for the rest.
+const JOINS = /[\r‍︎️⃣ᄀ-ᇿ\p{M}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{E0020}-\u{E007F}]/u;
+let graphemes: Intl.Segmenter | undefined;
 
 export function splitGraphemes(text: string) {
+	if (!JOINS.test(text)) return [...text];
+	graphemes ??= new Intl.Segmenter('ja', { granularity: 'grapheme' });
 	return [...graphemes.segment(text)].map((s) => s.segment);
 }
 

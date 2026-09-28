@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isIconText, isNickname } from './icons';
+import { isIconText, isNickname, splitGraphemes } from './icons';
 
 describe('isIconText', () => {
 	it('takes one or two characters you can see', () => {
@@ -22,5 +22,15 @@ describe('isNickname', () => {
 		for (const text of ['', ' ', '​​', 'た'.repeat(21), 'ゆう\u0000と', 'ゆう\nと']) {
 			expect(isNickname(text)).toBe(false);
 		}
+	});
+});
+
+describe('splitGraphemes', () => {
+	it('splits plain text by character and joined emoji as one', () => {
+		expect(splitGraphemes('たろう')).toEqual(['た', 'ろ', 'う']);
+		expect(splitGraphemes('👨‍👩‍👧あ')).toEqual(['👨‍👩‍👧', 'あ']);
+		expect(splitGraphemes('🇯🇵')).toEqual(['🇯🇵']);
+		expect(splitGraphemes('が')).toEqual(['が']);
+		expect(splitGraphemes('が')).toEqual(['が']);
 	});
 });

@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
+	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
 		actionHref,
@@ -114,7 +115,7 @@
 			<div class="title-row">
 				<div class="name">
 					<span class="bar" style:--c={courseColor(course.color)}></span>
-					<h1>{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}</h1>
+					{#key course.title}<h1 use:wrapTitle={course.title}>{course.title}</h1>{/key}
 				</div>
 				<a class="edit" href={courseHref(course.id, data.termParam, '/edit')}>
 					<svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">

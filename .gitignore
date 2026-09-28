@@ -29,3 +29,4 @@ relay/koma-files-secret.php
 # Local Worker secrets for npm run dev
 .dev.local.vars
 .dev.vars
+.bench/

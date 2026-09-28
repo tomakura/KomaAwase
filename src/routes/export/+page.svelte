@@ -9,6 +9,8 @@
 	import { iconOf } from '$lib/icons';
 	import { currentTerm } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
+	import { titleParts } from '$lib/title';
+	import { browser } from '$app/environment';
 
 	let { data } = $props();
 
@@ -60,7 +62,8 @@
 			termLabel: [String(data.year), term?.groupName, term?.name].filter(Boolean).join(' '),
 			days,
 			periods: data.periods,
-			courses: courses.filter((c) => c.slots.length),
+			// Split in the browser only (the drawing happens there), not while the server renders
+			courses: courses.filter((c) => c.slots.length).map((c) => ({ ...c, titleParts: browser ? titleParts(c.title) : [c.title] })),
 			unscheduled: courses.filter((c) => !c.slots.length).map((c) => c.title)
 		};
 	});

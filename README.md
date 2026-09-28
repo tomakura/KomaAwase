@@ -27,6 +27,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 - スクショの読み取りは、手元でも Workers AI（本物）につながる。`npm run dev` では順番待ちを通さずにその場で読む。Cron は `npx wrangler dev --test-scheduled` で開き、`/__scheduled` を呼ぶと動く
 - Worker の入口は `worker/entry.js`（SvelteKit の Worker に順番待ちと Cron を足したもの）。アダプターは `svelte-kit.wrangler.jsonc` を読む（[docs/architecture.md](docs/architecture.md#worker-の入口)）
 - アイコンを作り直すときは `node scripts/make-icons.mjs static`
+- 表示にかかる CPU を測るときは、`npm run build` と `npx wrangler deploy --dry-run --outdir .bench` のあと `node --no-warnings scripts/bench-worker.mjs <セッションのトークン>`（Node.js 22.16 以上）（`FIRST=1` で起動直後の1回目だけ）
 - 通知を手元で試すときは、`.dev.local.vars` に `VAPID_PUBLIC_KEY` と `VAPID_PRIVATE_KEY` を書く（作り方は `scripts/make-vapid.mjs` と同じ）
 
 ## 本番に出すとき

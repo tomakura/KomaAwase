@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { courseColor, deliveryLabel, type Delivery } from '$lib/courses';
+	import { wrapTitle } from '$lib/wrap-title';
 
 	// Courses without a slot (on demand, intensive), under the grid
 	let {
@@ -9,7 +10,7 @@
 		courses: {
 			id: string;
 			color: string;
-			titleParts: string[];
+			title: string;
 			delivery: Delivery | null;
 			intensiveFrom: string | null;
 			intensiveTo: string | null;
@@ -25,7 +26,7 @@
 			{#each courses as course (course.id)}
 				{@const label = deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo)}
 				<svelte:element this={href ? 'a' : 'div'} class="card" href={href?.(course.id)} style:--c={courseColor(course.color)}>
-					<span>{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}</span>
+					{#key course.title}<span use:wrapTitle={course.title}>{course.title}</span>{/key}
 					{#if label}<span class="delivery">{label}</span>{/if}
 				</svelte:element>
 			{/each}

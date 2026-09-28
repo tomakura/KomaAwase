@@ -2,6 +2,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { DAY_NAMES, courseColor, deliveryLabel, periodLabel, weekLabel } from '$lib/courses';
+	import { compareJa } from '$lib/sort';
 
 	let { data } = $props();
 
@@ -15,7 +16,7 @@
 			const tb = Math.min(...b.termIds.map((id) => termOrder.get(id) ?? 99));
 			const sa = a.slots[0] ? a.slots[0].weekday * 100 + a.slots[0].period : 9999;
 			const sb = b.slots[0] ? b.slots[0].weekday * 100 + b.slots[0].period : 9999;
-			return ta - tb || sa - sb || a.title.localeCompare(b.title, 'ja');
+			return ta - tb || sa - sb || compareJa(a.title, b.title);
 		})
 	);
 

@@ -2,18 +2,11 @@
 // aes128gcm) and the request is signed with the app's VAPID key (RFC 8292), so the push
 // service (Apple, Google, Mozilla, Microsoft) can't read them.
 
+import { base64url, fromBase64url } from './base64url';
+
+export { base64url, fromBase64url };
+
 const encoder = new TextEncoder();
-
-export function base64url(bytes: Uint8Array) {
-	let s = '';
-	for (const b of bytes) s += String.fromCharCode(b);
-	return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-export function fromBase64url(text: string) {
-	const s = atob(text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4));
-	return Uint8Array.from(s, (c) => c.charCodeAt(0));
-}
 
 function concat(...parts: Uint8Array[]): Uint8Array<ArrayBuffer> {
 	const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
