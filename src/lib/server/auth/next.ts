@@ -4,9 +4,19 @@ import { redirect, type Cookies } from '@sveltejs/kit';
 // It waits in a cookie through the email link, はじめの設定 and the rest.
 const NEXT_COOKIE = 'next';
 
-// Only paths on this site, never //other.example or /\other.example
+const BASE = 'https://koma.invalid';
+
+// Only paths on this site, never //other.example or /\other.example. The value is read the
+// way a browser reads it (tabs and newlines dropped, \ as /), so /%09/other.example can't
+// slip through either, and the path comes back in that read form.
 export function safeNext(value: string | null | undefined) {
-	return value && /^\/(?![/\\])/.test(value) ? value : null;
+	if (!value?.startsWith('/')) return null;
+	try {
+		const url = new URL(value, BASE);
+		return url.origin === BASE ? url.pathname + url.search + url.hash : null;
+	} catch {
+		return null;
+	}
 }
 
 export function rememberNext(cookies: Cookies, value: string | null) {
