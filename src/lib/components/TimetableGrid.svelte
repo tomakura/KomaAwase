@@ -5,7 +5,7 @@
 	export type GridCourse = {
 		id: string;
 		color: string;
-		titleParts: string[];
+		title: string;
 		slots: GridSlot[];
 		// Cancelled days (YYYY-MM-DD); only the owner's own timetable has them
 		cancels?: string[];
@@ -128,10 +128,8 @@
 		style:--progress={live ? `${live.progress * 100}%` : undefined}
 	>
 		<!-- Recreated when the title changes, since wrapTitle replaces the text it was given -->
-		{#key course.titleParts.join('|')}
-			<span class="title" use:wrapTitle={course.titleParts}>
-				{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}
-			</span>
+		{#key course.title}
+			<span class="title" use:wrapTitle={course.title}>{course.title}</span>
 		{/key}
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
 		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{/if}

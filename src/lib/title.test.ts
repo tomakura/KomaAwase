@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { titleParts } from './timetable';
+import { titleParts } from './title';
 
 describe('titleParts', () => {
 	it('wraps between words, keeping short pieces with their word', () => {

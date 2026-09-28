@@ -8,7 +8,7 @@ import { courseSlots, courseTeachers, courseTerms, courses, timetables } from '.
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
 import { canEditShared, loadSharedCourse, writeShared, type SharedCourse } from './shared-courses';
-import { loadShape, titleParts } from './timetable';
+import { loadShape } from './timetable';
 
 const TITLE_MAX = 60;
 const TEACHER_MAX = 30;
@@ -342,7 +342,6 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 		course: {
 			id: course.id,
 			...values,
-			titleParts: titleParts(values.title),
 			color: course.color,
 			termIds: termLinks.map((l) => l.termId),
 			syncMode: course.syncMode
