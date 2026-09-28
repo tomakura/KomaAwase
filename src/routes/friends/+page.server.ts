@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { acceptRequest, listFriendships, removeFriendship } from '$lib/server/friends';
+import { notifyLater } from '$lib/server/notify';
 import { listMyGroups } from '$lib/server/groups';
 import { withVerified } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
@@ -22,9 +23,17 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 const other = async (request: Request) => String((await request.formData()).get('id') ?? '');
 
 export const actions: Actions = {
-	accept: async ({ request, locals }) => {
+	accept: async ({ request, locals, platform }) => {
 		if (!locals.user) redirect(303, '/login');
-		await acceptRequest(locals.db, locals.user.id, await other(request));
+		const requester = await other(request);
+		if (await acceptRequest(locals.db, locals.user.id, requester)) {
+			notifyLater(platform, locals.db, [requester], 'friendAccepted', {
+				title: `${locals.user.nickname ?? 'だれか'}さんが友だち申請を承認しました`,
+				body: 'おたがいの時間割が見られるようになりました',
+				url: `/friends/${locals.user.id}`,
+				tag: `friend-${locals.user.id}`
+			});
+		}
 	},
 	// Declining a request and cancelling one's own both remove it.
 	remove: async ({ request, locals }) => {

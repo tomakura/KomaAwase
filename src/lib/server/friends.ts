@@ -92,8 +92,9 @@ export async function sendRequest(db: Db, meId: string, targetId: string): Promi
 	return 'sent';
 }
 
+/** True when there was a request from them to accept */
 export async function acceptRequest(db: Db, meId: string, requesterId: string) {
-	await db
+	const accepted = await db
 		.update(friendships)
 		.set({ status: 'accepted', acceptedAt: new Date() })
 		.where(
@@ -102,7 +103,9 @@ export async function acceptRequest(db: Db, meId: string, requesterId: string) {
 				eq(friendships.addresseeId, meId),
 				eq(friendships.status, 'pending')
 			)
-		);
+		)
+		.returning({ id: friendships.id });
+	return accepted.length > 0;
 }
 
 // Declines, cancels or ends a friendship, whichever side asked.
