@@ -38,7 +38,7 @@
 		</form>
 	{:else}
 		<p>
-			{data.nickname} さん、次からパスキーですぐログインできるようにしておきましょう。スマホの顔認証や指紋認証が使えます。
+			{data.nickname} さん、パスキーを作ると、次から顔認証や指紋認証だけでログインできます。
 		</p>
 		<button class="btn btn-primary" type="button" onclick={onPasskey} disabled={busy}>
 			パスキーを作る

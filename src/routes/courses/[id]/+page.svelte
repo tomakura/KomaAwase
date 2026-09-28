@@ -218,7 +218,7 @@
 				{:else}
 					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
 					<label class="field">
-						メモ（補講の日など・なくてもOK）
+						メモ（任意）
 						<input name="body" maxlength="100" autocomplete="off" />
 					</label>
 				{/if}

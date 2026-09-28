@@ -13,7 +13,7 @@
 </script>
 
 {#if sent}
-	<p class="sent" role="status">送りました。運営が確認します。ありがとうございます。</p>
+	<p class="sent" role="status">送信しました。ありがとうございます。</p>
 	<button class="btn" type="button" onclick={done}>とじる</button>
 {:else}
 	<form
@@ -36,7 +36,7 @@
 			{/each}
 		</fieldset>
 		<label class="field">
-			くわしい内容（なくてもOK）
+			くわしい内容（任意）
 			<textarea name="detail" rows="3" maxlength="500"></textarea>
 		</label>
 		{#if message}<p class="error" role="alert">{message}</p>{/if}

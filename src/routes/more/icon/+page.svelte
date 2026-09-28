@@ -83,13 +83,13 @@
 					</form>
 				{/if}
 			</div>
-			<p class="ui-note">写真は端末の中で小さく切り抜いてから送ります。友だちやグループの人に見えます。</p>
+			<p class="ui-note">写真は友だちとグループのメンバーに表示されます。</p>
 		{/if}
 	</section>
 
 	<form method="POST" action="?/letters" use:enhance>
 
-		{#if data.user.icon?.photo}<p class="ui-note">写真を使っているあいだ、文字と色は写真を読み込むまでのあいだに出ます。</p>{/if}
+		{#if data.user.icon?.photo}<p class="ui-note">文字と色は、写真が表示されるまでの間に使われます。</p>{/if}
 		<label class="field">
 			文字（{ICON_TEXT_MAX}文字まで）
 			<input name="text" bind:value={text} autocomplete="off" required />
