@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import UserIcon from '$lib/components/UserIcon.svelte';
-	import { DAY_NAMES, periodLabel, timetableHref } from '$lib/courses';
+	import { DAY_NAMES, periodLabel, timetableHref, weekLabel } from '$lib/courses';
 
 	let { data } = $props();
 
@@ -26,7 +26,7 @@
 		const here = r.slots.find((s) => s.weekday === data.slot?.weekday && s.period === data.slot?.period);
 		const others = r.slots
 			.filter((s) => s !== here)
-			.map((s) => `${DAY_NAMES[s.weekday]}${periodLabel(s.period, s.span, periodNumbers)}`)
+			.map((s) => `${DAY_NAMES[s.weekday]}${periodLabel(s.period, s.span, periodNumbers)}${weekLabel(s.week) ? `（${weekLabel(s.week)}）` : ''}`)
 			.join('・');
 		return [r.teachers.join('・'), here?.room, others && (here ? `${others}も` : others)]
 			.filter(Boolean)

@@ -68,6 +68,7 @@
 			courses={termCourses}
 			{clock}
 			termIsOn={on}
+			termStart={term?.startDate}
 			slotHref={(day, period) => `/courses/search?term=${termId}&day=${day}&period=${period}`}
 			courseHref={(id) => courseHref(id, termId ?? null)}
 		/>

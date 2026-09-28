@@ -4,7 +4,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import ReportForm from '$lib/components/ReportForm.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
-	import { DAY_NAMES, deliveryLabel, type Delivery } from '$lib/courses';
+	import { DAY_NAMES, deliveryLabel, weekLabel, type Delivery, type WeekPattern } from '$lib/courses';
 	import { tokyoTime } from '$lib/time';
 
 	let { data, form } = $props();
@@ -12,14 +12,14 @@
 	type Values = {
 		title: string;
 		teachers: string[];
-		slots: { weekday: number; period: number; span: number; room: string | null }[];
+		slots: { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null }[];
 		delivery: Delivery | null;
 		intensiveFrom: string | null;
 		intensiveTo: string | null;
 	};
 
 	const slotText = (s: Values['slots'][number]) =>
-		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}${s.room ? ` ${s.room}` : ''}`;
+		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}${weekLabel(s.week) ? `（${weekLabel(s.week)}）` : ''}${s.room ? ` ${s.room}` : ''}`;
 	const fields = (v: Values) => ({
 		授業名: v.title,
 		先生: v.teachers.join('・') || 'なし',

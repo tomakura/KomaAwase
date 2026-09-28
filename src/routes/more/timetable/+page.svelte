@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { DAY_NAMES, courseColor, deliveryLabel, periodLabel } from '$lib/courses';
+	import { DAY_NAMES, courseColor, deliveryLabel, periodLabel, weekLabel } from '$lib/courses';
 
 	let { data } = $props();
 
@@ -21,7 +21,9 @@
 
 	function detail(course: (typeof data.courses)[number]) {
 		const terms = data.terms.filter((t) => course.termIds.includes(t.id)).map((t) => t.name).join('・');
-		const slots = course.slots.map((s) => `${DAY_NAMES[s.weekday]}${periodLabel(s.period, s.span, periodNumbers)}`).join('・');
+		const slots = course.slots
+			.map((s) => `${DAY_NAMES[s.weekday]}${periodLabel(s.period, s.span, periodNumbers)}${weekLabel(s.week) ? `（${weekLabel(s.week)}）` : ''}`)
+			.join('・');
 		return [terms, slots || deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo)].filter(Boolean).join(' · ');
 	}
 </script>

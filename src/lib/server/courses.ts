@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { and, asc, count, eq } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { COURSE_COLORS, isCourseColor, type Delivery } from '$lib/courses';
+import { COURSE_COLORS, isCourseColor, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
@@ -16,7 +16,7 @@ const TEACHERS_MAX = 10;
 const ROOM_MAX = 20;
 const SLOTS_MAX = 14;
 
-export type SlotInput = { weekday: number; period: number; span: number; room: string | null };
+export type SlotInput = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
 
 export type CourseInput = {
 	title: string;
@@ -93,7 +93,7 @@ function parseSlots(values: FormDataEntryValue[], periods: number[]): SlotInput[
 	if (values.length > SLOTS_MAX) return `曜日・時限は${SLOTS_MAX}個までです`;
 	const slots: (SlotInput & { start: number })[] = [];
 	for (const value of values) {
-		let raw: { weekday?: unknown; period?: unknown; span?: unknown; room?: unknown };
+		let raw: { weekday?: unknown; period?: unknown; span?: unknown; week?: unknown; room?: unknown };
 		try {
 			raw = JSON.parse(String(value)) ?? {};
 		} catch {
@@ -106,11 +106,14 @@ function parseSlots(values: FormDataEntryValue[], periods: number[]): SlotInput[
 		if (start < 0 || start + span > periods.length) return invalid;
 		const room = typeof raw.room === 'string' ? raw.room.trim() : '';
 		if (length(room) > ROOM_MAX) return `教室は${ROOM_MAX}文字までです`;
+		// Slots sent without it (older pages, imports) meet every week.
+		const week = raw.week === undefined ? 'every' : raw.week;
+		if (!isWeekPattern(week)) return invalid;
 		const overlaps = slots.some(
 			(s) => s.weekday === weekday && s.start <= start + span - 1 && start <= s.start + s.span - 1
 		);
 		if (overlaps) return '同じ曜日で時限が重なっています';
-		slots.push({ weekday, period: period as number, span, room: room || null, start });
+		slots.push({ weekday, period: period as number, span, week, room: room || null, start });
 	}
 	return slots
 		.sort((a, b) => a.weekday - b.weekday || a.start - b.start)
@@ -201,6 +204,7 @@ export async function saveCourse(
 					weekday: s.weekday,
 					periodNumber: s.period,
 					span: s.span,
+					weekPattern: s.week,
 					room: s.room
 				}))
 			)
@@ -258,6 +262,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 					weekday: courseSlots.weekday,
 					period: courseSlots.periodNumber,
 					span: courseSlots.span,
+					week: courseSlots.weekPattern,
 					room: courseSlots.room
 				})
 				.from(courseSlots)

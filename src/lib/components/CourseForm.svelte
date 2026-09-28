@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { COURSE_COLORS, DAY_NAMES, courseColor, periodLabel, type Delivery } from '$lib/courses';
+	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, courseColor, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
 
-	type Slot = { weekday: number; period: number; span: number; room: string | null };
+	type Slot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
 	type SharedValues = {
 		title: string;
 		teachers: string[];
@@ -47,7 +47,7 @@
 	// svelte-ignore state_referenced_locally
 	const v = $state({
 		...structuredClone(initial),
-		slots: initial.slots.map((s) => ({ ...s, room: s.room ?? '' })),
+		slots: initial.slots.map((s) => ({ ...s, week: s.week ?? 'every', room: s.room ?? '' })),
 		unscheduled: initial.slots.length === 0 && initial.delivery !== null,
 		delivery: initial.delivery ?? 'ondemand',
 		intensiveFrom: initial.intensiveFrom ?? '',
@@ -64,7 +64,7 @@
 		if (mode !== 'synced' || !shared) return;
 		v.title = shared.title;
 		v.teachers = [...shared.teachers];
-		v.slots = shared.slots.map((s) => ({ ...s, room: s.room ?? '' }));
+		v.slots = shared.slots.map((s) => ({ ...s, week: s.week ?? 'every', room: s.room ?? '' }));
 		v.unscheduled = shared.slots.length === 0 && shared.delivery !== null;
 		v.delivery = shared.delivery ?? 'ondemand';
 		v.intensiveFrom = shared.intensiveFrom ?? '';
@@ -110,7 +110,7 @@
 			slotError = 'その曜日・時限はもう入っています';
 			return;
 		}
-		v.slots.push({ weekday: pick.weekday, period: pick.period, span, room: '' });
+		v.slots.push({ weekday: pick.weekday, period: pick.period, span, week: 'every', room: '' });
 		v.slots.sort((a, b) => a.weekday - b.weekday || a.period - b.period);
 		slotError = null;
 		picking = false;
@@ -236,6 +236,10 @@
 					{@const label = `${DAY_NAMES[slot.weekday]} ${periodLabel(slot.period, slot.span, periodNumbers)}`}
 					<div class="slot-row">
 						<span class="slot-label">{label}</span>
+						<!-- Classes on alternate weeks share a slot with another course -->
+						<select class="week" bind:value={slot.week} aria-label="{label}の週">
+							{#each WEEK_PATTERNS as w (w.id)}<option value={w.id}>{w.label}</option>{/each}
+						</select>
 						<input bind:value={slot.room} placeholder="教室" aria-label="{label}の教室" maxlength="20" autocomplete="off" />
 						<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
 							<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -579,6 +583,17 @@
 		flex-shrink: 0;
 		font-size: 14px;
 		font-weight: 700;
+	}
+
+	/* 16px like the other fields, so iOS doesn't zoom in on it */
+	.slot-row .week {
+		width: 88px;
+		flex-shrink: 0;
+		height: 36px;
+		padding: 0 4px;
+		border-color: var(--line);
+		border-radius: 9px;
+		background: var(--bg);
 	}
 
 	.slot-row input {

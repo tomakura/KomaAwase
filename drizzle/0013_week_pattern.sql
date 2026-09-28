@@ -1,0 +1,1 @@
+ALTER TABLE `shared_course_slots` ADD `week_pattern` text DEFAULT 'every' NOT NULL;

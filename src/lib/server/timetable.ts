@@ -271,6 +271,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 				weekday: courseSlots.weekday,
 				period: courseSlots.periodNumber,
 				span: courseSlots.span,
+				week: courseSlots.weekPattern,
 				room: courseSlots.room
 			})
 			.from(courseSlots)
@@ -372,6 +373,7 @@ export async function loadTimetables(db: Db, timetableIds: string[]) {
 				weekday: courseSlots.weekday,
 				period: courseSlots.periodNumber,
 				span: courseSlots.span,
+				week: courseSlots.weekPattern,
 				room: courseSlots.room
 			})
 			.from(courseSlots)

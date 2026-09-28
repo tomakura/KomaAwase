@@ -1,6 +1,6 @@
 // Draws a timetable as an image on a canvas, in the browser. Canvas text uses the page's web
 // fonts, which an SVG turned into an image couldn't.
-import { DAY_NAMES } from './courses';
+import { DAY_NAMES, type WeekPattern } from './courses';
 
 export type ExportOptions = {
 	format: 'tall' | 'wide';
@@ -23,7 +23,7 @@ export const DEFAULT_OPTIONS: ExportOptions = {
 export type ExportCourse = {
 	color: string;
 	titleParts: string[];
-	slots: { weekday: number; period: number; span: number; room: string | null }[];
+	slots: { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null }[];
 };
 
 export type ExportData = {
@@ -287,7 +287,10 @@ export function drawTimetable(ctx: CanvasRenderingContext2D, data: ExportData, o
 			const b = L.cell(col, row, span);
 			roundRect(ctx, b, radius, COLORS[course.color] ?? COLORS.gray);
 
-			const room = o.hideRoom ? null : slot.room;
+			// Alternate weeks show even with rooms hidden: 「奇 B-203」, or 「奇数週」 alone
+			const week = slot.week === 'odd' ? '奇' : slot.week === 'even' ? '偶' : null;
+			const shownRoom = o.hideRoom ? null : slot.room;
+			const room = week && shownRoom ? `${week} ${shownRoom}` : week ? `${week}数週` : shownRoom;
 			const roomH = room ? roomSize + 12 : 0;
 			const maxLines = Math.max(1, Math.floor((b.h - inner * 2 - (room ? roomH + 6 : 0)) / lineH));
 			ctx.font = `700 ${titleSize}px ${BODY}`;

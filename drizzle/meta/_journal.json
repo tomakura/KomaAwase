@@ -92,6 +92,13 @@
       "when": 1790573957305,
       "tag": "0012_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1790575170021,
+      "tag": "0013_week_pattern",
+      "breakpoints": true
     }
   ]
 }

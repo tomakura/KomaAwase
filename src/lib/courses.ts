@@ -1,4 +1,4 @@
-import { monthDay } from './time';
+import { addDays, daysBetween, monthDay, weekdayOf } from './time';
 
 // Ids match the --course-* variables in app.css.
 export const COURSE_COLORS = [
@@ -69,4 +69,29 @@ export function daysLabel(days: number[]) {
 	return runs
 		.map((r) => (r.length >= 3 ? `${DAY_NAMES[r[0]]}〜${DAY_NAMES[r.at(-1)!]}` : r.map((d) => DAY_NAMES[d]).join('・')))
 		.join('・');
+}
+
+export type WeekPattern = 'every' | 'odd' | 'even';
+
+export const WEEK_PATTERNS: { id: WeekPattern; label: string }[] = [
+	{ id: 'every', label: '毎週' },
+	{ id: 'odd', label: '奇数週' },
+	{ id: 'even', label: '偶数週' }
+];
+
+export function isWeekPattern(value: unknown): value is WeekPattern {
+	return value === 'every' || value === 'odd' || value === 'even';
+}
+
+export const weekLabel = (week: WeekPattern | undefined) => (week === 'odd' ? '奇数週' : week === 'even' ? '偶数週' : null);
+
+/**
+ * Whether a slot meets in the week of `date`. Weeks count from the one the term starts in
+ * (Monday to Sunday), that week being the 1st. Without a start date every week counts.
+ */
+export function meetsInWeek(week: WeekPattern | undefined, termStart: string | null | undefined, date: string) {
+	if (!week || week === 'every' || !termStart || date < termStart) return true;
+	const monday = (d: string) => addDays(d, 1 - weekdayOf(d));
+	const index = Math.floor(daysBetween(monday(termStart), monday(date)) / 7) + 1;
+	return (index % 2 === 1) === (week === 'odd');
 }

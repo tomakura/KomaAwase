@@ -53,7 +53,7 @@
 			<a class="btn" href="/overlay?with={data.person.id}"><Icon name="overlap" size={18} />自分の時間割と重ねる</a>
 		</div>
 		<TermBar year={data.year} terms={data.terms} bind:termId />
-		<TimetableGrid periods={data.periods} {days} courses={termCourses} clock={time.clock} termIsOn={termIsOn(term, time.clock.date)} />
+		<TimetableGrid periods={data.periods} {days} courses={termCourses} clock={time.clock} termIsOn={termIsOn(term, time.clock.date)} termStart={term?.startDate} />
 		<UnscheduledCards courses={termCourses.filter((c) => c.slots.length === 0)} />
 	{:else}
 		<p class="empty">{name}さんは、まだ{data.year}年度の時間割を作っていません。</p>

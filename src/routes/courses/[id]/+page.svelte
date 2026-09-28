@@ -8,7 +8,8 @@
 		courseHref,
 		deliveryLabel,
 		periodLabel,
-		timetableHref
+		timetableHref,
+		weekLabel
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
@@ -18,7 +19,9 @@
 	const course = $derived(data.course);
 	const periodNumbers = $derived(data.periods.map((p) => p.number));
 	const slotLabels = $derived(
-		course.slots.map((s) => `${DAY_NAMES[s.weekday]} ${periodLabel(s.period, s.span, periodNumbers)}`)
+		course.slots.map(
+			(s) => `${DAY_NAMES[s.weekday]} ${periodLabel(s.period, s.span, periodNumbers)}${weekLabel(s.week) ? `（${weekLabel(s.week)}）` : ''}`
+		)
 	);
 	const termNames = $derived(
 		data.terms

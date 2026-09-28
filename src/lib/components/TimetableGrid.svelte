@@ -1,5 +1,7 @@
 <script lang="ts" module>
-	export type GridSlot = { weekday: number; period: number; span: number; room: string | null };
+	import type { WeekPattern } from '$lib/courses';
+
+	export type GridSlot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
 	export type GridCourse = {
 		id: string;
 		color: string;
@@ -11,7 +13,7 @@
 </script>
 
 <script lang="ts">
-	import { DAY_NAMES, courseColor } from '$lib/courses';
+	import { DAY_NAMES, courseColor, meetsInWeek } from '$lib/courses';
 	import { addDays, monthDay, toMinutes, type TokyoTime, weekdayOf } from '$lib/time';
 
 	let {
@@ -23,7 +25,8 @@
 		slotHref,
 		courseHref,
 		slotLabel = (day: number, period: number) => `${DAY_NAMES[day]}曜${period}限に授業を追加`,
-		showToday = true
+		showToday = true,
+		termStart = null
 	}: {
 		periods: { number: number; start: string; end: string }[];
 		days: number[];
@@ -37,6 +40,8 @@
 		slotLabel?: (day: number, period: number) => string;
 		// Off for a past year, where today's column means nothing
 		showToday?: boolean;
+		// The term's first day, from which odd and even weeks are counted
+		termStart?: string | null;
 	} = $props();
 
 	const rowOf = $derived(new Map(periods.map((p, i) => [p.number, i + 2])));
@@ -65,6 +70,8 @@
 		span: number;
 		live: { progress: number; left: number } | null;
 		cancel: string | null;
+		// False for a slot on alternate weeks that doesn't meet this week
+		meets: boolean;
 	};
 
 	const cells = $derived(
@@ -79,8 +86,9 @@
 					(course.cancels ?? [])
 						.filter((d) => weekdayOf(d) === slot.weekday && d >= clock.date && d <= addDays(clock.date, 6))
 						.sort()[0] ?? null;
-				const live = cancel === clock.date ? null : session(slot.weekday, row, span);
-				return [{ course, slot, row, col, span, live, cancel }];
+				const meets = meetsInWeek(slot.week, termStart, clock.date);
+				const live = cancel === clock.date || !meets ? null : session(slot.weekday, row, span);
+				return [{ course, slot, row, col, span, live, cancel, meets }];
 			})
 		)
 	);
@@ -106,11 +114,14 @@
 	const time = (hhmm: string) => hhmm.replace(/^0/, '');
 </script>
 
-{#snippet course({ course, slot, live, cancel }: Cell)}
+{#snippet course({ course, slot, live, cancel, meets }: Cell)}
+	{@const week = slot.week === 'odd' ? '奇' : slot.week === 'even' ? '偶' : null}
 	<svelte:element
 		this={courseHref ? 'a' : 'div'}
 		class="course"
 		class:live
+		class:offweek={!meets}
+		title={meets ? undefined : '今週はありません'}
 		href={courseHref?.(course.id)}
 		style:--c={courseColor(course.color)}
 		style:--progress={live ? `${live.progress * 100}%` : undefined}
@@ -120,7 +131,11 @@
 		</span>
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
 		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{/if}
-		{#if slot.room}<span class="room">{slot.room}</span>{/if}
+		{#if slot.room && week}
+			<span class="room"><b class="week" aria-label="{week}数週">{week}</b>{slot.room}</span>
+		{:else if slot.room || week}
+			<span class="room">{slot.room ?? `${week}数週`}</span>
+		{/if}
 	</svelte:element>
 {/snippet}
 
@@ -332,5 +347,15 @@
 
 	.cancel + .room {
 		margin-top: 0;
+	}
+
+	/* Alternate weeks: 奇 or 偶 leads the room tag */
+	.week {
+		margin-right: 3px;
+		font-weight: 700;
+	}
+
+	.course.offweek {
+		opacity: 0.5;
 	}
 </style>

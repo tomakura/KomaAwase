@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import type { Delivery } from '$lib/courses';
+import type { Delivery, WeekPattern } from '$lib/courses';
 import type { Db } from './db';
 import {
 	courses,
@@ -10,7 +10,7 @@ import {
 	sharedCourses
 } from './db/schema';
 
-type Slot = { weekday: number; period: number; span: number; room: string | null };
+type Slot = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
 
 // What everyone syncing a course shares. Colors, terms taken and notes stay personal.
 export type SharedValues = {
@@ -27,7 +27,7 @@ function normalize(v: SharedValues): SharedValues {
 	return {
 		title: v.title,
 		teachers: v.teachers,
-		slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, room: s.room })),
+		slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, week: s.week ?? 'every', room: s.room })),
 		delivery: v.delivery,
 		intensiveFrom: v.intensiveFrom,
 		intensiveTo: v.intensiveTo
@@ -89,7 +89,7 @@ export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<stri
 					teachers: teachers.filter((t) => t.sharedCourseId === r.id).map((t) => t.name),
 					slots: slots
 						.filter((s) => s.sharedCourseId === r.id)
-						.map((s) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, room: s.room })),
+						.map((s) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, week: s.weekPattern, room: s.room })),
 					delivery: r.delivery,
 					intensiveFrom: r.intensiveFrom,
 					intensiveTo: r.intensiveTo
@@ -113,6 +113,7 @@ function insertDetails(db: Db, sharedCourseId: string, v: SharedValues): BatchIt
 					weekday: s.weekday,
 					periodNumber: s.period,
 					span: s.span,
+					weekPattern: s.week,
 					room: s.room
 				}))
 			)

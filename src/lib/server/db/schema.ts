@@ -307,6 +307,10 @@ export const sharedCourseSlots = sqliteTable(
 		weekday: integer('weekday').notNull(),
 		periodNumber: integer('period_number').notNull(),
 		span: integer('span').notNull().default(1),
+		// Every week, or only odd or even weeks of the term
+		weekPattern: text('week_pattern', { enum: ['every', 'odd', 'even'] })
+			.notNull()
+			.default('every'),
 		room: text('room')
 	},
 	(t) => [
