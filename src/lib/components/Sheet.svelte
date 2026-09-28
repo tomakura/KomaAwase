@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { swipeDown } from '$lib/swipe';
 
 	// A sheet that slides up from the bottom, on the native <dialog> so focus and Escape work.
 	let {
@@ -20,6 +21,7 @@
 
 <dialog
 	bind:this={dialog}
+	use:swipeDown={() => dialog?.close()}
 	aria-label={title}
 	onclose={() => {
 		open = false;
