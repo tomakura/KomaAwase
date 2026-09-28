@@ -43,12 +43,11 @@
 			</svg>
 			<span>コマあわせ</span>
 		</div>
-		<!-- The export screen comes later. -->
-		<button class="icon-button" type="button" aria-label="画像で書き出す" disabled>
+		<a class="icon-button" href="/export{termId ? `?term=${encodeURIComponent(termId)}` : ''}" aria-label="画像で書き出す">
 			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
 				<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2" />
 			</svg>
-		</button>
+		</a>
 	</header>
 
 	<main>
@@ -98,10 +97,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0;
-		border: none;
 		border-radius: 12px;
-		background: none;
 		color: var(--ink);
 	}
 
