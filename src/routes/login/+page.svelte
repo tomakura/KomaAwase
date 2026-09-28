@@ -3,11 +3,17 @@
 	import { enhance } from '$app/forms';
 	import { loginWithPasskey } from '$lib/passkey';
 	import logo from '$lib/assets/favicon.svg';
+	import { clearPageCaches } from '$lib/offline';
 
 	let { data, form } = $props();
 	let busy = $state(false);
 	let sending = $state(false);
 	let passkeyError = $state<string | null>(null);
+
+	// Signed out: the pages kept for offline use hold the last person's timetable.
+	$effect(() => {
+		clearPageCaches();
+	});
 
 	async function onPasskey() {
 		busy = true;

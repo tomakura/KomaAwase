@@ -52,7 +52,7 @@
 
 	<main>
 		{#if data.imported}
-			<a class="notice" href="/import/{data.imported.id}">
+			<a class="notice" class:failed={data.imported.status !== 'done'} href="/import/{data.imported.id}">
 				<span>
 					<b>{data.imported.status === 'done' ? 'スクショの読み取りが終わりました' : 'スクショを読み取れませんでした'}</b>
 					{data.imported.status === 'done' ? '内容を見直して、時間割に追加します' : 'くわしくはこちら'}
@@ -134,6 +134,10 @@
 		color: var(--ink);
 		font-size: 12px;
 		text-decoration: none;
+	}
+
+	.notice.failed {
+		background: var(--course-orange);
 	}
 
 	.notice span {
