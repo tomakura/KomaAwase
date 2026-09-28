@@ -64,7 +64,7 @@ export async function finishVerification(db: Db, token: string) {
 		expiresAt: verificationExpiry()
 	};
 	await db.batch([
-		db.delete(univVerifications).where(and(eq(univVerifications.email, row.email))),
+		db.delete(univVerifications).where(eq(univVerifications.email, row.email)),
 		db
 			.insert(univVerifications)
 			.values(values)
