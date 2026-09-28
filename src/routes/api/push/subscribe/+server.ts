@@ -1,5 +1,5 @@
 import { error, json } from '@sveltejs/kit';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, ne } from 'drizzle-orm';
 import { pushSubscriptions } from '$lib/server/db/schema';
 import { pushEnabled } from '$lib/server/notify';
 import { isPushEndpoint } from '$lib/server/push';
@@ -22,7 +22,11 @@ export const POST: RequestHandler = async ({ locals, request, url, platform }) =
 	if (typeof endpoint !== 'string' || endpoint.length > 1000 || !isPushEndpoint(endpoint)) error(400, 'この端末では通知を受け取れません');
 	if (typeof p256dh !== 'string' || typeof auth !== 'string' || !KEY.test(p256dh) || !KEY.test(auth)) error(400, 'この端末では通知を受け取れません');
 
-	const [mine] = await locals.db.select({ n: count() }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, locals.user.id));
+	// This browser registering again doesn't count against itself
+	const [mine] = await locals.db
+		.select({ n: count() })
+		.from(pushSubscriptions)
+		.where(and(eq(pushSubscriptions.userId, locals.user.id), ne(pushSubscriptions.endpoint, endpoint)));
 	if ((mine?.n ?? 0) >= DEVICES_MAX) {
 		return json({ message: `通知を受け取れる端末は${DEVICES_MAX}台までです。使っていない端末で通知をオフにしてください` }, { status: 400 });
 	}
