@@ -125,5 +125,15 @@ export async function saveTimetableShape(
 		...periodStatements(db, settings.timetableId, shape.periods),
 		userUpdate
 	];
-	await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+	await db.batch(statements as Batch);
+}
+
+type Batch = [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]];
+
+export async function saveTerms(db: Db, timetableId: string, input: TermInput[]) {
+	await db.batch((await termStatements(db, timetableId, input)) as Batch);
+}
+
+export async function savePeriods(db: Db, timetableId: string, input: PeriodInput[]) {
+	await db.batch(periodStatements(db, timetableId, input) as Batch);
 }

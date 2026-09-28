@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { replaceState } from '$app/navigation';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
-	import { courseColor, courseHref, deliveryLabel, timetableHref } from '$lib/courses';
+	import UnscheduledCards from '$lib/components/UnscheduledCards.svelte';
+	import { courseHref, timetableHref } from '$lib/courses';
 	import { tokyoTime } from '$lib/time';
 
 	let { data } = $props();
@@ -22,10 +24,7 @@
 	let termId = $state(initialTerm());
 	const term = $derived(data.terms.find((t) => t.id === termId));
 
-	function selectTerm(id: string) {
-		termId = id;
-		replaceState(timetableHref(id), {});
-	}
+	const selectTerm = (id: string) => replaceState(timetableHref(id), {});
 
 	// Starts at the server's time so hydration matches, then follows the browser's clock.
 	// svelte-ignore state_referenced_locally
@@ -74,19 +73,7 @@
 	</header>
 
 	<main>
-		<div class="term-bar">
-			<div class="term-title">
-				<span class="year">{data.year}年度</span>
-				<span class="group">{term?.groupName ?? term?.name ?? ''}</span>
-			</div>
-			<div class="tabs" role="group" aria-label="学期">
-				{#each data.terms as t (t.id)}
-					<button type="button" aria-pressed={t.id === termId} onclick={() => selectTerm(t.id)}>
-						{t.name}
-					</button>
-				{/each}
-			</div>
-		</div>
+		<TermBar year={data.year} terms={data.terms} bind:termId onchange={selectTerm} />
 
 		<TimetableGrid
 			periods={data.periods}
@@ -98,20 +85,7 @@
 			courseHref={(id) => courseHref(id, termId ?? null)}
 		/>
 
-		{#if unscheduled.length}
-			<section class="unscheduled">
-				<h2>曜日・時限なし</h2>
-				<div class="cards">
-					{#each unscheduled as course (course.id)}
-						{@const label = deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo)}
-						<a class="card" href={courseHref(course.id, termId ?? null)} style:--c={courseColor(course.color)}>
-							<span>{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}</span>
-							{#if label}<span class="delivery">{label}</span>{/if}
-						</a>
-					{/each}
-				</div>
-			</section>
-		{/if}
+		<UnscheduledCards courses={unscheduled} href={(id) => courseHref(id, termId ?? null)} />
 	</main>
 
 	<BottomNav current="timetable" />
@@ -162,108 +136,5 @@
 
 	main {
 		padding-bottom: 20px;
-	}
-
-	.term-bar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 4px 16px 12px;
-	}
-
-	.term-title {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.year {
-		font-size: 12px;
-		color: var(--ink-sub);
-	}
-
-	.group {
-		font-family: var(--font-display);
-		font-weight: 700;
-		font-size: 17px;
-	}
-
-	.tabs {
-		display: flex;
-		gap: 4px;
-		padding: 3px;
-		background: var(--slot);
-		border-radius: 12px;
-	}
-
-	.tabs button {
-		min-width: 44px;
-		height: 36px;
-		padding: 0 8px;
-		border: none;
-		border-radius: 9px;
-		background: transparent;
-		color: var(--ink-sub);
-		font-family: inherit;
-		font-size: 13px;
-		font-weight: 500;
-		cursor: pointer;
-	}
-
-	.tabs button[aria-pressed='true'] {
-		background: var(--surface);
-		color: var(--ink);
-		font-weight: 700;
-		box-shadow: 0 1px 0 var(--line-strong);
-	}
-
-	.unscheduled {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		padding: 14px 12px 0;
-	}
-
-	h2 {
-		margin: 0;
-		padding-left: 2px;
-		font-size: 12px;
-		font-weight: 400;
-		color: var(--ink-sub);
-	}
-
-	.cards {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 6px;
-	}
-
-	/* The label moves under a title that needs the whole width. */
-	.card {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: space-between;
-		gap: 6px;
-		padding: 7px 8px;
-		border-radius: 8px;
-		background: var(--c);
-		color: var(--ink);
-		font-size: 12px;
-		font-weight: 700;
-		text-decoration: none;
-		word-break: keep-all;
-		overflow-wrap: anywhere;
-	}
-
-	.delivery {
-		flex-shrink: 0;
-		padding: 1px 6px;
-		border-radius: 5px;
-		background: var(--surface);
-		font-size: 10px;
-		font-weight: 400;
-		white-space: nowrap;
 	}
 </style>

@@ -22,7 +22,8 @@
 		termIsOn,
 		slotHref,
 		courseHref,
-		slotLabel = (day: number, period: number) => `${DAY_NAMES[day]}曜${period}限に授業を追加`
+		slotLabel = (day: number, period: number) => `${DAY_NAMES[day]}曜${period}限に授業を追加`,
+		showToday = true
 	}: {
 		periods: { number: number; start: string; end: string }[];
 		days: number[];
@@ -34,12 +35,15 @@
 		slotHref?: (day: number, period: number) => string;
 		courseHref?: (courseId: string) => string;
 		slotLabel?: (day: number, period: number) => string;
+		// Off for a past year, where today's column means nothing
+		showToday?: boolean;
 	} = $props();
 
 	const rowOf = $derived(new Map(periods.map((p, i) => [p.number, i + 2])));
 	const colOf = $derived(new Map(days.map((d, i) => [d, i + 2])));
 	const lastRow = $derived(periods.length + 1);
-	const todayShown = $derived(colOf.has(clock.weekday));
+	const todayShown = $derived(showToday && colOf.has(clock.weekday));
+	const isToday = (day: number) => showToday && day === clock.weekday;
 	const isNow = (start: string, end: string) =>
 		toMinutes(start) <= clock.minutes && clock.minutes < toMinutes(end);
 
@@ -123,7 +127,7 @@
 <div class="grid" style:--days={days.length} style:--periods={periods.length}>
 	{#each days as day, i (day)}
 		<div class="day" style:grid-column={i + 2}>
-			{#if day === clock.weekday}
+			{#if isToday(day)}
 				<span class="today-mark" aria-label="{DAY_NAMES[day]}曜日（今日）">{DAY_NAMES[day]}</span>
 			{:else}
 				{DAY_NAMES[day]}
@@ -141,7 +145,7 @@
 			<svelte:element
 				this={slotHref ? 'a' : 'div'}
 				class="slot"
-				class:today={day === clock.weekday}
+				class:today={isToday(day)}
 				href={slotHref?.(day, p.number)}
 				aria-label={slotHref ? slotLabel(day, p.number) : undefined}
 				style:grid-row={i + 2}

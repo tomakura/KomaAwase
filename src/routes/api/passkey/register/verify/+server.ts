@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { verifyRegistrationResponse, type RegistrationResponseJSON } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
+import { passkeyName } from '$lib/server/auth/passkey-name';
 import { passkeys } from '$lib/server/db/schema';
 import { relyingParty, takeChallenge } from '$lib/server/auth/webauthn';
 import type { RequestHandler } from './$types';
@@ -27,7 +28,7 @@ export const POST: RequestHandler = async ({ locals, cookies, url, request }) =>
 	}
 	if (!verification.verified) error(400, 'パスキーを確認できませんでした');
 
-	const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+	const { credential, credentialDeviceType, credentialBackedUp, aaguid } = verification.registrationInfo;
 	await locals.db.insert(passkeys).values({
 		id: credential.id,
 		userId: user.id,
@@ -35,7 +36,8 @@ export const POST: RequestHandler = async ({ locals, cookies, url, request }) =>
 		counter: credential.counter,
 		transports: credential.transports ?? null,
 		deviceType: credentialDeviceType,
-		backedUp: credentialBackedUp
+		backedUp: credentialBackedUp,
+		name: passkeyName(aaguid, request.headers.get('user-agent'))
 	});
 
 	return json({ ok: true });

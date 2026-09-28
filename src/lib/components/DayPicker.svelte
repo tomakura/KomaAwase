@@ -2,14 +2,20 @@
 	import { DAY_NAMES } from '$lib/courses';
 
 	// Days shown in the timetable, 1 = Monday ... 7 = Sunday. At least one stays on.
-	let { days = $bindable(), name }: { days: number[]; name?: string } = $props();
+	let {
+		days = $bindable(),
+		name,
+		onchange
+	}: { days: number[]; name?: string; onchange?: (days: number[]) => void } = $props();
 
 	function toggle(day: number) {
 		if (days.includes(day)) {
-			if (days.length > 1) days = days.filter((d) => d !== day);
+			if (days.length === 1) return;
+			days = days.filter((d) => d !== day);
 		} else {
 			days = [...days, day].sort((a, b) => a - b);
 		}
+		onchange?.(days);
 	}
 </script>
 

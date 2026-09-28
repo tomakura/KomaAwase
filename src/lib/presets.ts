@@ -107,6 +107,15 @@ export function periodsProblem(periods: PeriodInput[]): string | null {
 	return null;
 }
 
+// "6限 · 8:40〜19:10"
+export function periodsRange(periods: PeriodInput[]) {
+	const first = periods[0];
+	const last = periods.at(-1);
+	if (!first || !last) return '時限なし';
+	const time = (t: string) => t.replace(/^0/, '');
+	return `${last.number}限 · ${time(first.start)}〜${time(last.end)}`;
+}
+
 // "6限まで · 1コマ90分" and "1限 9:00〜 / 6限 〜19:30"
 export function periodsSummary(periods: PeriodInput[]) {
 	if (!periods.length) return { title: '時限なし', detail: '' };

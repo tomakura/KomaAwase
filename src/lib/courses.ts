@@ -56,3 +56,17 @@ export function courseHref(courseId: string, termId: string | null, page: '' | '
 export function actionHref(action: string, termId: string | null) {
 	return `?/${action}${termId ? `&term=${encodeURIComponent(termId)}` : ''}`;
 }
+
+// 月〜金, 月〜土, 月・水・金, 月〜金・日
+export function daysLabel(days: number[]) {
+	const sorted = [...new Set(days)].sort((a, b) => a - b);
+	const runs: number[][] = [];
+	for (const d of sorted) {
+		const run = runs.at(-1);
+		if (run && run.at(-1) === d - 1) run.push(d);
+		else runs.push([d]);
+	}
+	return runs
+		.map((r) => (r.length >= 3 ? `${DAY_NAMES[r[0]]}〜${DAY_NAMES[r.at(-1)!]}` : r.map((d) => DAY_NAMES[d]).join('・')))
+		.join('・');
+}

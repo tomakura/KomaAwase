@@ -5,6 +5,8 @@ declare global {
 	interface Env {
 		RELAY_SECRET?: string;
 		FILES_SECRET?: string;
+		// The page for supporting development (開発を応援する); the row is hidden without it
+		SUPPORT_URL?: string;
 	}
 
 	namespace App {
