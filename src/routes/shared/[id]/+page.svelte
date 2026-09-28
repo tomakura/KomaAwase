@@ -79,7 +79,9 @@
 			</p>
 		</div>
 		<p class="ui-note">
-			同じ大学の人ならだれでも直せます。直すと、同期しているみんなの時間割に反映されます。まちがった変更は、下の履歴から元に戻せます。
+			直せるのは、この授業を時間割に入れていて在籍確認をした人です。直すと、同期しているみんなの時間割に反映されます。まちがった変更は、下の履歴から元に戻せます。{data.canEdit
+				? ''
+				: 'まちがいを見つけたら、報告してください。'}
 		</p>
 		<button class="btn" type="button" onclick={() => (reporting = true)}><Icon name="flag" size={18} />まちがい・荒らしを報告する</button>
 	</section>
@@ -98,7 +100,7 @@
 					{#each changes(edit.diff) as change (change.label)}
 						<p class="change"><b>{change.label}</b>{change.text}</p>
 					{/each}
-					{#if data.page > 1 || i > 0}
+					{#if data.canEdit && (data.page > 1 || i > 0)}
 						<form
 							method="POST"
 							action="?/restore"

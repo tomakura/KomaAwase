@@ -44,7 +44,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		sync: {
 			canSync: !!timetable.universityId,
 			year: timetable.year,
-			shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values }
+			shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values },
+			// Only someone who already has it (and is verified) changes it for everyone
+			canEdit: !shared
 		},
 		initial: {
 			...values,

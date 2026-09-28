@@ -7,7 +7,7 @@ import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
-import { loadSharedCourse, writeShared, type SharedCourse } from './shared-courses';
+import { canEditShared, loadSharedCourse, writeShared, type SharedCourse } from './shared-courses';
 import { loadShape, titleParts } from './timetable';
 
 const TITLE_MAX = 60;
@@ -164,8 +164,9 @@ export async function prepareCourse(
 	}
 
 	let sharedCourseId = existing?.id ?? null;
+	let syncMode = input.syncMode;
 	const shared: BatchItem<'sqlite'>[] = [];
-	if (input.syncMode === 'synced') {
+	if (syncMode === 'synced') {
 		if (!timetable.universityId) error(400, '大学が決まっていないので同期できません');
 		const written = writeShared(db, {
 			userId,
@@ -178,8 +179,14 @@ export async function prepareCourse(
 		if (written.changed && existing && input.sharedVersion !== null && input.sharedVersion !== existing.version) {
 			return { message: CONFLICT };
 		}
-		sharedCourseId = written.id;
-		shared.push(...written.statements);
+		if (written.changed && existing && !(await canEditShared(db, userId, existing))) {
+			// Not theirs to change for everyone: the change stays in their timetable, still linked
+			// (so overlays still group it), as 自分だけで使う. The form says so beforehand.
+			syncMode = 'personal';
+		} else {
+			sharedCourseId = written.id;
+			shared.push(...written.statements);
+		}
 	}
 
 	const id = courseId ?? crypto.randomUUID();
@@ -189,7 +196,7 @@ export async function prepareCourse(
 		delivery: input.delivery,
 		intensiveFrom: input.intensiveFrom,
 		intensiveTo: input.intensiveTo,
-		syncMode: input.syncMode,
+		syncMode,
 		sharedCourseId
 	};
 	const rest: BatchItem<'sqlite'>[] = [];

@@ -7,7 +7,10 @@ import {
 	sharedCourseEdits,
 	sharedCourseSlots,
 	sharedCourseTeachers,
-	sharedCourses
+	sharedCourses,
+	timetables,
+	univVerifications,
+	users
 } from './db/schema';
 
 type Slot = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
@@ -97,6 +100,35 @@ export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<stri
 			}
 		])
 	);
+}
+
+/**
+ * Who may change a shared course for everyone: someone who has it in a timetable, synced,
+ * and holds a current enrollment check for its university. Admins may always. Anyone at
+ * the university can still add new courses, use this one as it is, keep their own copy
+ * (自分だけで使う) and report it.
+ */
+export async function canEditShared(db: Db, userId: string, course: { id: string; universityId: string }) {
+	const [[user], [synced], [verified]] = await db.batch([
+		db.select({ role: users.role }).from(users).where(eq(users.id, userId)),
+		db
+			.select({ id: courses.id })
+			.from(courses)
+			.innerJoin(timetables, eq(timetables.id, courses.timetableId))
+			.where(and(eq(timetables.userId, userId), eq(courses.sharedCourseId, course.id), eq(courses.syncMode, 'synced')))
+			.limit(1),
+		db
+			.select({ userId: univVerifications.userId })
+			.from(univVerifications)
+			.where(
+				and(
+					eq(univVerifications.userId, userId),
+					eq(univVerifications.universityId, course.universityId),
+					sql`${univVerifications.expiresAt} > ${Date.now()}`
+				)
+			)
+	]);
+	return user?.role === 'admin' || (!!synced && !!verified);
 }
 
 export async function loadSharedCourse(db: Db, id: string) {

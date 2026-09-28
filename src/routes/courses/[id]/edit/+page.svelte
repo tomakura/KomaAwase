@@ -14,7 +14,7 @@
 	heading="授業を編集"
 	backHref={courseHref(data.course.id, data.termParam)}
 	action={actionHref('save', data.termParam)}
-	sync={{ canSync: !!data.timetable.universityId, year: data.timetable.year, shared: data.shared }}
+	sync={{ canSync: !!data.timetable.universityId, year: data.timetable.year, shared: data.shared, canEdit: data.canEditShared }}
 	initial={data.course}
 	terms={data.terms}
 	periods={data.periods}

@@ -21,6 +21,8 @@
 		year: number;
 		// The shared course this one is linked to
 		shared: { id: string; source: 'syllabus' | 'user'; version: number; values: SharedValues } | null;
+		// Whether this person's changes reach the shared course (see canEditShared)
+		canEdit: boolean;
 	};
 
 	let {
@@ -81,7 +83,9 @@
 	const syncNote = $derived(
 		v.syncMode === 'personal'
 			? '授業名や教室を自分用に変えられます。ほかの人が直しても反映されません。'
-			: sync.shared
+			: sync.shared && !sync.canEdit
+				? '教室の変更などをだれかが直したときに自動で反映されます。みんなの授業データを直せるのは、この授業を時間割に入れていて在籍確認をした人です。ここで内容を変えて保存すると、この授業は「自分だけで使う」になります。'
+				: sync.shared
 				? '教室の変更などをだれかが直したときに自動で反映されます。コマを重ねたときも、同じ授業としてまとまります。ここで直した内容は、同期しているみんなにも反映されます。'
 				: '同じ大学の人が授業をさがしたときに出てくるようになり、コマを重ねたときも同じ授業としてまとまります。'
 	);
