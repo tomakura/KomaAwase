@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { feedback, groups, reports, sharedCourses, users } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -10,9 +10,15 @@ function requireAdmin(locals: App.Locals) {
 	return locals.user;
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+// Each list pages on its own (?reports=2, ?feedback=3), oldest open items included.
+const PAGE = 50;
+const pageOf = (url: URL, key: string) => Math.min(Math.max(Math.floor(Number(url.searchParams.get(key))) || 1, 1), 1000);
+
+export const load: PageServerLoad = async ({ locals, url }) => {
 	requireAdmin(locals);
-	const [reportRows, feedbackRows] = await locals.db.batch([
+	const reportPage = pageOf(url, 'reports');
+	const feedbackPage = pageOf(url, 'feedback');
+	const [reportRows, feedbackRows, [reportTotal], [feedbackTotal]] = await locals.db.batch([
 		locals.db
 			.select({
 				id: reports.id,
@@ -26,8 +32,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.from(reports)
 			.leftJoin(users, eq(users.id, reports.reporterId))
 			.where(eq(reports.status, 'open'))
-			.orderBy(desc(reports.createdAt))
-			.limit(100),
+			.orderBy(desc(reports.createdAt), desc(reports.id))
+			.limit(PAGE)
+			.offset((reportPage - 1) * PAGE),
 		locals.db
 			.select({
 				id: feedback.id,
@@ -40,8 +47,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.from(feedback)
 			.leftJoin(users, eq(users.id, feedback.userId))
 			.where(eq(feedback.status, 'open'))
-			.orderBy(desc(feedback.createdAt))
-			.limit(100)
+			.orderBy(desc(feedback.createdAt), desc(feedback.id))
+			.limit(PAGE)
+			.offset((feedbackPage - 1) * PAGE),
+		locals.db.select({ n: count() }).from(reports).where(eq(reports.status, 'open')),
+		locals.db.select({ n: count() }).from(feedback).where(eq(feedback.status, 'open'))
 	]);
 
 	// What each report is about, by name
@@ -64,7 +74,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		reports: reportRows.map((r) => ({ ...r, target: names.get(r.targetId) ?? '（消えています）' })),
-		feedback: feedbackRows
+		feedback: feedbackRows,
+		pageSize: PAGE,
+		reportPage,
+		feedbackPage,
+		reportTotal: reportTotal?.n ?? 0,
+		feedbackTotal: feedbackTotal?.n ?? 0
 	};
 };
 

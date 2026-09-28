@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { tokyoTime } from '$lib/time';
 
@@ -7,6 +8,15 @@
 
 	const TARGETS = { user: '利用者', group: 'グループ', shared_course: '共有授業' } as const;
 	const KINDS = { bug: '不具合', request: '要望', other: 'そのほか' } as const;
+	// This page with another page of one list, the other list left where it is
+	function pageHref(key: 'reports' | 'feedback', n: number) {
+		const url = new URL(page.url);
+		if (n > 1) url.searchParams.set(key, String(n));
+		else url.searchParams.delete(key);
+		return url.pathname + url.search;
+	}
+	const pages = (total: number) => Math.max(1, Math.ceil(total / data.pageSize));
+
 	const when = (d: Date) => {
 		const t = tokyoTime(d.getTime());
 		const m = Math.floor(t.minutes);
@@ -22,7 +32,7 @@
 	<PageHeader title="運営" back="/more" />
 
 	<section class="ui-section">
-		<h2 class="ui-section-title">通報（{data.reports.length}）</h2>
+		<h2 class="ui-section-title">通報（{data.reportTotal}）</h2>
 		{#each data.reports as r (r.id)}
 			<div class="item">
 				<div class="meta">
@@ -43,10 +53,11 @@
 		{:else}
 			<p class="ui-note">未対応の通報はありません。</p>
 		{/each}
+		{@render pager('reports', data.reportPage, pages(data.reportTotal))}
 	</section>
 
 	<section class="ui-section">
-		<h2 class="ui-section-title">不具合・要望（{data.feedback.length}）</h2>
+		<h2 class="ui-section-title">不具合・要望（{data.feedbackTotal}）</h2>
 		{#each data.feedback as f (f.id)}
 			<div class="item">
 				<div class="meta">
@@ -76,10 +87,34 @@
 		{:else}
 			<p class="ui-note">未対応の不具合・要望はありません。</p>
 		{/each}
+		{@render pager('feedback', data.feedbackPage, pages(data.feedbackTotal))}
 	</section>
 </div>
 
+{#snippet pager(key: 'reports' | 'feedback', current: number, last: number)}
+	{#if last > 1}
+		<nav class="pager" aria-label="ページ">
+			{#if current > 1}<a href={pageHref(key, current - 1)}>新しい{data.pageSize}件</a>{/if}
+			<span>{current} / {last}</span>
+			{#if current < last}<a href={pageHref(key, current + 1)}>古い{data.pageSize}件</a>{/if}
+		</nav>
+	{/if}
+{/snippet}
+
 <style>
+	.pager {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 16px;
+		padding: 12px 0 0;
+		font-size: 14px;
+	}
+
+	.pager a {
+		color: var(--accent-text);
+	}
+
 	.item {
 		display: flex;
 		flex-direction: column;
