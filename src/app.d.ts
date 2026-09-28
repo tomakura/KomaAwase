@@ -12,6 +12,10 @@ declare global {
 		// Google sign-in; the button appears once both are set
 		GOOGLE_CLIENT_ID?: string;
 		GOOGLE_CLIENT_SECRET?: string;
+		// Notifications (Web Push): the VAPID key pair, base64url (public: raw point, private: d).
+		// Without them the notification settings say they aren't available yet.
+		VAPID_PUBLIC_KEY?: string;
+		VAPID_PRIVATE_KEY?: string;
 		// Set by worker/entry.js on calls it makes to itself (queue and cron), never by requests
 		KOMA_INTERNAL?: boolean;
 	}

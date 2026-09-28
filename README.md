@@ -27,6 +27,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 - スクショの読み取りは、手元でも Workers AI（本物）につながる。`npm run dev` では順番待ちを通さずにその場で読む。Cron は `npx wrangler dev --test-scheduled` で開き、`/__scheduled` を呼ぶと動く
 - Worker の入口は `worker/entry.js`（SvelteKit の Worker に順番待ちと Cron を足したもの）。アダプターは `svelte-kit.wrangler.jsonc` を読む（[docs/architecture.md](docs/architecture.md#worker-の入口)）
 - アイコンを作り直すときは `node scripts/make-icons.mjs static`
+- 通知を手元で試すときは、`.dev.local.vars` に `VAPID_PUBLIC_KEY` と `VAPID_PRIVATE_KEY` を書く（作り方は `scripts/make-vapid.mjs` と同じ）
 
 ## 本番に出すとき
 
@@ -41,6 +42,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
    - `RELAY_SECRET`、`FILES_SECRET`（メール中継と資料）
    - `GROQ_API_KEY`（任意。Groq のダッシュボードの Data Controls でゼロデータ保持を有効にしてから）
    - `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（任意。Google Cloud の OAuth クライアントで、リダイレクト先を `https://koma.tomakura.com/login/google/callback` にする）
+   - `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`（通知。`node scripts/make-vapid.mjs` で作って入れる。作り直すとみんなの通知の登録がやり直しになるので1回だけ）
 5. 「開発を応援する」を出すなら、`wrangler.jsonc` の `vars` に `SUPPORT_URL` を足す
 6. `relay/send.php` を変えたときは、シンの `public_html/koma-relay/send.php` に上書きする
 7. 運営の画面（`/admin`）を使う人は、D1 で `update users set role = 'admin' where email = '…'`
