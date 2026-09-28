@@ -3,7 +3,6 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let { data, form } = $props();
-	let agreed = $state(false);
 	let deleting = $state(false);
 	let formEl = $state<HTMLFormElement>();
 </script>
@@ -55,11 +54,14 @@
 		</section>
 
 		<label class="agree">
-			<input type="checkbox" name="confirm" bind:checked={agreed} />
+			<!-- Required rather than a disabled button, so the form works before (or without) JavaScript -->
+			<input type="checkbox" name="confirm" required checked={form?.more} />
 			上のことを確認しました
 		</label>
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-		<button class="btn danger" type="submit" disabled={!agreed || deleting}>{deleting ? '削除しています…' : '退会する'}</button>
+		<!-- With JavaScript the page carries on by itself; without, one press per round -->
+		{#if form?.more}<p class="more" role="status">資料のファイルを少しずつ消しています。もう一度「退会する」を押して続けてください。</p>{/if}
+		<button class="btn danger" type="submit" disabled={deleting}>{deleting ? '削除しています…' : '退会する'}</button>
 	</form>
 </div>
 
@@ -69,6 +71,12 @@
 		flex-direction: column;
 		gap: 14px;
 		padding: 6px 16px 0;
+	}
+
+	.more {
+		margin: 0;
+		font-size: 13px;
+		line-height: 1.6;
 	}
 
 	.lead {
