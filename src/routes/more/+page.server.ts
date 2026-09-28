@@ -38,7 +38,8 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		pastCount: past?.n ?? 0,
 		passkeyCount: keys?.n ?? 0,
 		universityName: university?.name ?? null,
-		supportUrl: platform?.env.SUPPORT_URL || null
+		supportUrl: platform?.env.SUPPORT_URL || null,
+		isAdmin: user.role === 'admin'
 	};
 };
 

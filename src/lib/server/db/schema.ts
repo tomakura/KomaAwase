@@ -462,3 +462,22 @@ export const importJobs = sqliteTable(
 	},
 	(t) => [index('import_jobs_user_idx').on(t.userId), index('import_jobs_status_idx').on(t.status)]
 );
+
+// Bug reports and requests from the app. The sender is cleared, not the message, when their
+// account is deleted.
+export const feedback = sqliteTable(
+	'feedback',
+	{
+		id: id(),
+		userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+		kind: text('kind', { enum: ['bug', 'request', 'other'] }).notNull(),
+		body: text('body').notNull(),
+		// Browser, screen and page, attached only if the sender agreed after seeing them
+		env: text('env', { mode: 'json' }).$type<Record<string, string>>(),
+		status: text('status', { enum: ['open', 'closed'] })
+			.notNull()
+			.default('open'),
+		createdAt: createdAt()
+	},
+	(t) => [index('feedback_status_idx').on(t.status)]
+);

@@ -34,6 +34,7 @@
 	</div>
 
 	<div class="actions">
+		{#if data.bye}<p class="sent" role="status">退会しました。ご利用ありがとうございました。</p>{/if}
 		<button class="btn btn-primary" type="button" onclick={onPasskey} disabled={busy}>
 			パスキーでログイン
 		</button>
@@ -67,6 +68,9 @@
 				</button>
 			</form>
 		{/if}
+		<p class="legal">
+			登録すると、<a href="/terms">利用規約</a>と<a href="/privacy">プライバシーポリシー</a>に同意したことになります。
+		</p>
 	</div>
 </main>
 
@@ -125,6 +129,14 @@
 		flex-grow: 1;
 		height: 1px;
 		background: var(--line);
+	}
+
+	.legal {
+		margin: 4px 0 0;
+		font-size: 12px;
+		line-height: 1.6;
+		color: var(--ink-sub);
+		text-align: center;
 	}
 
 	.sent {

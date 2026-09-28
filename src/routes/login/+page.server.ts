@@ -7,7 +7,7 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = ({ locals, url, cookies }) => {
 	const next = url.searchParams.get('next');
 	if (locals.user) redirect(303, safeNext(next) ?? '/');
-	return { next: rememberNext(cookies, next) };
+	return { next: rememberNext(cookies, next), bye: url.searchParams.has('bye') };
 };
 
 export const actions: Actions = {

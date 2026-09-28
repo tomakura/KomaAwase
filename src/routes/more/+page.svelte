@@ -100,10 +100,28 @@
 			</div>
 		</section>
 
+		<section class="ui-section">
+			<h2 class="ui-section-title">サポート</h2>
+			<div class="ui-list">
+				{@render link('/feedback?from=/more', '不具合・要望を送る')}
+				{#if data.supportUrl}
+					<a class="ui-row" href={data.supportUrl} target="_blank" rel="noopener">
+						<span>開発を応援する</span>
+						<span class="ui-row-value"><Icon name="external" size={16} /></span>
+					</a>
+				{/if}
+				{@render link('/terms', '利用規約')}
+				{@render link('/privacy', 'プライバシーポリシー')}
+				{@render link('/about', 'このアプリについて')}
+				{#if data.isAdmin}{@render link('/admin', '運営（通報・要望）')}{/if}
+			</div>
+		</section>
+
 		<section class="ui-section account-actions">
 			<form method="POST" action="/logout">
 				<button class="btn logout" type="submit">ログアウト</button>
 			</form>
+			<a class="delete" href="/more/delete">退会する</a>
 		</section>
 	</main>
 
@@ -169,6 +187,13 @@
 
 	.logout {
 		width: 100%;
+	}
+
+	.delete {
+		align-self: center;
+		padding: 10px;
+		color: var(--ink-sub);
+		font-size: 13px;
 	}
 
 	.error {
