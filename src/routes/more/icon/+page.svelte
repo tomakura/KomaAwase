@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
-	import { ICON_COLORS, ICON_TEXT_MAX, iconOf, splitGraphemes } from '$lib/icons';
+	import { ICON_COLORS, ICON_TEXT_MAX, iconOf, isIconText } from '$lib/icons';
 
 	let { data, form } = $props();
 
@@ -12,7 +12,7 @@
 	// svelte-ignore state_referenced_locally
 	let color = $state<string>(ICON_COLORS.find((c) => c.hex === initial.hex)?.id ?? ICON_COLORS[0].id);
 
-	const count = $derived(splitGraphemes(text.trim()).length);
+	const valid = $derived(isIconText(text.trim()));
 	const preview = $derived({ ...data.user, icon: { color, text: text.trim() || initial.text } });
 </script>
 
@@ -46,7 +46,7 @@
 		</fieldset>
 
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-		<button class="btn btn-primary" type="submit" disabled={!count || count > ICON_TEXT_MAX}>保存する</button>
+		<button class="btn btn-primary" type="submit" disabled={!valid}>保存する</button>
 	</form>
 </div>
 

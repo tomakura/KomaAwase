@@ -22,6 +22,22 @@ export function splitGraphemes(text: string) {
 	return [...graphemes.segment(text)].map((s) => s.segment);
 }
 
+// Spaces, control characters and marks with nothing to sit on show as nothing.
+const INVISIBLE = /^[\p{White_Space}\p{Cc}\p{Cf}\p{M}]+$/u;
+const VISIBLE = /[^\p{White_Space}\p{Cc}\p{Cf}\p{M}]/u;
+
+/** 1〜2 characters that can all be seen */
+export function isIconText(text: string) {
+	const chars = splitGraphemes(text);
+	// Graphemes can be long (family emoji), so the code units are capped too.
+	return chars.length > 0 && chars.length <= ICON_TEXT_MAX && text.length <= 16 && !chars.some((c) => INVISIBLE.test(c));
+}
+
+/** Up to NICKNAME_MAX characters with something to see, and no control characters */
+export function isNickname(text: string) {
+	return [...text].length <= NICKNAME_MAX && VISIBLE.test(text) && !/\p{Cc}/u.test(text);
+}
+
 export function isIconColor(id: string): id is IconColor {
 	return ICON_COLORS.some((c) => c.id === id);
 }
