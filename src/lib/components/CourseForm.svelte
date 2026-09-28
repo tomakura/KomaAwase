@@ -99,6 +99,23 @@
 	const pick = $state({ weekday: 1, period: periods[0]?.number ?? 1, span: 1 });
 	const maxSpan = $derived(periodNumbers.length - periodNumbers.indexOf(pick.period));
 
+	// How many periods the slot can run to: up to the end of the day or the next class that day
+	function spanChoices(index: number) {
+		const slot = v.slots[index];
+		const start = periodNumbers.indexOf(slot.period);
+		const choices: number[] = [];
+		for (let n = 1; start >= 0 && start + n <= periodNumbers.length; n++) {
+			const clash = v.slots.some((s, j) => {
+				if (j === index || s.weekday !== slot.weekday) return false;
+				const other = periodNumbers.indexOf(s.period);
+				return other <= start + n - 1 && start <= other + s.span - 1;
+			});
+			if (clash) break;
+			choices.push(n);
+		}
+		return choices.length ? choices : [slot.span];
+	}
+
 	function addSlot() {
 		const start = periodNumbers.indexOf(pick.period);
 		const span = Math.min(pick.span, maxSpan);
@@ -236,14 +253,18 @@
 					{@const label = `${DAY_NAMES[slot.weekday]} ${periodLabel(slot.period, slot.span, periodNumbers)}`}
 					<div class="slot-row">
 						<span class="slot-label">{label}</span>
+						<!-- Longer or shorter in place, without taking the slot out and adding it again -->
+						<select class="span" bind:value={slot.span} aria-label="{label}のコマ数">
+							{#each spanChoices(i) as n (n)}<option value={n}>{n}コマ</option>{/each}
+						</select>
+						<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
+							<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+						</button>
 						<!-- Classes on alternate weeks share a slot with another course -->
 						<select class="week" bind:value={slot.week} aria-label="{label}の週">
 							{#each WEEK_PATTERNS as w (w.id)}<option value={w.id}>{w.label}</option>{/each}
 						</select>
 						<input bind:value={slot.room} placeholder="教室" aria-label="{label}の教室" maxlength="20" autocomplete="off" />
-						<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
-							<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-						</button>
 						<input type="hidden" name="slot" value={JSON.stringify(slot)} />
 					</div>
 				{/each}
@@ -568,8 +589,10 @@
 		font-weight: 700;
 	}
 
+	/* Two lines: the slot, its length and the remove button; then the weeks and the room */
 	.slot-row {
-		display: flex;
+		display: grid;
+		grid-template-columns: auto 1fr auto;
 		align-items: center;
 		gap: 8px;
 		padding: 6px 6px 6px 12px;
@@ -585,6 +608,16 @@
 		font-weight: 700;
 	}
 
+	.slot-row .span {
+		justify-self: start;
+		width: 88px;
+		height: 36px;
+		padding: 0 4px;
+		border-color: var(--line);
+		border-radius: 9px;
+		background: var(--bg);
+	}
+
 	/* 16px like the other fields, so iOS doesn't zoom in on it */
 	.slot-row .week {
 		width: 88px;
@@ -597,7 +630,7 @@
 	}
 
 	.slot-row input {
-		flex: 1 1 0;
+		grid-column: 2 / 4;
 		min-width: 0;
 		height: 36px;
 		padding: 0 10px;
