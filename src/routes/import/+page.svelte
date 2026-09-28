@@ -45,6 +45,8 @@
 			if (src) URL.revokeObjectURL(src);
 			src = null;
 			agreed = false;
+			// So picking the same file again still opens it
+			if (fileInput) fileInput.value = '';
 			await invalidate('app:import');
 		} catch {
 			message = '送れませんでした。電波のよいところでもう一度お試しください';
