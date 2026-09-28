@@ -124,17 +124,18 @@
 		cursor: move;
 	}
 
+	/* Inside the frame's corners, so none is cut off at the image's edge */
 	.handle {
 		position: absolute;
-		width: 28px;
-		height: 28px;
-		margin: -14px;
+		width: 32px;
+		height: 32px;
+		margin: -4px;
 	}
 
 	.handle::after {
 		content: '';
 		position: absolute;
-		inset: 7px;
+		inset: 8px;
 		border-radius: 50%;
 		background: #fffdf8;
 		box-shadow: 0 0 0 2px var(--shu);
