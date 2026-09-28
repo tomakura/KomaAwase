@@ -20,6 +20,7 @@
 	let photoSrc = $state<string | null>(null);
 	let picker = $state<PhotoPicker>();
 	let photoInput = $state<HTMLInputElement>();
+	let photoError = $state<string | null>(null);
 	function pickPhoto(files: FileList | null) {
 		const file = files?.[0];
 		if (!file) return;
@@ -56,10 +57,16 @@
 				action="?/photo"
 				use:enhance={({ formData, cancel }) => {
 					const url = picker?.render();
+					photoError = null;
 					if (url) formData.set('photo', url);
-					else cancel();
+					else {
+						// Not loaded (HEIC outside Safari, say) or too big even at low quality
+						photoError = 'この写真は使えませんでした。別の写真でお試しください';
+						cancel();
+					}
 				}}
 			>
+				{#if photoError}<p class="error" role="alert">{photoError}</p>{/if}
 				<div class="row">
 					<button class="btn" type="button" onclick={cancelPhoto}>やめる</button>
 					<button class="btn btn-primary" type="submit">この写真にする</button>

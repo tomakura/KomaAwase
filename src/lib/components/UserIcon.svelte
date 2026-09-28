@@ -5,10 +5,23 @@
 	let { user, size = 28, short = false }: { user: IconSource; size?: number; short?: boolean } = $props();
 	const icon = $derived(iconOf(user));
 	const text = $derived(short ? splitGraphemes(icon.text)[0] : icon.text);
+	// The photo that failed to load (not allowed, or gone): its letters show instead
+	let failed = $state<string | null>(null);
 </script>
 
-{#if icon.photo}
-	<img class="icon" style:--size="{size}px" style:background={icon.hex} src={icon.photo} alt="" width={size} height={size} loading="lazy" decoding="async" />
+{#if icon.photo && failed !== icon.photo}
+	<img
+		class="icon"
+		style:--size="{size}px"
+		style:background={icon.hex}
+		src={icon.photo}
+		alt=""
+		width={size}
+		height={size}
+		loading="lazy"
+		decoding="async"
+		onerror={() => (failed = icon.photo)}
+	/>
 {:else}
 	<span
 		class="icon"
