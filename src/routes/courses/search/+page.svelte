@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES, periodLabel, timetableHref } from '$lib/courses';
 
 	let { data } = $props();
@@ -109,6 +110,16 @@
 								{/if}
 							</span>
 							{#if info}<span class="details">{info}</span>{/if}
+							{#if r.friends.length}
+								<span class="friends">
+									{#each r.friends.slice(0, 5) as f (f.id)}<UserIcon user={f} size={20} short />{/each}
+									<span class="friends-text">
+										{r.friends.length > 2
+											? `${r.friends[0].nickname}さんたち${r.friends.length}人`
+											: `${r.friends.map((f) => f.nickname).join('さん・')}さん`}も取っています
+									</span>
+								</span>
+							{/if}
 						</a>
 					{/each}
 				</div>
@@ -312,6 +323,19 @@
 	.details {
 		font-size: 12px;
 		color: var(--ink-sub);
+	}
+
+	.friends {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 3px;
+	}
+
+	.friends-text {
+		margin-left: 3px;
+		font-size: 11px;
+		color: var(--ink-soft);
 	}
 
 	.note,

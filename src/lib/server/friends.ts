@@ -1,7 +1,7 @@
 import { and, count, eq, inArray, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
-import { blocks, friendships, groupMembers, universities, users } from './db/schema';
+import { blocks, courses, friendships, groupMembers, timetables, universities, users } from './db/schema';
 
 // No 0/O or 1/I, so a code read aloud or off a screen is typed right. 256 is a multiple
 // of 32, so every character is equally likely; 10 characters are 50 bits.
@@ -216,6 +216,24 @@ export async function loadPeople(db: Db, ids: string[]) {
 				.leftJoin(universities, eq(universities.id, users.universityId))
 				.where(inArray(users.id, ids.slice(i, i + 90))))
 		);
+	}
+	return out;
+}
+
+/** For each shared course, the people among `visible` who have it in their timetable for the year. */
+export async function peopleTaking(db: Db, sharedIds: string[], year: number, visible: Set<string>) {
+	const out = new Map<string, string[]>();
+	if (!sharedIds.length || !visible.size) return out;
+	const rows = await db
+		.select({ sharedCourseId: courses.sharedCourseId, userId: timetables.userId })
+		.from(courses)
+		.innerJoin(timetables, eq(timetables.id, courses.timetableId))
+		.where(and(inArray(courses.sharedCourseId, sharedIds.slice(0, 90)), eq(timetables.year, year)));
+	for (const r of rows) {
+		if (!r.sharedCourseId || !visible.has(r.userId)) continue;
+		const list = out.get(r.sharedCourseId) ?? [];
+		if (!list.includes(r.userId)) list.push(r.userId);
+		out.set(r.sharedCourseId, list);
 	}
 	return out;
 }
