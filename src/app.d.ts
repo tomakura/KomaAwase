@@ -9,6 +9,9 @@ declare global {
 		SUPPORT_URL?: string;
 		// Screenshot reading with Groq; without it only Workers AI reads them
 		GROQ_API_KEY?: string;
+		// Google sign-in; the button appears once both are set
+		GOOGLE_CLIENT_ID?: string;
+		GOOGLE_CLIENT_SECRET?: string;
 		// Set by worker/entry.js on calls it makes to itself (queue and cron), never by requests
 		KOMA_INTERNAL?: boolean;
 	}
