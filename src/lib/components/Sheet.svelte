@@ -2,7 +2,12 @@
 	import type { Snippet } from 'svelte';
 
 	// A sheet that slides up from the bottom, on the native <dialog> so focus and Escape work.
-	let { open = $bindable(false), title, children }: { open?: boolean; title: string; children: Snippet } = $props();
+	let {
+		open = $bindable(false),
+		title,
+		onclose,
+		children
+	}: { open?: boolean; title: string; onclose?: () => void; children: Snippet } = $props();
 
 	let dialog = $state<HTMLDialogElement>();
 
@@ -16,10 +21,13 @@
 <dialog
 	bind:this={dialog}
 	aria-label={title}
-	onclose={() => (open = false)}
+	onclose={() => {
+		open = false;
+		onclose?.();
+	}}
 	onclick={(e) => {
 		// A tap on the backdrop closes it.
-		if (e.target === dialog) open = false;
+		if (e.target === dialog) dialog.close();
 	}}
 >
 	<div class="sheet">

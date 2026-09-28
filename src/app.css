@@ -9,6 +9,8 @@
 	--line-strong: #d8d0c0;
 	--line-bold: #b8ae9c;
 	--switch-off: #cfc6b5;
+	/* A card sitting on a slot, as in the overlay */
+	--raised: #fffdf8;
 	--scrim: #8f887d;
 	--slot: #ede7da;
 	--slot-today: #e6dac4;
@@ -52,6 +54,7 @@
 		--line-strong: #4a443d;
 		--line-bold: #5e564d;
 		--switch-off: #5e564d;
+		--raised: #45403a;
 		--scrim: #0e0d0c;
 		--slot: #2e2a26;
 		--slot-today: #3a3329;
@@ -91,6 +94,7 @@
 	--line-strong: #4a443d;
 	--line-bold: #5e564d;
 	--switch-off: #5e564d;
+	--raised: #45403a;
 	--scrim: #0e0d0c;
 	--slot: #2e2a26;
 	--slot-today: #3a3329;

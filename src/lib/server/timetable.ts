@@ -308,3 +308,100 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 		})
 	};
 }
+
+/**
+ * Several timetables at once, for laying them over each other: terms, periods and courses
+ * (with the shared course they are linked to), but nothing private such as notes.
+ */
+export async function loadTimetables(db: Db, timetableIds: string[]) {
+	const ids = [...new Set(timetableIds)];
+	const out = new Map<
+		string,
+		{
+			terms: Awaited<ReturnType<typeof termsQuery>>;
+			periods: Awaited<ReturnType<typeof periodsQuery>>;
+			courses: {
+				id: string;
+				title: string;
+				color: string;
+				sharedCourseId: string | null;
+				termIds: string[];
+				slots: { weekday: number; period: number; span: number; room: string | null }[];
+			}[];
+		}
+	>();
+	if (!ids.length) return out;
+	const [termRows, periodRows, courseRows, termLinks, slotRows] = await db.batch([
+		db
+			.select({
+				timetableId: terms.timetableId,
+				id: terms.id,
+				name: terms.name,
+				groupName: terms.groupName,
+				startDate: terms.startDate,
+				endDate: terms.endDate
+			})
+			.from(terms)
+			.where(inArray(terms.timetableId, ids))
+			.orderBy(asc(terms.sortOrder)),
+		db
+			.select({ timetableId: periods.timetableId, number: periods.number, start: periods.startTime, end: periods.endTime })
+			.from(periods)
+			.where(inArray(periods.timetableId, ids))
+			.orderBy(asc(periods.number)),
+		db
+			.select({
+				timetableId: courses.timetableId,
+				id: courses.id,
+				title: courses.title,
+				color: courses.color,
+				syncMode: courses.syncMode,
+				sharedCourseId: courses.sharedCourseId
+			})
+			.from(courses)
+			.where(inArray(courses.timetableId, ids))
+			.orderBy(asc(courses.createdAt)),
+		db
+			.select({ courseId: courseTerms.courseId, termId: courseTerms.termId })
+			.from(courseTerms)
+			.innerJoin(courses, eq(courseTerms.courseId, courses.id))
+			.where(inArray(courses.timetableId, ids)),
+		db
+			.select({
+				courseId: courseSlots.courseId,
+				weekday: courseSlots.weekday,
+				period: courseSlots.periodNumber,
+				span: courseSlots.span,
+				room: courseSlots.room
+			})
+			.from(courseSlots)
+			.innerJoin(courses, eq(courseSlots.courseId, courses.id))
+			.where(inArray(courses.timetableId, ids))
+	]);
+	const shared = await loadSharedCourses(
+		db,
+		courseRows.flatMap((c) => (c.syncMode === 'synced' && c.sharedCourseId ? [c.sharedCourseId] : []))
+	);
+	for (const id of ids) {
+		out.set(id, {
+			terms: termRows.filter((t) => t.timetableId === id).map(({ timetableId: _, ...t }) => t),
+			periods: periodRows.filter((p) => p.timetableId === id).map(({ timetableId: _, ...p }) => p),
+			courses: courseRows
+				.filter((c) => c.timetableId === id)
+				.map((c) => {
+					const synced = c.syncMode === 'synced' && c.sharedCourseId ? shared.get(c.sharedCourseId) : undefined;
+					return {
+						id: c.id,
+						title: synced?.values.title ?? c.title,
+						color: c.color,
+						sharedCourseId: c.sharedCourseId,
+						termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
+						slots:
+							synced?.values.slots ??
+							slotRows.filter((s) => s.courseId === c.id).map(({ courseId: _, ...s }) => s)
+					};
+				})
+		});
+	}
+	return out;
+}

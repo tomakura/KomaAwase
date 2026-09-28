@@ -46,6 +46,9 @@
 	</header>
 
 	{#if data.terms.length}
+		<div class="actions">
+			<a class="btn" href="/overlay?with={data.person.id}"><Icon name="overlap" size={18} />自分の時間割と重ねる</a>
+		</div>
 		<TermBar year={data.year} terms={data.terms} bind:termId />
 		<TimetableGrid periods={data.periods} {days} courses={termCourses} clock={time.clock} termIsOn={termIsOn(term, time.clock.date)} />
 		<UnscheduledCards courses={termCourses.filter((c) => c.slots.length === 0)} />
@@ -132,6 +135,15 @@
 	.sub {
 		font-size: 12px;
 		color: var(--ink-sub);
+	}
+
+	.actions {
+		padding: 0 16px 10px;
+	}
+
+	.actions .btn {
+		min-height: 44px;
+		font-size: 14px;
 	}
 
 	.empty {

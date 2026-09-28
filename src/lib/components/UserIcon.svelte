@@ -1,16 +1,18 @@
 <script lang="ts">
-	import { iconOf, type IconSource } from '$lib/icons';
+	import { iconOf, splitGraphemes, type IconSource } from '$lib/icons';
 
-	let { user, size = 28 }: { user: IconSource; size?: number } = $props();
+	// `short` keeps only the first character, for the tiny icons in the overlay.
+	let { user, size = 28, short = false }: { user: IconSource; size?: number; short?: boolean } = $props();
 	const icon = $derived(iconOf(user));
+	const text = $derived(short ? splitGraphemes(icon.text)[0] : icon.text);
 </script>
 
 <span
 	class="icon"
 	style:--size="{size}px"
 	style:background={icon.hex}
-	style:font-size="{Math.round(size * (icon.text.length > 1 ? 0.4 : 0.46))}px"
-	aria-hidden="true">{icon.text}</span
+	style:font-size="{Math.round(size * (splitGraphemes(text).length > 1 ? 0.4 : 0.5))}px"
+	aria-hidden="true">{text}</span
 >
 
 <style>

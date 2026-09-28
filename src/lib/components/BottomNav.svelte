@@ -7,7 +7,6 @@
 	const pending = $derived(Number(page.data.pendingRequests ?? 0));
 </script>
 
-<!-- 重ねる is a placeholder until that screen exists. -->
 <nav aria-label="メニュー">
 	<a href="/" aria-current={current === 'timetable' ? 'page' : undefined}>
 		<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -16,13 +15,13 @@
 		</svg>
 		時間割
 	</a>
-	<span>
+	<a href="/overlay" aria-current={current === 'overlay' ? 'page' : undefined}>
 		<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
 			<rect x="3.5" y="3.5" width="11" height="11" rx="2.5" />
 			<rect x="9.5" y="9.5" width="11" height="11" rx="2.5" />
 		</svg>
 		重ねる
-	</span>
+	</a>
 	<a href="/friends" aria-current={current === 'friends' ? 'page' : undefined}>
 		<span class="icon">
 			<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -56,8 +55,7 @@
 		border-top: 1px solid var(--line);
 	}
 
-	nav > a,
-	nav > span {
+	nav > a {
 		display: flex;
 		flex-direction: column;
 		align-items: center;

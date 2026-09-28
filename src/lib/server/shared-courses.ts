@@ -45,21 +45,34 @@ export type SharedCourse = {
 	values: SharedValues;
 };
 
+// D1 takes at most 100 bound values per query, so many ids are read 90 at a time.
+const CHUNK = 90;
+
 export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<string, SharedCourse>> {
-	if (!ids.length) return new Map();
-	const [rows, slots, teachers] = await db.batch([
-		db.select().from(sharedCourses).where(inArray(sharedCourses.id, ids)),
-		db
-			.select()
-			.from(sharedCourseSlots)
-			.where(inArray(sharedCourseSlots.sharedCourseId, ids))
-			.orderBy(asc(sharedCourseSlots.weekday), asc(sharedCourseSlots.periodNumber)),
-		db
-			.select()
-			.from(sharedCourseTeachers)
-			.where(inArray(sharedCourseTeachers.sharedCourseId, ids))
-			.orderBy(asc(sharedCourseTeachers.sortOrder))
-	]);
+	const unique = [...new Set(ids)];
+	if (!unique.length) return new Map();
+	const chunks = [];
+	for (let i = 0; i < unique.length; i += CHUNK) chunks.push(unique.slice(i, i + CHUNK));
+	const parts = await Promise.all(
+		chunks.map((part) =>
+			db.batch([
+				db.select().from(sharedCourses).where(inArray(sharedCourses.id, part)),
+				db
+					.select()
+					.from(sharedCourseSlots)
+					.where(inArray(sharedCourseSlots.sharedCourseId, part))
+					.orderBy(asc(sharedCourseSlots.weekday), asc(sharedCourseSlots.periodNumber)),
+				db
+					.select()
+					.from(sharedCourseTeachers)
+					.where(inArray(sharedCourseTeachers.sharedCourseId, part))
+					.orderBy(asc(sharedCourseTeachers.sortOrder))
+			])
+		)
+	);
+	const rows = parts.flatMap((p) => p[0]);
+	const slots = parts.flatMap((p) => p[1]);
+	const teachers = parts.flatMap((p) => p[2]);
 	return new Map(
 		rows.map((r) => [
 			r.id,

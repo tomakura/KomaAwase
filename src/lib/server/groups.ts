@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
 import { groupMembers, groups, universities, users } from './db/schema';
@@ -119,4 +119,19 @@ export async function removeMember(db: Db, groupId: string, userId: string) {
 
 export async function deleteGroup(db: Db, groupId: string) {
 	await db.delete(groups).where(eq(groups.id, groupId));
+}
+
+/** The user's groups with the members who show them their timetable, for the overlay's chips. */
+export async function groupsWithSharers(db: Db, userId: string) {
+	const mineRows = await listMyGroups(db, userId);
+	if (!mineRows.length) return [];
+	const members = await db
+		.select({ groupId: groupMembers.groupId, userId: groupMembers.userId })
+		.from(groupMembers)
+		.where(and(inArray(groupMembers.groupId, mineRows.slice(0, 90).map((g) => g.id)), eq(groupMembers.shareTimetable, true)));
+	return mineRows.map((g) => ({
+		id: g.id,
+		name: g.name,
+		memberIds: members.filter((m) => m.groupId === g.id && m.userId !== userId).map((m) => m.userId)
+	}));
 }

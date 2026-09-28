@@ -20,6 +20,9 @@
 	let reporting = $state(false);
 	let status = $state<string | null>(null);
 
+	// Members whose timetables can be laid over, at most as many as the overlay takes
+	const overlayWith = $derived(data.members.filter((m) => m.visible).map((m) => m.id).slice(0, 20));
+
 	async function sendInvite() {
 		const result = await shareLink(data.invite, `コマあわせの「${data.group.name}」に参加しよう`);
 		status = result === 'copied' ? 'リンクをコピーしました' : result === 'failed' ? 'リンクをコピーできませんでした' : null;
@@ -59,7 +62,10 @@
 		</p>
 	</section>
 
-	<section class="ui-section">
+	<section class="ui-section group-actions">
+		{#if overlayWith.length}
+			<a class="btn btn-primary" href="/overlay?with={overlayWith.join(',')}"><Icon name="overlap" size={18} />メンバーと重ねる</a>
+		{/if}
 		<button class="btn" type="button" onclick={() => (inviting = true)}><Icon name="plus" size={18} />メンバーを招待する</button>
 	</section>
 
@@ -197,6 +203,10 @@
 </Sheet>
 
 <style>
+	.group-actions {
+		gap: 8px;
+	}
+
 	.icon-button {
 		width: 44px;
 		height: 44px;
