@@ -57,6 +57,7 @@
 | 1 | Groq | `qwen/qwen3.8-27b` | 1日1,000回、1分8,000トークン、1日200,000トークン | 1日50件くらい |
 | 2 | Workers AI | `@cf/meta/llama-4-scout-17b-16e-instruct` | 1日10,000 Neurons | 1日60件くらい |
 
+- AI には授業ごとに曜日を答えさせず、表を行ごと・マスごとに書き写させる（`days` と `rows[].cells`）。曜日と時限は見出しからこちらで決め、上下に続く同じ授業は1つにまとめる。授業ごとに曜日を答えさせたら、実際のスクショで列を取り違えた（月曜が木曜になり、授業も抜けた）ため。プロンプトは短いまま保つ（1行足しただけで漢字が化けた）
 - どちらにも同じ JSON Schema（`src/lib/import.ts` の `IMPORT_SCHEMA`）で返させる。Groq は `strict` で、考える過程は出させない（`reasoning_effort: "none"`）
 - Groq の画像は1枚2,048トークン。指示文と出力を足して1回3,000〜4,000トークンくらい。1分の上限にかかる（429 で待ち時間が2分以内）ときは、その時間だけ待って Groq でやり直す。1日の上限なら Workers AI に回す
 - Workers AI の Llama 4 Scout は画像と JSON Schema に対応していて、Llama 3.2 Vision のような利用規約の同意のリクエストが要らない。手元で自分の時間割の画像を読ませ、授業名・曜日・時限・教室まで正しく読めた
@@ -111,8 +112,17 @@ AI の読み取りは間違えることがある。画面と規約の両方で�
 
 - `static/manifest.webmanifest` とアイコン（`scripts/make-icons.mjs` でロゴから作る）で、ホーム画面に追加できる
 - Service Worker は、ビルドしたファイルと `static/` を最初に保存し、ページと `__data.json` はネットワークを先に見て、つながらないときに最後に見たものを出す
-- ログイン・ログアウト・認証・アップロード・資料・`/internal` は保存しない
+- ログイン・ログアウト・認証・アップロード・資料・`/internal`・運営画面は保存しない。保存したページは、SvelteKit の `x-sveltekit-invalidated` 以外のクエリまで一致するときだけ出す
 - 残したページには時間割が入っているので、ログイン画面を開いたとき（ログアウト・退会のあと）に消す。バージョンが変わると古いものも消す
+
+## 通知（Web Push）
+
+- 知らせるのは、友だち申請が届いた・承認された、スクショの読み取りが終わった（読めなかった）、グループに人が参加した、の4つ。「その他」→「通知」で端末ごとに受け取りを始め、種類ごとにオン・オフできる（`users.notify`、ないものはオン）
+- 送るのは Worker から直接。ライブラリは使わず WebCrypto で、中身をブラウザ向けに暗号化し（RFC 8291、aes128gcm）、VAPID の鍵で署名する（RFC 8292）。`src/lib/server/push.ts`。通知サービス（Apple・Google・Mozilla・Microsoft）には中身が読めない
+- 宛先は `PUSH_SUBSCRIPTIONS`。ブラウザの通知サービス以外のアドレスは受け付けない（Worker にほかへ送らせないため）。404・410 が返った宛先は消す
+- 送るのはレスポンスのあと（`waitUntil`）。1回に送るのは40件まで（無料プランの外へのリクエストは50回まで）
+- iPhone・iPad はホーム画面に追加したアプリからだけ受け取れるので、通知の画面から追加のしかた（`/install`）へ案内する
+- 鍵は secret の `VAPID_PUBLIC_KEY` と `VAPID_PRIVATE_KEY`（`node scripts/make-vapid.mjs` で作って入れる）。ないあいだは通知の画面に「まだ使えません」と出す
 
 ## 回数制限
 
@@ -140,6 +150,7 @@ WAF のルールはダッシュボードで設定していて、リポジトリ�
 | `RELAY_SECRET` / `FILES_SECRET` | secret | 中継と資料の HMAC の鍵 |
 | `GROQ_API_KEY` | secret | Groq（ないと Workers AI だけで読む） |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret | Google ログイン（ないとボタンを出さない） |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | secret | 通知（ないと通知の画面で「まだ使えません」） |
 | `SUPPORT_URL` | vars（任意） | 「開発を応援する」のリンク（ないと出さない） |
 | `IMPORT_QUEUE` | Queues | `npx wrangler queues create koma-import` で作っておく |
 | `AI` | Workers AI | 手元でも本物につながる（`remote: true`）。少し無料枠を使う |
