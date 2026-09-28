@@ -4,6 +4,7 @@ import { TERM_SYSTEMS, parseDays, periodsRange, termSystemOf } from '$lib/preset
 import { passkeys, timetables, universities, users } from '$lib/server/db/schema';
 import { readTheme, thisYear } from '$lib/server/setup';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
+import { currentTerm } from '$lib/terms';
 import { tokyoTime } from '$lib/time';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -26,10 +27,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 
 	// The term on now (or next), for 「2026年度 後期」
 	const today = tokyoTime(Date.now()).date;
-	const term =
-		shape.terms.find((t) => t.startDate && t.endDate && t.startDate <= today && today <= t.endDate) ??
-		shape.terms.find((t) => t.startDate && today < t.startDate) ??
-		shape.terms[0];
+	const term = currentTerm(shape.terms, today);
 	const system = termSystemOf(shape.terms);
 
 	return {

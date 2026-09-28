@@ -343,3 +343,92 @@ export const sharedCourseEdits = sqliteTable(
 	},
 	(t) => [index('shared_course_edits_course_idx').on(t.sharedCourseId)]
 );
+
+// --- friends & groups ---
+
+// One row per pair of people, whoever asked; `pair` is the two ids in order.
+// Timetables are visible to each other only once the request is accepted.
+export const friendships = sqliteTable(
+	'friendships',
+	{
+		id: id(),
+		requesterId: text('requester_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		addresseeId: text('addressee_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		pair: text('pair').notNull().unique(),
+		status: text('status', { enum: ['pending', 'accepted'] })
+			.notNull()
+			.default('pending'),
+		createdAt: createdAt(),
+		acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' })
+	},
+	(t) => [
+		index('friendships_requester_idx').on(t.requesterId),
+		index('friendships_addressee_idx').on(t.addresseeId)
+	]
+);
+
+// Blocking wins over friendships and groups: neither sees the other's timetable.
+export const blocks = sqliteTable(
+	'blocks',
+	{
+		blockerId: text('blocker_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		blockedId: text('blocked_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.blockerId, t.blockedId] }), index('blocks_blocked_idx').on(t.blockedId)]
+);
+
+// Circles and seminars. The table isn't called `groups`, which SQLite also uses as a keyword.
+export const groups = sqliteTable('friend_groups', {
+	id: id(),
+	name: text('name').notNull(),
+	// Passed to the longest-standing member when the owner leaves
+	ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+	inviteCode: text('invite_code').notNull().unique(),
+	createdAt: createdAt()
+});
+
+export const groupMembers = sqliteTable(
+	'group_members',
+	{
+		groupId: text('group_id')
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		// Whether the other members see this member's timetable; chosen when joining
+		shareTimetable: integer('share_timetable', { mode: 'boolean' }).notNull().default(true),
+		joinedAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_members_user_idx').on(t.userId)]
+);
+
+// --- operations ---
+
+// Reports about people, groups and shared course data. The reporter is cleared, not the
+// report, when their account is deleted.
+export const reports = sqliteTable(
+	'reports',
+	{
+		id: id(),
+		reporterId: text('reporter_id').references(() => users.id, { onDelete: 'set null' }),
+		targetType: text('target_type', { enum: ['user', 'group', 'shared_course'] }).notNull(),
+		targetId: text('target_id').notNull(),
+		reason: text('reason').notNull(),
+		detail: text('detail'),
+		status: text('status', { enum: ['open', 'closed'] })
+			.notNull()
+			.default('open'),
+		createdAt: createdAt()
+	},
+	(t) => [index('reports_status_idx').on(t.status)]
+);

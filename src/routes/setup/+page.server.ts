@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { takeNext } from '$lib/server/auth/next';
 import { presetsFor, readDays, readShape, readTheme, saveTimetableShape, thisYear, timetableSettings } from '$lib/server/setup';
 import { findOrCreateUniversity, listUniversities } from '$lib/server/universities';
 import type { Actions, PageServerLoad } from './$types';
@@ -19,7 +20,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals }) => {
+	default: async ({ request, locals, cookies }) => {
 		if (!locals.user) redirect(303, '/login');
 		const form = await request.formData();
 		const shape = readShape(form);
@@ -39,6 +40,6 @@ export const actions: Actions = {
 			{ ...shape, universityId: university?.id ?? null },
 			{ daysShown: days, theme, setupAt: new Date() }
 		);
-		redirect(303, '/');
+		redirect(303, takeNext(cookies) ?? '/');
 	}
 };

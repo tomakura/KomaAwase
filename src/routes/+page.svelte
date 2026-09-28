@@ -4,47 +4,26 @@
 	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
 	import UnscheduledCards from '$lib/components/UnscheduledCards.svelte';
+	import { liveClock } from '$lib/clock.svelte';
 	import { courseHref, timetableHref } from '$lib/courses';
+	import { currentTerm, termIsOn } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
 
 	let { data } = $props();
 
+	// svelte-ignore state_referenced_locally
+	const time = liveClock(data.now);
 	// Open on the term in the URL (coming back from a course), else the term that is on now,
 	// or during a break the next one to start.
-	function initialTerm() {
-		const today = tokyoTime(data.now).date;
-		const term =
-			data.terms.find((t) => t.id === data.termParam) ??
-			data.terms.find((t) => t.startDate && t.endDate && t.startDate <= today && today <= t.endDate) ??
-			data.terms.find((t) => t.startDate && today < t.startDate) ??
-			data.terms[0];
-		return term?.id;
-	}
-
-	let termId = $state(initialTerm());
+	// svelte-ignore state_referenced_locally
+	let termId = $state(
+		(data.terms.find((t) => t.id === data.termParam) ?? currentTerm(data.terms, tokyoTime(data.now).date))?.id
+	);
 	const term = $derived(data.terms.find((t) => t.id === termId));
-
 	const selectTerm = (id: string) => replaceState(timetableHref(id), {});
 
-	// Starts at the server's time so hydration matches, then follows the browser's clock.
-	// svelte-ignore state_referenced_locally
-	let now = $state(data.now);
-	$effect(() => {
-		const tick = () => (now = Date.now());
-		tick();
-		const timer = setInterval(tick, 30_000);
-		document.addEventListener('visibilitychange', tick);
-		return () => {
-			clearInterval(timer);
-			document.removeEventListener('visibilitychange', tick);
-		};
-	});
-	const clock = $derived(tokyoTime(now));
-	// Classes are only on in a term that includes today; a term without dates always is.
-	const termIsOn = $derived(
-		!!term &&
-			(!term.startDate || !term.endDate || (term.startDate <= clock.date && clock.date <= term.endDate))
-	);
+	const clock = $derived(time.clock);
+	const on = $derived(termIsOn(term, clock.date));
 
 	const days = $derived(data.days.toSorted((a, b) => a - b));
 	const termCourses = $derived(data.courses.filter((c) => termId && c.termIds.includes(termId)));
@@ -80,7 +59,7 @@
 			{days}
 			courses={termCourses}
 			{clock}
-			{termIsOn}
+			termIsOn={on}
 			slotHref={(day, period) => `/courses/search?term=${termId}&day=${day}&period=${period}`}
 			courseHref={(id) => courseHref(id, termId ?? null)}
 		/>

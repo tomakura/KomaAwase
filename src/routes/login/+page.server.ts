@@ -1,10 +1,13 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { consumeEmailToken, createEmailToken, normalizeEmail, sendSignInEmail } from '$lib/server/auth/email';
+import { rememberNext, safeNext } from '$lib/server/auth/next';
 import { RATE_LIMITED_MESSAGE, isRateLimited } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals }) => {
-	if (locals.user) redirect(303, '/');
+export const load: PageServerLoad = ({ locals, url, cookies }) => {
+	const next = url.searchParams.get('next');
+	if (locals.user) redirect(303, safeNext(next) ?? '/');
+	return { next: rememberNext(cookies, next) };
 };
 
 export const actions: Actions = {

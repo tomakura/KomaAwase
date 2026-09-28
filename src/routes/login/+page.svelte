@@ -4,7 +4,7 @@
 	import { loginWithPasskey } from '$lib/passkey';
 	import logo from '$lib/assets/favicon.svg';
 
-	let { form } = $props();
+	let { data, form } = $props();
 	let busy = $state(false);
 	let sending = $state(false);
 	let passkeyError = $state<string | null>(null);
@@ -14,7 +14,7 @@
 		passkeyError = null;
 		try {
 			const result = await loginWithPasskey();
-			if (result.ok) await goto('/', { invalidateAll: true });
+			if (result.ok) await goto(data.next ?? '/', { invalidateAll: true });
 			else passkeyError = result.message;
 		} finally {
 			busy = false;

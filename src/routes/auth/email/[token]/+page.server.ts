@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { passkeys, users } from '$lib/server/db/schema';
 import { consumeEmailToken } from '$lib/server/auth/email';
+import { takeNext } from '$lib/server/auth/next';
 import { createSession, setSessionCookie } from '$lib/server/auth/session';
 import type { Actions } from './$types';
 
@@ -24,6 +25,7 @@ export const actions: Actions = {
 			.from(passkeys)
 			.where(eq(passkeys.userId, user.id))
 			.get();
-		redirect(303, user.nickname && hasPasskey ? '/' : '/welcome');
+		// Until the nickname, passkey and はじめの設定 are done, `next` waits for the home page.
+		redirect(303, user.nickname && hasPasskey ? (user.setupAt ? (takeNext(cookies) ?? '/') : '/setup') : '/welcome');
 	}
 };

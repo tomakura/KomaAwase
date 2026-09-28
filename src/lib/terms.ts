@@ -69,3 +69,17 @@ export function parseTerms(json: string): TermInput[] | null {
 	}
 	return out;
 }
+
+// The term on now, else the next one to start (during a break), else the first
+export function currentTerm<T extends { startDate: string | null; endDate: string | null }>(terms: T[], today: string) {
+	return (
+		terms.find((t) => t.startDate && t.endDate && t.startDate <= today && today <= t.endDate) ??
+		terms.find((t) => t.startDate && today < t.startDate) ??
+		terms[0]
+	);
+}
+
+// A term without dates is always on.
+export function termIsOn(term: { startDate: string | null; endDate: string | null } | undefined, today: string) {
+	return !!term && (!term.startDate || !term.endDate || (term.startDate <= today && today <= term.endDate));
+}
