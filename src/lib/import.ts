@@ -50,6 +50,7 @@ const TITLE_MAX = 60;
 const ROOM_MAX = 20;
 const TEACHER_MAX = 30;
 const TEACHERS_MAX = 10;
+const SPAN_MAX = 4;
 export const IMPORT_COURSES_MAX = 60;
 
 const clip = (s: string, max: number) => [...s.trim()].slice(0, max).join('');
@@ -83,7 +84,7 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 			title,
 			weekday,
 			period,
-			span: Number.isInteger(span) && span >= 1 && span <= 4 ? span : 1,
+			span: Number.isInteger(span) && span >= 1 && span <= SPAN_MAX ? span : 1,
 			room: typeof c.room === 'string' ? clip(c.room, ROOM_MAX) : '',
 			teachers: Array.isArray(c.teachers)
 				? [...new Set(c.teachers.filter((t): t is string => typeof t === 'string').map((t) => clip(t, TEACHER_MAX)))]
@@ -97,7 +98,13 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 	const merged: ImportedCourse[] = [];
 	for (const c of out) {
 		const prev = merged.at(-1);
-		if (prev && prev.title === c.title && prev.weekday === c.weekday && prev.period + prev.span === c.period) {
+		if (
+			prev &&
+			prev.title === c.title &&
+			prev.weekday === c.weekday &&
+			prev.period + prev.span === c.period &&
+			prev.span + c.span <= SPAN_MAX
+		) {
 			prev.span += c.span;
 			prev.room ||= c.room;
 			continue;

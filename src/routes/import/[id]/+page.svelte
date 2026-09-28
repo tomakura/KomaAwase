@@ -47,6 +47,13 @@
 	const periodNumbers = $derived(data.periods.map((p) => p.number));
 	const included = $derived(rows.filter((r) => r.include));
 
+	// What was read has to be one of this timetable's periods, with room for the span.
+	function fits(s: Slot) {
+		const start = periodNumbers.indexOf(s.period);
+		return start >= 0 && start + s.span <= periodNumbers.length;
+	}
+	const unfit = $derived(included.some((r) => !r.sharedId && r.slots.some((s) => !fits(s))));
+
 	const payload = $derived(
 		JSON.stringify(
 			included.map((r) => ({
@@ -157,12 +164,11 @@
 									{#each [1, 2, 3, 4, 5, 6, 7] as d (d)}<option value={d}>{DAY_NAMES[d]}</option>{/each}
 								</select>
 								<select bind:value={slot.period} aria-label="時限">
+									{#if !periodNumbers.includes(slot.period)}<option value={slot.period}>{slot.period}限</option>{/if}
 									{#each data.periods as p (p.number)}<option value={p.number}>{p.number}限</option>{/each}
 								</select>
 								<select bind:value={slot.span} aria-label="コマ数">
-									<option value={1}>1コマ</option>
-									<option value={2}>2コマ</option>
-									<option value={3}>3コマ</option>
+									{#each [1, 2, 3, 4] as n (n)}<option value={n}>{n}コマ</option>{/each}
 								</select>
 								<input bind:value={slot.room} maxlength="20" placeholder="教室" aria-label="教室" />
 								{#if row.slots.length > 1}
@@ -172,7 +178,9 @@
 								{/if}
 							</div>
 							{@const taken = takenBy(slot, termIds)}
-							{#if taken}
+							{#if !fits(slot)}
+								<p class="taken">この時間割にない時限です。時限かコマ数を選び直してください</p>
+							{:else if taken}
 								<p class="taken">
 									{same(taken, row.title) ? 'すでに時間割にあります' : `この時間には「${taken}」が入っています`}
 								</p>
@@ -185,7 +193,7 @@
 
 			<input type="hidden" name="rows" value={payload} />
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-			<button class="btn btn-primary" type="submit" disabled={saving || !included.length || !termIds.length}>
+			<button class="btn btn-primary" type="submit" disabled={saving || !included.length || !termIds.length || unfit}>
 				{saving ? '保存中…' : `${included.length}件を時間割に追加`}
 			</button>
 		</form>
