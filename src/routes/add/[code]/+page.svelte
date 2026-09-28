@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import UserIcon from '$lib/components/UserIcon.svelte';
+	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 
 	let { data, form } = $props();
 	const name = $derived(data.person.nickname ?? '');
@@ -15,6 +16,7 @@
 		<UserIcon user={data.person} size={88} />
 		<h1>{name}</h1>
 		{#if data.person.university}<p class="university">{data.person.university}</p>{/if}
+		{#if data.person.verified}<VerifiedBadge label />{/if}
 	</div>
 
 	<div class="actions">

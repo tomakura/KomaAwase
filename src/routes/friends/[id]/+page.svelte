@@ -7,6 +7,7 @@
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
 	import UnscheduledCards from '$lib/components/UnscheduledCards.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
+	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import { liveClock } from '$lib/clock.svelte';
 	import { currentTerm, termIsOn } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
@@ -38,7 +39,9 @@
 		<UserIcon user={data.person} size={36} />
 		<span class="who">
 			<h1>{name}</h1>
-			{#if data.person.university}<span class="sub">{data.person.university}</span>{/if}
+			{#if data.person.university}
+				<span class="sub">{data.person.university}{#if data.person.verified}&nbsp;<VerifiedBadge label />{/if}</span>
+			{/if}
 		</span>
 		<button class="menu" type="button" aria-label="{name}さんのメニュー" onclick={() => (menu = true)}>
 			<Icon name="more" size={22} />

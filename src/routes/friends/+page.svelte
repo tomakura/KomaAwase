@@ -3,6 +3,7 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
+	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 
 	let { data } = $props();
 </script>
@@ -11,10 +12,10 @@
 	<title>友だち · コマあわせ</title>
 </svelte:head>
 
-{#snippet who(p: (typeof data.friends)[number])}
+{#snippet who(p: (typeof data.outgoing)[number] & { verified?: boolean })}
 	<UserIcon user={p} size={36} />
 	<span class="text">
-		<span class="name">{p.nickname}</span>
+		<span class="name">{p.nickname}{#if p.verified}&nbsp;<VerifiedBadge />{/if}</span>
 		{#if p.university}<span class="sub">{p.university}</span>{/if}
 	</span>
 {/snippet}

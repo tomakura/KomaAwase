@@ -7,6 +7,7 @@
 	import Sheet from '$lib/components/Sheet.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
+	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import { copyText, shareLink } from '$lib/share';
 
 	let { data, form } = $props();
@@ -78,7 +79,7 @@
 						<UserIcon user={m} size={36} />
 						<span class="text">
 							<span class="name">
-								{m.nickname}{#if m.id === data.meId}<span class="tag">あなた</span>{/if}{#if m.owner}<span class="tag">作った人</span>{/if}
+								{m.nickname}{#if m.verified}<VerifiedBadge />{/if}{#if m.id === data.meId}<span class="tag">あなた</span>{/if}{#if m.owner}<span class="tag">作った人</span>{/if}
 							</span>
 							<span class="sub">
 								{m.shareTimetable ? (m.university ?? '') : '時間割を見せていません'}

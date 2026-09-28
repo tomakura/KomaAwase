@@ -14,6 +14,7 @@ import {
 	setShare
 } from '$lib/server/groups';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
+import { verifiedIds } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -21,6 +22,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const [loaded, visible] = await Promise.all([loadGroup(locals.db, params.id, me.id), visibleUserIds(locals.db, me.id)]);
 	if (!loaded) error(404, 'グループが見つかりません');
 	const { group, members } = loaded;
+	const verified = await verifiedIds(
+		locals.db,
+		members.map((m) => m.id)
+	);
 	return {
 		group: { id: group.id, name: group.name },
 		isOwner: isOwner(group, me.id),
@@ -30,6 +35,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		members: members.map(({ joinedAt: _, ...m }) => ({
 			...m,
 			owner: m.id === group.ownerId,
+			verified: verified.has(m.id),
 			// Whose timetable opens from here: shown to the group and not blocked either way
 			visible: m.id !== me.id && visible.has(m.id)
 		})),

@@ -97,6 +97,7 @@
 				{@render link('/more/nickname', 'ニックネーム', data.user.nickname)}
 				{@render link('/more/university', '大学', data.universityName ?? '未設定')}
 				{@render link('/more/passkeys', 'パスキー', data.passkeyCount ? `${data.passkeyCount}台` : 'なし')}
+				{@render link('/more/verify', '在籍確認', data.verified ? '確認済み' : 'まだ')}
 			</div>
 		</section>
 

@@ -481,3 +481,32 @@ export const feedback = sqliteTable(
 	},
 	(t) => [index('feedback_status_idx').on(t.status)]
 );
+
+// Enrollment checks: a link sent to a university address was opened. One address
+// verifies one account at a time. Checks lapse each spring, when students re-confirm.
+export const univVerifications = sqliteTable('univ_verifications', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	universityId: text('university_id')
+		.notNull()
+		.references(() => universities.id),
+	email: text('email').notNull().unique(),
+	verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }).notNull(),
+	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+// Links sent for enrollment checks. id is the SHA-256 of the token in the link.
+export const verifyTokens = sqliteTable(
+	'verify_tokens',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		universityId: text('university_id').notNull(),
+		email: text('email').notNull(),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(t) => [index('verify_tokens_user_idx').on(t.userId)]
+);

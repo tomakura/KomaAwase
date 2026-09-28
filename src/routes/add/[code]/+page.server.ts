@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { rememberNext, requireUser } from '$lib/server/auth/next';
 import { findByFriendCode, friendshipBetween, isBlocked, readCode, sendRequest } from '$lib/server/friends';
+import { verifiedIds } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
 async function target(db: App.Locals['db'], code: string) {
@@ -18,7 +19,8 @@ export const load: PageServerLoad = async ({ locals, params, url, cookies }) => 
 		rememberNext(cookies, url.pathname);
 		redirect(303, '/');
 	}
-	const person = await target(locals.db, params.code);
+	const found = await target(locals.db, params.code);
+	const person = { ...found, verified: (await verifiedIds(locals.db, [found.id])).has(found.id) };
 	if (person.id === me.id) return { person, state: 'self' as const };
 	const [friendship, blocked] = await Promise.all([
 		friendshipBetween(locals.db, me.id, person.id),

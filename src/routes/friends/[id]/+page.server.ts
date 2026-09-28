@@ -5,6 +5,7 @@ import { timetables } from '$lib/server/db/schema';
 import { block, canSeeTimetable, friendshipBetween, loadPeople, removeFriendship } from '$lib/server/friends';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
 import { thisYear } from '$lib/server/setup';
+import { verifiedIds } from '$lib/server/verify';
 import { loadTimetable } from '$lib/server/timetable';
 import { tokyoTime } from '$lib/time';
 import type { Actions, PageServerLoad } from './$types';
@@ -17,20 +18,21 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 
 	const now = Date.now();
 	const year = thisYear();
-	const [timetable, friendship] = await Promise.all([
+	const [timetable, friendship, verified] = await Promise.all([
 		locals.db
 			.select({ id: timetables.id })
 			.from(timetables)
 			.where(and(eq(timetables.userId, person.id), eq(timetables.year, year)))
 			.get(),
-		friendshipBetween(locals.db, me.id, person.id)
+		friendshipBetween(locals.db, me.id, person.id),
+		verifiedIds(locals.db, [person.id])
 	]);
 	const loaded = timetable ? await loadTimetable(locals.db, timetable.id, tokyoTime(now).date) : null;
 	const { daysShown, universityId: _, ...profile } = person;
 	return {
 		now,
 		year,
-		person: profile,
+		person: { ...profile, verified: verified.has(person.id) },
 		isFriend: friendship?.status === 'accepted',
 		days: daysShown,
 		terms: loaded?.terms ?? [],
