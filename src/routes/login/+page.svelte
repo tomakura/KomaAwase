@@ -66,6 +66,9 @@
 				Googleで続ける
 			</a>
 			{#if data.googleFailed}<p class="error" role="alert">Googleでログインできませんでした。もう一度お試しください</p>{/if}
+			{#if data.googleUseMail}
+				<p class="error" role="alert">このGoogleアカウントのメールアドレスでは続けられません。下からメールアドレスでログインしてください</p>
+			{/if}
 		{/if}
 
 		{#if form?.sentTo}

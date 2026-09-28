@@ -12,7 +12,8 @@ export const load: PageServerLoad = ({ locals, url, cookies, platform }) => {
 		next: rememberNext(cookies, next),
 		bye: url.searchParams.has('bye'),
 		google: googleEnabled(platform?.env),
-		googleFailed: url.searchParams.get('error') === 'google'
+		googleFailed: url.searchParams.get('error') === 'google',
+		googleUseMail: url.searchParams.get('error') === 'google-mail'
 	};
 };
 

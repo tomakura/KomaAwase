@@ -40,15 +40,25 @@ export async function finishGoogle(env: Env, url: URL, cookies: Cookies) {
 
 	const tokens = await client(env, url.origin).validateAuthorizationCode(code, verifier);
 	// Straight from Google's token endpoint over TLS, so the signature needn't be checked here.
-	const claims = decodeIdToken(tokens.idToken()) as { sub?: string; email?: string; email_verified?: boolean };
+	const claims = decodeIdToken(tokens.idToken()) as { sub?: string; email?: string; email_verified?: boolean; hd?: string };
 	if (!claims.sub || !claims.email || claims.email_verified !== true) return null;
-	return { sub: claims.sub, email: claims.email.toLowerCase() };
+	return { sub: claims.sub, email: claims.email.toLowerCase(), hd: claims.hd ?? null };
 }
 
-/** The account for a Google sign-in: known by its Google id, else by its address (then linked), else new. */
-export async function userForGoogle(db: Db, account: { sub: string; email: string }) {
+// Google speaks for who holds an address now only for Gmail and Workspace (hd) accounts. Any
+// other Google account was made with an address that may have changed hands since.
+function ownsAddress(account: { email: string; hd: string | null }) {
+	return account.email.endsWith('@gmail.com') || !!account.hd;
+}
+
+/**
+ * The account for a Google sign-in: known by its Google id, else by its address (then
+ * linked), else new. 'use-mail' when the address can't be trusted to find or make one.
+ */
+export async function userForGoogle(db: Db, account: { sub: string; email: string; hd: string | null }) {
 	const bySub = await db.select().from(users).where(eq(users.googleSub, account.sub)).get();
 	if (bySub) return bySub;
+	if (!ownsAddress(account)) return 'use-mail' as const;
 	const byEmail = await db.select().from(users).where(eq(users.email, account.email)).get();
 	if (byEmail) {
 		// The address was proven both ways, by Google and by the sign-in mail.
