@@ -4,12 +4,18 @@
 //   npx wrangler deploy --dry-run --outdir .bench     (after npm run build)
 //   node --no-warnings scripts/bench-worker.mjs <session token> [paths…]
 // FIRST=1 times only the first request of a fresh process, like a Worker that just started.
+// Needs Node 22.16 or later (node:sqlite without a flag, and setReturnArrays).
 import { register } from 'node:module';
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+if (typeof DatabaseSync.prototype.constructor !== 'function' || !('setReturnArrays' in new DatabaseSync(':memory:').prepare('select 1'))) {
+	console.error('This needs Node 22.16 or later.');
+	process.exit(1);
+}
 
 // The bundle's one outside import, `env` from cloudflare:workers
 register(
