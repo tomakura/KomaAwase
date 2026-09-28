@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { and, count, eq, gte } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { feedback } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
@@ -22,12 +22,6 @@ export const actions: Actions = {
 		if (!kind) return fail(400, { message: '種類を選んでください' });
 		if (!body || [...body].length > BODY_MAX) return fail(400, { message: `内容は1〜${BODY_MAX}文字で書いてください` });
 
-		const [sent] = await locals.db
-			.select({ n: count() })
-			.from(feedback)
-			.where(and(eq(feedback.userId, me.id), gte(feedback.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000))));
-		if ((sent?.n ?? 0) >= DAILY_MAX) return fail(429, { message: '今日はたくさん送っていただきました。また明日お願いします' });
-
 		// Only what the page showed before sending, each value bounded
 		let env: Record<string, string> | null = null;
 		if (form.get('attach') === 'on') {
@@ -37,7 +31,13 @@ export const actions: Actions = {
 				if (value) env[key] = value;
 			}
 		}
-		await locals.db.insert(feedback).values({ userId: me.id, kind, body, env });
+		// Counted and saved in one statement, so sends at the same moment can't pass the limit together.
+		const since = Date.now() - 24 * 60 * 60 * 1000;
+		const saved = await locals.db.run(sql`
+			insert into ${feedback} (id, user_id, kind, body, env)
+			select ${crypto.randomUUID()}, ${me.id}, ${kind}, ${body}, ${env && JSON.stringify(env)}
+			where (select count(*) from ${feedback} where ${feedback.userId} = ${me.id} and ${feedback.createdAt} >= ${since}) < ${DAILY_MAX}`);
+		if (!saved.meta.changes) return fail(429, { message: '今日はたくさん送っていただきました。また明日お願いします' });
 		return { sent: true };
 	}
 };

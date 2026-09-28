@@ -483,7 +483,11 @@ export const feedback = sqliteTable(
 			.default('open'),
 		createdAt: createdAt()
 	},
-	(t) => [index('feedback_status_idx').on(t.status)]
+	(t) => [
+		index('feedback_status_idx').on(t.status),
+		// For the daily limit on sending
+		index('feedback_user_created_idx').on(t.userId, t.createdAt)
+	]
 );
 
 // Enrollment checks: a link sent to a university address was opened. One address
