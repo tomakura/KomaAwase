@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { rememberNext, requireUser } from '$lib/server/auth/next';
-import { findByFriendCode, friendshipBetween, isBlocked, readCode, sendRequest } from '$lib/server/friends';
+import { findByFriendCode, friendshipBetween, isBlocked, pendingRequestCount, readCode, sendRequest } from '$lib/server/friends';
 import { notifyLater } from '$lib/server/notify';
 import { verifiedIds } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
@@ -61,7 +61,8 @@ export const actions: Actions = {
 				title: `${name}さんから友だち申請が届きました`,
 				body: '承認すると、おたがいの時間割が見られるようになります',
 				url: '/friends',
-				tag: `friend-${me.id}`
+				tag: `friend-${me.id}`,
+				badge: await pendingRequestCount(locals.db, person.id)
 			});
 		} else if (result === 'accepted') {
 			// They had asked first, so this accepted their request

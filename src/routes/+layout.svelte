@@ -18,7 +18,8 @@
 		return () => document.removeEventListener('visibilitychange', changed);
 	});
 
-	// Friend requests waiting, on the app's icon on the home screen
+	// Friend requests waiting, on the app's icon on the home screen. A push sets it while the
+	// app is closed (src/service-worker.ts); this keeps it right once the app is open.
 	$effect(() => {
 		const n = data.pendingRequests;
 		if (!('setAppBadge' in navigator)) return;

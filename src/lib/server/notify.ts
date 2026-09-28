@@ -9,7 +9,8 @@ const SUBJECT = 'https://koma.tomakura.com';
 // The Free plan allows 50 outside requests per invocation; the rest of the work needs a few
 const SENDS_MAX = 40;
 
-export type PushMessage = { title: string; body?: string; url: string; tag?: string };
+// `badge`: the number to show on the app's icon, for when the app isn't open
+export type PushMessage = { title: string; body?: string; url: string; tag?: string; badge?: number };
 
 export function pushEnabled(env: Env | undefined) {
 	return !!env?.VAPID_PUBLIC_KEY && !!env.VAPID_PRIVATE_KEY;
