@@ -5,7 +5,9 @@
 	"compatibility_flags": [
 		"nodejs_als"
 	],
-	"main": ".svelte-kit/cloudflare/_worker.js",
+	// SvelteKit's worker, wrapped to also take the import queue and the daily cron. The adapter
+	// reads svelte-kit.wrangler.jsonc instead, since it writes its worker to `main`.
+	"main": "worker/entry.js",
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
@@ -31,6 +33,16 @@
 			"migrations_dir": "drizzle"
 		}
 	],
+	// Screenshot imports: one at a time, so Groq's per-minute limits hold. Jobs live in D1
+	// (import_jobs); a message only names one, and the daily cron re-sends what is due.
+	"queues": {
+		"producers": [{ "binding": "IMPORT_QUEUE", "queue": "koma-import" }],
+		"consumers": [{ "queue": "koma-import", "max_batch_size": 1, "max_batch_timeout": 5, "max_retries": 10, "max_concurrency": 1 }]
+	},
+	// 03:00 Japan time, after the AI quotas reset: retries, cleanup of old images and sessions
+	"triggers": { "crons": ["0 18 * * *"] },
+	// The backup reader for screenshots (Groq, keyed by the GROQ_API_KEY secret, comes first)
+	"ai": { "binding": "AI", "remote": true },
 	// Per-IP limits for endpoints anyone can call. Period must be 10 or 60 seconds.
 	"ratelimits": [
 		{

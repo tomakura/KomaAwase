@@ -51,6 +51,15 @@
 	</header>
 
 	<main>
+		{#if data.imported}
+			<a class="notice" href="/import/{data.imported.id}">
+				<span>
+					<b>{data.imported.status === 'done' ? 'スクショの読み取りが終わりました' : 'スクショを読み取れませんでした'}</b>
+					{data.imported.status === 'done' ? '内容を見直して、時間割に追加します' : 'くわしくはこちら'}
+				</span>
+				<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+			</a>
+		{/if}
 		<TermBar year={data.year} terms={data.terms} bind:termId onchange={selectTerm} />
 
 		<TimetableGrid
@@ -111,5 +120,38 @@
 
 	main {
 		padding-bottom: 20px;
+	}
+
+	.notice {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin: 4px 16px 10px;
+		padding: 10px 14px;
+		border-radius: 12px;
+		background: var(--course-green);
+		color: var(--ink);
+		font-size: 12px;
+		text-decoration: none;
+	}
+
+	.notice span {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.notice b {
+		font-size: 13px;
+	}
+
+	.notice svg {
+		flex-shrink: 0;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 </style>

@@ -71,6 +71,13 @@
       "when": 1790558152928,
       "tag": "0009_friends_and_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790560444615,
+      "tag": "0010_import_jobs",
+      "breakpoints": true
     }
   ]
 }

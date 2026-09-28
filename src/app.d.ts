@@ -7,6 +7,10 @@ declare global {
 		FILES_SECRET?: string;
 		// The page for supporting development (開発を応援する); the row is hidden without it
 		SUPPORT_URL?: string;
+		// Screenshot reading with Groq; without it only Workers AI reads them
+		GROQ_API_KEY?: string;
+		// Set by worker/entry.js on calls it makes to itself (queue and cron), never by requests
+		KOMA_INTERNAL?: boolean;
 	}
 
 	namespace App {

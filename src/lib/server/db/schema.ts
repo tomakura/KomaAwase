@@ -432,3 +432,33 @@ export const reports = sqliteTable(
 	},
 	(t) => [index('reports_status_idx').on(t.status)]
 );
+
+// Screenshot imports waiting for, or back from, the AI. This table is the queue's source of
+// truth: Queues messages only say which job to work on and last a day at most.
+export const importJobs = sqliteTable(
+	'import_jobs',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		timetableId: text('timetable_id')
+			.notNull()
+			.references(() => timetables.id, { onDelete: 'cascade' }),
+		status: text('status', { enum: ['queued', 'processing', 'retry', 'done', 'failed'] })
+			.notNull()
+			.default('queued'),
+		// The cropped screenshot as a JPEG data URL, cleared as soon as it has been read
+		image: text('image'),
+		provider: text('provider', { enum: ['groq', 'workers-ai'] }),
+		result: text('result', { mode: 'json' }).$type<import('$lib/import').ImportedCourse[]>(),
+		error: text('error'),
+		attempts: integer('attempts').notNull().default(0),
+		retryAt: integer('retry_at', { mode: 'timestamp_ms' }),
+		createdAt: createdAt(),
+		finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+		// When the results were saved to the timetable or put aside
+		closedAt: integer('closed_at', { mode: 'timestamp_ms' })
+	},
+	(t) => [index('import_jobs_user_idx').on(t.userId), index('import_jobs_status_idx').on(t.status)]
+);

@@ -142,15 +142,15 @@
 				<span>自分で入力する</span>
 				<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 			</a>
-			<!-- Reading screenshots comes later. -->
-			<span class="option disabled" aria-disabled="true">
+			<a class="option" href="/import?back={encodeURIComponent(page.url.pathname + page.url.search)}">
 				<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
 					<rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
 					<circle cx="9" cy="10" r="1.8" />
 					<path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" />
 				</svg>
-				<span>スクショからまとめて読み込む（準備中）</span>
-			</span>
+				<span>スクショからまとめて読み込む</span>
+				<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+			</a>
 		</section>
 	</div>
 </div>
@@ -371,10 +371,6 @@
 
 	.option span {
 		flex-grow: 1;
-	}
-
-	.option.disabled {
-		color: var(--ink-sub);
 	}
 
 	.chevron {
