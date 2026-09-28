@@ -11,9 +11,11 @@
 	let passkeyError = $state<string | null>(null);
 	let blocked = $state(false);
 
-	// Signed out: the pages kept for offline use hold the last person's timetable.
+	// Signed out: the pages kept for offline use hold the last person's timetable. Signing in
+	// waits for them to go, so the next person never sees one.
+	let cleared: Promise<void> = Promise.resolve();
 	$effect(() => {
-		clearPageCaches();
+		cleared = clearPageCaches().catch(() => {});
 	});
 
 	async function onPasskey() {
@@ -21,7 +23,10 @@
 		passkeyError = null;
 		try {
 			const result = await loginWithPasskey();
-			if (result.ok) await goto(data.next ?? '/', { invalidateAll: true });
+			if (result.ok) {
+				await cleared;
+				await goto(data.next ?? '/', { invalidateAll: true });
+			}
 			else passkeyError = result.message;
 		} finally {
 			busy = false;

@@ -38,16 +38,26 @@ sw.addEventListener('activate', (event) => {
 
 const OFFLINE = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>オフライン · コマあわせ</title><body style="margin:0;min-height:100svh;display:flex;align-items:center;justify-content:center;background:#f6f2ea;color:#2b2824;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box"><p style="line-height:1.8">インターネットにつながっていません。<br>電波のよいところで、もう一度開いてください。</p></body></html>`;
 
+// SvelteKit's data requests say which parts to reload in x-sveltekit-invalidated; the page is
+// the same whatever it says, so it's kept under one key. Any other query must match exactly.
+function pageKey(request: Request) {
+	const url = new URL(request.url);
+	url.searchParams.delete('x-sveltekit-invalidated');
+	return url.href;
+}
+
 async function networkFirst(request: Request) {
 	const cache = await caches.open(PAGES);
 	try {
 		const response = await fetch(request);
+		// Cache-Control isn't read: SvelteKit marks every __data.json no-store (for HTTP caches),
+		// and this copy is the app's own, dropped at sign-out. Pages never to keep are NETWORK_ONLY.
 		if (response.ok && response.type === 'basic' && !response.redirected) {
-			cache.put(request, response.clone());
+			cache.put(pageKey(request), response.clone());
 		}
 		return response;
 	} catch {
-		const cached = (await cache.match(request)) ?? (await cache.match(request, { ignoreSearch: true }));
+		const cached = await cache.match(pageKey(request));
 		if (cached) return cached;
 		if (request.mode === 'navigate') {
 			return new Response(OFFLINE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8' } });
