@@ -17,6 +17,7 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 			? {
 					id: current.id,
 					status: current.status,
+					createdAt: current.createdAt.getTime(),
 					retryAt: current.retryAt?.getTime() ?? null,
 					ahead: current.status === 'queued' ? await queuePosition(locals.db, current) : 0
 				}

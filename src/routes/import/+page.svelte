@@ -64,6 +64,19 @@
 	});
 
 	const minutes = $derived(Math.max(1, Math.ceil(((data.job?.ahead ?? 0) + 1) * 0.5)));
+
+	// How long ago it was sent, ticking while it waits or is read
+	let now = $state(Date.now());
+	$effect(() => {
+		const status = data.job?.status;
+		if (status !== 'queued' && status !== 'processing') return;
+		const timer = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(timer);
+	});
+	const elapsed = $derived.by(() => {
+		const seconds = Math.max(0, Math.round((now - (data.job?.createdAt ?? now)) / 1000));
+		return seconds < 60 ? `${seconds}秒` : `${Math.floor(seconds / 60)}分${seconds % 60 ? `${seconds % 60}秒` : ''}`;
+	});
 </script>
 
 <svelte:head>
@@ -79,16 +92,19 @@
 			<div class="status" class:ready={job.status === 'done'} role="status">
 				<Icon name={job.status === 'done' ? 'check' : 'clock'} size={22} />
 				<div class="status-text">
-					{#if job.status === 'queued'}
-						<b>順番待ち中</b>
-						<span>{job.ahead ? `前にあと${job.ahead}件 · ` : ''}目安は{minutes}分くらい</span>
+					{#if job.status === 'queued' && job.ahead}
+						<b>順番待ち中（前にあと{job.ahead}件）</b>
+						<span>ほかの人の画像を読み取っています。目安はあと{minutes}分くらいです。</span>
+					{:else if job.status === 'queued'}
+						<b>まもなく読み取りを始めます</b>
+						<span>AIの準備ができしだい始まります。</span>
 					{:else if job.status === 'processing'}
-						<b>読み取り中</b>
-						<span>もう少しで終わります</span>
+						<b>AIが読み取っています</b>
+						<span>表のマスを1つずつ書き写しています。ふつうは30秒〜1分ほどで終わります。</span>
 					{:else if job.status === 'retry'}
 						<b>明日もう一度読み取ります</b>
 						<span>
-							今日はAIが混んでいました。{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の朝に` : ''}読み取って、この画面でお知らせします。
+							今日のAIの無料枠を使い切ったので、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度読み取ります。終わったら時間割の画面でお知らせします。
 						</span>
 					{:else if job.status === 'done'}
 						<b>読み取りが終わりました</b>
@@ -99,6 +115,19 @@
 					{/if}
 				</div>
 			</div>
+			{#if job.status === 'queued' || job.status === 'processing'}
+				<ol class="steps" aria-label="読み取りの進み具合">
+					<li class="done">画像を受け取りました</li>
+					<li class:done={job.status === 'processing'} class:now={job.status === 'queued'}>
+						{job.ahead ? '順番待ち' : '読み取りの準備'}
+					</li>
+					<li class:now={job.status === 'processing'}>AIが表を書き写す</li>
+					<li>読み取った授業を見直して、時間割に保存</li>
+				</ol>
+				<p class="ui-note">
+					送ってから{elapsed}。この画面を閉じても読み取りは続きます。終わったら時間割の画面でお知らせします（通知をオンにしていれば通知も届きます）。
+				</p>
+			{/if}
 			{#if job.status === 'done' || job.status === 'failed'}
 				<a class="btn btn-primary" href="/import/{job.id}">{job.status === 'done' ? '読み取った授業を見る' : 'くわしく見る'}</a>
 			{/if}
@@ -137,7 +166,7 @@
 				</div>
 				<div class="item">
 					<span class="num">3</span>
-					<span>混んでいる日は順番待ちになります。読み取りが終わったら、時間割の画面でお知らせします。</span>
+					<span>読み取りはふつう1分ほどです。ほかの人と重なると順番待ちになります。終わったら、時間割の画面でお知らせします（通知をオンにしていれば通知も届きます）。</span>
 				</div>
 			</div>
 
@@ -279,6 +308,60 @@
 		border-radius: 14px;
 		background: var(--slot);
 		color: var(--ink-soft);
+	}
+
+	.steps {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin: 0;
+		padding: 4px 4px 0;
+		list-style: none;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+
+	.steps li {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	/* A dot per step: filled when done, ringed and pulsing while it's the current one */
+	.steps li::before {
+		content: '';
+		width: 10px;
+		height: 10px;
+		flex-shrink: 0;
+		border: 2px solid var(--line);
+		border-radius: 50%;
+	}
+
+	.steps li.done::before {
+		border-color: var(--ink-soft);
+		background: var(--ink-soft);
+	}
+
+	.steps li.now {
+		color: var(--ink);
+		font-weight: 700;
+	}
+
+	.steps li.now::before {
+		border-color: var(--accent-text);
+		animation: pulse 1.2s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		50% {
+			box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-text) 25%, transparent);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.steps li.now::before {
+			animation: none;
+		}
 	}
 
 	.status.ready {
