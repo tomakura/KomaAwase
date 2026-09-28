@@ -27,6 +27,7 @@
 				<span>開発を応援する</span><span class="ui-row-value"><Icon name="external" size={16} /></span>
 			</a>
 		{/if}
+		<a class="ui-row" href="/install"><span>ホーム画面に追加する方法</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/feedback?from=/about"><span>不具合・要望を送る</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/terms"><span>利用規約</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/privacy"><span>プライバシーポリシー</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
