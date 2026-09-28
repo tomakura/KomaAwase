@@ -15,5 +15,6 @@
 	initial={data.initial}
 	terms={data.terms}
 	periods={data.periods}
+	others={data.others}
 	message={form?.message}
 />

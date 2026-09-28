@@ -1,6 +1,6 @@
 import { error, fail, isHttpError, redirect } from '@sveltejs/kit';
 import { courseHref, timetableHref } from '$lib/courses';
-import { deleteCourse, loadCourse, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
+import { deleteCourse, loadCourse, otherSlots, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
 import { canEditShared } from '$lib/server/shared-courses';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -9,11 +9,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const loaded = await loadCourse(locals.db, locals.user.id, params.id);
 	if (!loaded) error(404, '授業が見つかりません');
 	const { shared, timetable } = loaded;
-	const canEdit =
+	const [canEdit, others] = await Promise.all([
 		shared && timetable.universityId
-			? await canEditShared(locals.db, locals.user.id, { id: shared.id, universityId: timetable.universityId })
-			: true;
-	return { ...loaded, canEditShared: canEdit, termParam: url.searchParams.get('term') };
+			? canEditShared(locals.db, locals.user.id, { id: shared.id, universityId: timetable.universityId })
+			: true,
+		otherSlots(locals.db, timetable.id, params.id)
+	]);
+	return { ...loaded, canEditShared: canEdit, others, termParam: url.searchParams.get('term') };
 };
 
 export const actions: Actions = {

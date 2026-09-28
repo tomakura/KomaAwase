@@ -18,6 +18,7 @@
 	initial={data.course}
 	terms={data.terms}
 	periods={data.periods}
+	others={data.others}
 	message={form?.message}
 />
 

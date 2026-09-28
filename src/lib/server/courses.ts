@@ -261,6 +261,31 @@ export async function commitCourses(db: Db, prepared: PreparedCourse[], first: B
 	return null;
 }
 
+/** Every other course's slots in the timetable, with their terms: what a new length must not run into */
+export async function otherSlots(db: Db, timetableId: string, exceptCourseId: string | null) {
+	const [slots, terms] = await db.batch([
+		db
+			.select({
+				courseId: courseSlots.courseId,
+				weekday: courseSlots.weekday,
+				period: courseSlots.periodNumber,
+				span: courseSlots.span,
+				week: courseSlots.weekPattern
+			})
+			.from(courseSlots)
+			.innerJoin(courses, eq(courses.id, courseSlots.courseId))
+			.where(eq(courses.timetableId, timetableId)),
+		db
+			.select({ courseId: courseTerms.courseId, termId: courseTerms.termId })
+			.from(courseTerms)
+			.innerJoin(courses, eq(courses.id, courseTerms.courseId))
+			.where(eq(courses.timetableId, timetableId))
+	]);
+	return slots
+		.filter((s) => s.courseId !== exceptCourseId)
+		.map(({ courseId, ...s }) => ({ ...s, termIds: terms.filter((t) => t.courseId === courseId).map((t) => t.termId) }));
+}
+
 // The course, only if it is in one of the user's timetables
 export function findOwnedCourse(db: Db, userId: string, courseId: string) {
 	return db

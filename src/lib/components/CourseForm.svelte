@@ -33,6 +33,7 @@
 		initial,
 		terms,
 		periods,
+		others = [],
 		message
 	}: {
 		heading: string;
@@ -42,6 +43,8 @@
 		initial: CourseValues;
 		terms: { id: string; name: string }[];
 		periods: { number: number }[];
+		// The timetable's other courses, which a slot's length stops short of
+		others?: { weekday: number; period: number; span: number; week: WeekPattern; termIds: string[] }[];
 		message?: string;
 	} = $props();
 
@@ -103,17 +106,30 @@
 	const pick = $state({ weekday: 1, period: periods[0]?.number ?? 1, span: 1 });
 	const maxSpan = $derived(periodNumbers.length - periodNumbers.indexOf(pick.period));
 
-	// How many periods the slot can run to: up to the end of the day or the next class that day
+	// Odd and even weeks can share a slot; anything else meets in the same week
+	const sameWeeks = (a: WeekPattern | undefined, b: WeekPattern | undefined) =>
+		!((a === 'odd' && b === 'even') || (a === 'even' && b === 'odd'));
+
+	// How many periods the slot can run to: up to the end of the day, or the next class that
+	// day, of this course or of another one in the same terms
 	function spanChoices(index: number) {
 		const slot = v.slots[index];
 		const start = periodNumbers.indexOf(slot.period);
+		const overlaps = (s: { period: number; span: number }, n: number) => {
+			const other = periodNumbers.indexOf(s.period);
+			return other >= 0 && other <= start + n - 1 && start <= other + s.span - 1;
+		};
 		const choices: number[] = [];
 		for (let n = 1; start >= 0 && start + n <= periodNumbers.length; n++) {
-			const clash = v.slots.some((s, j) => {
-				if (j === index || s.weekday !== slot.weekday) return false;
-				const other = periodNumbers.indexOf(s.period);
-				return other <= start + n - 1 && start <= other + s.span - 1;
-			});
+			const clash =
+				v.slots.some((s, j) => j !== index && s.weekday === slot.weekday && overlaps(s, n)) ||
+				others.some(
+					(o) =>
+						o.weekday === slot.weekday &&
+						o.termIds.some((t) => v.termIds.includes(t)) &&
+						sameWeeks(o.week, slot.week) &&
+						overlaps(o, n)
+				);
 			if (clash) break;
 			choices.push(n);
 		}
