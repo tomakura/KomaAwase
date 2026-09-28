@@ -104,7 +104,7 @@
 					{:else if job.status === 'retry'}
 						<b>明日もう一度読み取ります</b>
 						<span>
-							今日のAIの無料枠を使い切ったので、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度読み取ります。終わったら時間割の画面でお知らせします。
+							今日は読み取れなかったので、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度読み取ります（AIが混んでいたり、1日の無料枠を使い切ったりしたときに起きます）。終わったら時間割の画面でお知らせします。
 						</span>
 					{:else if job.status === 'done'}
 						<b>読み取りが終わりました</b>
