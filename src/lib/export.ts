@@ -186,6 +186,14 @@ export function wrap(measure: (s: string) => number, parts: string[], maxWidth: 
 	return kept;
 }
 
+/** The text if it fits in `maxWidth`, else as much as fits followed by "…" */
+export function fitLabel(measure: (s: string) => number, label: string, maxWidth: number) {
+	if (measure(label) <= maxWidth) return label;
+	const chars = [...label];
+	while (chars.length > 1 && measure(`${chars.join('')}…`) > maxWidth) chars.pop();
+	return `${chars.join('')}…`;
+}
+
 function drawLogo(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
 	const s = size / 48;
 	ctx.save();
@@ -299,9 +307,7 @@ export function drawTimetable(ctx: CanvasRenderingContext2D, data: ExportData, o
 
 			if (room) {
 				ctx.font = `500 ${roomSize}px ${BODY}`;
-				let label = room;
-				while (label.length > 1 && ctx.measureText(label).width > b.w - inner * 2 - 16) label = label.slice(0, -1);
-				if (label !== room) label = `${label.slice(0, -1)}…`;
+				const label = fitLabel((v) => ctx.measureText(v).width, room, b.w - inner * 2 - 16);
 				const w = Math.min(b.w - inner * 2, ctx.measureText(label).width + 16);
 				const pill = { x: b.x + (b.w - w) / 2, y: b.y + b.h - inner - roomH, w, h: roomH };
 				roundRect(ctx, pill, 8, SURFACE);

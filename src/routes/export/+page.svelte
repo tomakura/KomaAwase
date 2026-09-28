@@ -63,16 +63,22 @@
 		if (!target || !ready) return;
 		const size = SIZES[o.format];
 		const key = JSON.stringify(d);
+		// A newer run (options changed while fonts loaded) draws instead of this one.
+		let stale = false;
 		(async () => {
 			if (fontsFor !== key) {
 				await loadFonts(d);
 				fontsFor = key;
 			}
+			if (stale) return;
 			target.width = size.width;
 			target.height = size.height;
 			const ctx = target.getContext('2d');
 			if (ctx) drawTimetable(ctx, d, o);
 		})();
+		return () => {
+			stale = true;
+		};
 	});
 
 	const fileName = $derived(`komaawase-${data.year}-${term?.name ?? 'timetable'}.png`);

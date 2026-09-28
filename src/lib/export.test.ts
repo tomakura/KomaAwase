@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_OPTIONS, layout, wrap, type ExportData } from './export';
+import { DEFAULT_OPTIONS, fitLabel, layout, wrap, type ExportData } from './export';
 
 // One unit per character
 const measure = (s: string) => [...s].length;
@@ -58,5 +58,16 @@ describe('layout', () => {
 			expect(last.x + last.w).toBeLessThanOrEqual(L.width - L.pad + 0.001);
 			expect(last.y + last.h).toBeLessThanOrEqual(L.height - L.pad + 0.001);
 		}
+	});
+});
+
+describe('fitLabel', () => {
+	it('leaves a label that fits alone', () => {
+		expect(fitLabel(measure, 'A-305', 5)).toBe('A-305');
+	});
+
+	it('cuts it so the label with … still fits, never inside an emoji', () => {
+		expect(fitLabel(measure, '講義棟A-305', 5)).toBe('講義棟A…');
+		expect(fitLabel(measure, '🏫体育館アリーナ', 3)).toBe('🏫体…');
 	});
 });
