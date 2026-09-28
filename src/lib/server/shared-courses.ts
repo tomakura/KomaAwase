@@ -273,3 +273,55 @@ export async function searchSharedCourses(
 		)
 		.slice(0, 30);
 }
+
+/** The course's changes, newest first. Who made them is never shown. */
+export function loadEdits(db: Db, sharedCourseId: string) {
+	return db
+		.select({ id: sharedCourseEdits.id, diff: sharedCourseEdits.diff, createdAt: sharedCourseEdits.createdAt })
+		.from(sharedCourseEdits)
+		.where(eq(sharedCourseEdits.sharedCourseId, sharedCourseId))
+		.orderBy(desc(sharedCourseEdits.createdAt))
+		.limit(50);
+}
+
+/**
+ * Puts the course back to how it was after an earlier edit, as a new edit (so that can be
+ * undone too). A message comes back when someone changed it since the page was opened.
+ */
+export async function restoreShared(
+	db: Db,
+	{ userId, course, editId, version }: { userId: string; course: SharedCourse; editId: string; version: number }
+) {
+	if (course.version !== version) return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度お試しください' };
+	const edit = await db
+		.select({ diff: sharedCourseEdits.diff })
+		.from(sharedCourseEdits)
+		.where(and(eq(sharedCourseEdits.id, editId), eq(sharedCourseEdits.sharedCourseId, course.id)))
+		.get();
+	const values = edit?.diff.after as SharedValues | null | undefined;
+	if (!values) return { message: 'その版が見つかりません' };
+	const written = writeShared(db, {
+		userId,
+		universityId: course.universityId,
+		year: course.year,
+		termNames: course.terms,
+		existing: course,
+		values
+	});
+	if (!written.changed) return { message: 'いまの内容と同じです' };
+	try {
+		await db.batch(written.statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+	} catch {
+		return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度お試しください' };
+	}
+	return { restored: true };
+}
+
+/** How many timetables sync the course */
+export async function syncedCount(db: Db, sharedCourseId: string) {
+	const [row] = await db
+		.select({ n: count() })
+		.from(courses)
+		.where(and(eq(courses.sharedCourseId, sharedCourseId), eq(courses.syncMode, 'synced')));
+	return row?.n ?? 0;
+}

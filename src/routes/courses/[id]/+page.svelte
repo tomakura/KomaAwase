@@ -137,6 +137,11 @@
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
 			{/if}
+			{#if data.shared}
+				<a class="shared-link" href="/shared/{data.shared.id}?back={encodeURIComponent(courseHref(course.id, data.termParam))}">
+					みんなの授業データ（変更の履歴・報告）
+				</a>
+			{/if}
 		</div>
 
 		<h2 class="add-heading">追加する</h2>
@@ -457,6 +462,11 @@
 	.teachers {
 		font-size: 13px;
 		color: var(--ink-soft);
+	}
+
+	.shared-link {
+		align-self: flex-start;
+		font-size: 12px;
 	}
 
 	.add-heading,

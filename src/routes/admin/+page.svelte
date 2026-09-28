@@ -33,6 +33,7 @@
 				<p class="reason">{r.reason}{r.detail ? `：${r.detail}` : ''}</p>
 				<div class="foot">
 					<span class="from">{r.reporter ?? '（退会した人）'}から</span>
+					{#if r.targetType === 'shared_course'}<a href="/shared/{r.targetId}?back=/admin">変更の履歴</a>{/if}
 					<form method="POST" action="?/closeReport" use:enhance>
 						<input type="hidden" name="id" value={r.id} />
 						<button class="small" type="submit">対応済み</button>
