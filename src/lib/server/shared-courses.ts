@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Delivery, WeekPattern } from '$lib/courses';
+import { compareJa } from '$lib/sort';
 import type { Db } from './db';
 import {
 	courses,
@@ -302,7 +303,7 @@ export async function searchSharedCourses(
 			(a, b) =>
 				Number(b.source === 'syllabus') - Number(a.source === 'syllabus') ||
 				b.users - a.users ||
-				a.values.title.localeCompare(b.values.title, 'ja')
+				compareJa(a.values.title, b.values.title)
 		)
 		.slice(0, 30);
 }

@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import { OVERLAY_COOKIE } from '$lib/overlay';
+import { compareJa } from '$lib/sort';
 import { requireUser } from '$lib/server/auth/next';
 import { friendships, timetables } from '$lib/server/db/schema';
 import { loadPeople, visibleUserIds } from '$lib/server/friends';
@@ -54,7 +55,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		mine: loaded.get(mine.id)!,
 		people: people
 			.map(({ daysShown: _, ...p }) => ({ ...p, friend: friendIds.has(p.id) }))
-			.sort((a, b) => Number(b.friend) - Number(a.friend) || (a.nickname ?? '').localeCompare(b.nickname ?? '', 'ja')),
+			.sort((a, b) => Number(b.friend) - Number(a.friend) || compareJa(a.nickname ?? '', b.nickname ?? '')),
 		groups: groups.map((g) => ({ ...g, memberIds: g.memberIds.filter((id) => visible.has(id)) })),
 		selected,
 		// null: no timetable for this year yet
