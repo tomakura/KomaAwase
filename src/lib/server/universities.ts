@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import type { Db } from './db';
 import { universities } from './db/schema';
 
@@ -10,8 +10,8 @@ export function normalizeUniversityName(input: string) {
 }
 
 // Names for the suggestions in はじめの設定 and 大学; preset universities first.
-export async function listUniversities(db: Db) {
-	const rows = await db
+export function listUniversities(db: Db) {
+	return db
 		.select({
 			id: universities.id,
 			name: universities.name,
@@ -20,9 +20,9 @@ export async function listUniversities(db: Db) {
 			periodPreset: universities.periodPreset
 		})
 		.from(universities)
-		.orderBy(asc(universities.name))
+		// Sorted before the limit, so however many are added the presets stay in.
+		.orderBy(desc(eq(universities.source, 'preset')), asc(universities.name))
 		.limit(500);
-	return rows.toSorted((a, b) => Number(a.source !== 'preset') - Number(b.source !== 'preset'));
 }
 
 export function getUniversity(db: Db, id: string) {
