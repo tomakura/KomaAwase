@@ -1,10 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { COURSE_COLORS } from '$lib/courses';
 import { IMPORT_COURSES_MAX, groupImported } from '$lib/import';
 import { normalizeTitle } from '$lib/overlay';
 import { requireUser } from '$lib/server/auth/next';
-import { nextColor, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
+import { commitCourses, nextColor, parseCourseForm, prepareCourse, shapeOf } from '$lib/server/courses';
 import { importJobs, sharedCourseSlots, sharedCourses, timetables } from '$lib/server/db/schema';
 import { loadSharedCourses } from '$lib/server/shared-courses';
 import { loadShape, loadTimetable } from '$lib/server/timetable';
@@ -92,9 +92,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 type Row = {
 	title: string;
 	teachers: string[];
-	slots: { weekday: number; period: number; span: number; room: string }[];
+	slots: Record<string, unknown>[];
 	sharedId: string | null;
 };
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export const actions: Actions = {
 	save: async ({ locals, params, url, request }) => {
@@ -109,6 +111,9 @@ export const actions: Actions = {
 			return fail(400, { message: '入力を読み取れませんでした。もう一度お試しください' });
 		}
 		if (!Array.isArray(raw) || !raw.length) return fail(400, { message: '追加する授業を1つ以上選んでください' });
+		if (!raw.every((r) => isObject(r) && (r.slots === undefined || (Array.isArray(r.slots) && r.slots.every(isObject))))) {
+			return fail(400, { message: '入力を読み取れませんでした。もう一度お試しください' });
+		}
 		// Checked field by field again below (parseCourseForm); here only the shape
 		const rows: Row[] = raw.slice(0, IMPORT_COURSES_MAX).map((r) => ({
 			title: typeof r?.title === 'string' ? r.title : '',
@@ -149,11 +154,29 @@ export const actions: Actions = {
 			inputs.push(parsed.input);
 		}
 
+		const prepared = [];
 		for (const input of inputs) {
-			const saved = await saveCourse(locals.db, { userId: me.id, timetable, terms: shape.terms, courseId: null, input });
-			if ('message' in saved) return fail(409, { message: saved.message });
+			const course = await prepareCourse(locals.db, { userId: me.id, timetable, terms: shape.terms, courseId: null, input });
+			if ('message' in course) return fail(409, { message: course.message });
+			prepared.push(course);
 		}
-		await locals.db.update(importJobs).set({ closedAt: new Date() }).where(eq(importJobs.id, job.id));
+		// One batch with the job closed first: every course is added or none, and a second save
+		// of this import (another tab) stops at the guard, which rolls the whole batch back.
+		let failed;
+		try {
+			failed = await commitCourses(locals.db, prepared, [
+				locals.db
+					.update(importJobs)
+					.set({ closedAt: new Date() })
+					.where(and(eq(importJobs.id, job.id), isNull(importJobs.closedAt))),
+				locals.db.run(sql`select json(case when changes() = 1 then 'true' else 'already saved' end)`)
+			]);
+		} catch (e) {
+			const now = await locals.db.select({ closedAt: importJobs.closedAt }).from(importJobs).where(eq(importJobs.id, job.id)).get();
+			if (now?.closedAt) redirect(303, '/');
+			throw e;
+		}
+		if (failed) return fail(409, failed);
 		redirect(303, termIds[0] ? `/?term=${encodeURIComponent(termIds[0])}` : '/');
 	},
 	dismiss: async ({ locals, params, url }) => {

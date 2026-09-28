@@ -7,7 +7,7 @@ import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
-import { loadSharedCourse, writeShared } from './shared-courses';
+import { loadSharedCourse, writeShared, type SharedCourse } from './shared-courses';
 import { loadShape, titleParts } from './timetable';
 
 const TITLE_MAX = 60;
@@ -130,26 +130,31 @@ export async function nextColor(db: Db, timetableId: string) {
 const CONFLICT =
 	'ほかの人が先にこの授業を直しました。画面を読み込み直すと最新の内容になるので、もう一度直して保存してください';
 
+type SaveArgs = {
+	userId: string;
+	timetable: { id: string; year: number; universityId: string | null };
+	terms: { id: string; name: string }[];
+	courseId: string | null;
+	input: CourseInput;
+};
+
+type PreparedCourse = { id: string; existing: SharedCourse | null; statements: BatchItem<'sqlite'>[] };
+
 // Saves the course in the timetable. A synced course also adds itself to the shared data, or
 // updates the shared course it is linked to. The local copy is always written, so switching to
 // 自分だけで使う keeps the latest values. Returns a message instead when the shared course
 // changed after the form was opened, so nobody overwrites an edit they haven't seen.
-export async function saveCourse(
+export async function saveCourse(db: Db, args: SaveArgs) {
+	const prepared = await prepareCourse(db, args);
+	if ('message' in prepared) return prepared;
+	return (await commitCourses(db, [prepared])) ?? { id: prepared.id };
+}
+
+/** The statements that save one course, so several can go in one batch (commitCourses). */
+export async function prepareCourse(
 	db: Db,
-	{
-		userId,
-		timetable,
-		terms,
-		courseId,
-		input
-	}: {
-		userId: string;
-		timetable: { id: string; year: number; universityId: string | null };
-		terms: { id: string; name: string }[];
-		courseId: string | null;
-		input: CourseInput;
-	}
-) {
+	{ userId, timetable, terms, courseId, input }: SaveArgs
+): Promise<PreparedCourse | { message: string }> {
 	const existing = input.sharedCourseId ? await loadSharedCourse(db, input.sharedCourseId) : null;
 	if (
 		input.sharedCourseId &&
@@ -217,21 +222,36 @@ export async function saveCourse(
 				.values(input.teachers.map((name, sortOrder) => ({ courseId: id, name, sortOrder })))
 		);
 	}
-	try {
-		await db.batch([
+	return {
+		id,
+		existing,
+		statements: [
 			courseId
 				? db.update(courses).set(values).where(eq(courses.id, id))
 				: db.insert(courses).values({ id, timetableId: timetable.id, ...values }),
 			...shared,
 			...rest
-		]);
+		]
+	};
+}
+
+/**
+ * Writes prepared courses in one batch, after any `first` statements: all of it is saved or
+ * none. A message comes back when a shared course changed after it was read.
+ */
+export async function commitCourses(db: Db, prepared: PreparedCourse[], first: BatchItem<'sqlite'>[] = []) {
+	const [head, ...tail] = [...first, ...prepared.flatMap((p) => p.statements)];
+	try {
+		await db.batch([head, ...tail]);
 	} catch (e) {
-		// Someone saved the shared course between reading it and writing (the batch was rolled back).
-		const now = existing && (await loadSharedCourse(db, existing.id));
-		if (now && now.version !== existing.version) return { message: CONFLICT };
+		// Someone saved a shared course between reading it and writing (the batch was rolled back).
+		for (const { existing } of prepared) {
+			const now = existing && (await loadSharedCourse(db, existing.id));
+			if (now && now.version !== existing.version) return { message: CONFLICT };
+		}
 		throw e;
 	}
-	return { id };
+	return null;
 }
 
 // The course, only if it is in one of the user's timetables
