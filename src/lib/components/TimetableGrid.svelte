@@ -258,6 +258,19 @@
 		background: var(--slot-today);
 	}
 
+	/* A tap presses the cell in a little */
+	@media (prefers-reduced-motion: no-preference) {
+		a.slot,
+		a.course {
+			transition: transform 0.12s ease;
+		}
+
+		a.slot:active,
+		a.course:active {
+			transform: scale(0.95);
+		}
+	}
+
 	.place {
 		min-width: 0;
 		min-height: 0;

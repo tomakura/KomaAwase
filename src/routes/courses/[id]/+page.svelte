@@ -107,7 +107,7 @@
 <div class="page">
 	<a class="scrim" href={timetableHref(data.termParam)} aria-label="閉じて時間割にもどる"></a>
 
-	<div class="sheet" use:swipeDown={() => goto(timetableHref(data.termParam))}>
+	<div class="sheet course-sheet" use:swipeDown={() => goto(timetableHref(data.termParam))}>
 		<div class="grabber"><span></span></div>
 
 		<div class="head">

@@ -85,13 +85,22 @@
 
 	@media (prefers-reduced-motion: no-preference) {
 		dialog[open] {
-			animation: up 0.2s ease-out;
+			animation: up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+		}
+
+		dialog[open]::backdrop {
+			animation: fade 0.24s ease-out;
+		}
+
+		@keyframes fade {
+			from {
+				opacity: 0;
+			}
 		}
 
 		@keyframes up {
 			from {
-				transform: translateY(24px);
-				opacity: 0.6;
+				transform: translateY(100%);
 			}
 		}
 	}

@@ -283,3 +283,108 @@ button.ui-row {
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
+
+/* Motion. Page changes use view transitions (src/routes/+layout.svelte sets data-nav); all
+   of it stays still for people who ask for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation-duration: 0.18s;
+	}
+
+	:root[data-nav='forward']::view-transition-old(root) {
+		animation: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both nav-out-left;
+	}
+	:root[data-nav='forward']::view-transition-new(root) {
+		animation: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both nav-in-right;
+	}
+	:root[data-nav='back']::view-transition-old(root) {
+		animation: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both nav-out-right;
+	}
+	:root[data-nav='back']::view-transition-new(root) {
+		animation: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both nav-in-left;
+	}
+
+	/* A course opens as a sheet over the timetable and closes back down */
+	:root[data-nav^='sheet'] .course-sheet {
+		view-transition-name: course-sheet;
+	}
+	:root[data-nav='sheet-open']::view-transition-old(root) {
+		animation: none;
+	}
+	:root[data-nav='sheet-open']::view-transition-new(root) {
+		animation: 0.2s ease-out both fade-in;
+	}
+	:root[data-nav='sheet-open']::view-transition-new(course-sheet) {
+		animation: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both sheet-up;
+	}
+	:root[data-nav='sheet-close']::view-transition-new(root) {
+		animation: none;
+	}
+	:root[data-nav='sheet-close']::view-transition-old(root) {
+		animation: 0.2s ease-in both fade-out;
+	}
+	:root[data-nav='sheet-close']::view-transition-old(course-sheet) {
+		animation: 0.24s cubic-bezier(0.4, 0, 1, 1) both sheet-down;
+	}
+
+	/* A press you can feel */
+	.btn,
+	.ui-row {
+		transition:
+			transform 0.12s ease,
+			background-color 0.12s ease;
+	}
+	.btn:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+	a.ui-row:active,
+	button.ui-row:active {
+		background: var(--slot);
+	}
+}
+
+@keyframes nav-in-right {
+	from {
+		transform: translateX(28px);
+		opacity: 0;
+	}
+}
+@keyframes nav-out-left {
+	to {
+		transform: translateX(-14px);
+		opacity: 0;
+	}
+}
+@keyframes nav-in-left {
+	from {
+		transform: translateX(-14px);
+		opacity: 0;
+	}
+}
+@keyframes nav-out-right {
+	to {
+		transform: translateX(28px);
+		opacity: 0;
+	}
+}
+@keyframes sheet-up {
+	from {
+		transform: translateY(100%);
+	}
+}
+@keyframes sheet-down {
+	to {
+		transform: translateY(100%);
+	}
+}
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes fade-out {
+	to {
+		opacity: 0;
+	}
+}
