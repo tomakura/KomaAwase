@@ -124,6 +124,15 @@ AI の読み取りは間違えることがある。画面と規約の両方で�
 - iPhone・iPad はホーム画面に追加したアプリからだけ受け取れるので、通知の画面から追加のしかた（`/install`）へ案内する
 - 鍵は secret の `VAPID_PUBLIC_KEY` と `VAPID_PRIVATE_KEY`（`node scripts/make-vapid.mjs` で作って入れる）。ないあいだは通知の画面に「まだ使えません」と出す
 
+## 速さ（Worker の CPU）
+
+無料プランの目安は1回10ms。利用者が少ないうちは多くのリクエストが起きたばかりの isolate に当たるので、起動と最初の1回を軽くしている。
+
+- サーバーでは ICU のデータを読み込むものを作らない。日本語の単語分け（`Intl.Segmenter` の word、8ms以上）は授業名の区切りに要るので、ブラウザで行う（`src/lib/title.ts`）。文字の区切り（grapheme、約9ms）は絵文字などがあるときだけ、日本語の並べ替え（`localeCompare(…, 'ja')`、約7ms）はかなの順に並べる軽い比較（`src/lib/sort.ts`）、日本時間は UTC+9 を足すだけ（`src/lib/time.ts`）
+- パスキーのライブラリ（@simplewebauthn/server とその証明書ライブラリ、約600KB）はパスキーの API だけで読み込む。セッションのトークンの base64url は自前（`src/lib/server/base64url.ts`）
+- drizzle のインスタンスは D1 のバインディングごとに1つ
+- 測り方：`scripts/bench-worker.mjs`（wrangler が作るバンドルを Node で動かし、D1 は node:sqlite で置き換える）。手元の計測では、起きたばかりの isolate の最初の1回は 45〜50ms → 35〜40ms（Node 自体の分を含む）、読み込みは 52ms → 38ms、温まったあとは 1.5〜4ms
+
 ## 回数制限
 
 | どこで | 何を | 上限 |
