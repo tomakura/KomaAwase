@@ -14,8 +14,9 @@ const ASSETS = `assets-${version}`;
 const PAGES = `${PAGE_CACHE_PREFIX}${version}`;
 const precached = new Set([...build, ...files]);
 
-// Never kept: sign-in, anything that changes data, files, and the Worker's own routes
-const NETWORK_ONLY = /^\/(login|logout|auth|api|internal|verify|import\/upload|courses\/[^/]+\/files)(\/|$)/;
+// Never kept: sign-in, anything that changes data, files, the Worker's own routes, and the
+// admin page (other people's reports and feedback)
+const NETWORK_ONLY = /^\/(login|logout|auth|api|internal|verify|admin|import\/upload|courses\/[^/]+\/files)(\/|$)/;
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
