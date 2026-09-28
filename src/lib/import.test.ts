@@ -5,6 +5,21 @@ const empty = { title: '', room: '', teacher: '' };
 const cell = (title: string, room = '', teacher = '') => ({ title, room, teacher });
 
 describe('readImport', () => {
+	it('marks courses from a row that does not match the headings, and keeps the teachers of both halves', () => {
+		const answer = {
+			days: ['月', '火'],
+			rows: [
+				{ period: 1, cells: [cell('演習', 'A1'), empty] },
+				{ period: 2, cells: [cell('演習', '', '田中'), empty] },
+				{ period: 3, cells: [empty, empty, cell('ゼミ')] }
+			]
+		};
+		expect(readImport(answer)).toEqual([
+			{ title: '演習', weekday: 1, period: 1, span: 2, room: 'A1', teachers: ['田中'] },
+			{ title: 'ゼミ', weekday: 3, period: 3, span: 1, room: '', teachers: [], check: true }
+		]);
+	});
+
 	it('reads a copied table: weekdays from the headers, double classes joined', () => {
 		// What Llama 4 Scout gave for a real screenshot
 		const answer = {

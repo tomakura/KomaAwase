@@ -9,7 +9,7 @@
 
 	let { data, form } = $props();
 
-	type Slot = { weekday: number; period: number; span: number; room: string };
+	type Slot = { weekday: number; period: number; span: number; room: string; check?: true };
 
 	// Courses already in the chosen terms at a slot a row wants
 	function takenBy(slot: Slot, terms: string[]) {
@@ -179,6 +179,9 @@
 								{/if}
 							</div>
 							{@const taken = takenBy(slot, termIds)}
+							{#if slot.check}
+								<p class="taken">曜日の見出しとマスの数が合わない行から読み取りました。曜日を確かめてください</p>
+							{/if}
 							{#if !fits(slot)}
 								<p class="taken">この時間割にない時限です。時限かコマ数を選び直してください</p>
 							{:else if taken}

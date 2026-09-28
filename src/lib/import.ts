@@ -9,6 +9,8 @@ export type ImportedCourse = {
 	span: number;
 	room: string;
 	teachers: string[];
+	// Read from a row whose cells didn't match the weekday headings: the weekday is a guess
+	check?: true;
 };
 
 // The AI copies the table out row by row, cell by cell, as it looks; weekdays and periods
@@ -84,6 +86,8 @@ function cellsOfGrid(days: unknown[], rows: unknown[]) {
 		const period = Number.isInteger(r.period) ? (r.period as number) : lastPeriod + 1;
 		lastPeriod = period;
 		if (!Array.isArray(r.cells)) continue;
+		// A row with more or fewer cells than headings may have its courses in the wrong columns
+		const unsure = r.cells.length !== weekdays.length;
 		r.cells.forEach((cell, i) => {
 			if (typeof cell !== 'object' || cell === null) return;
 			const c = cell as { title?: unknown; room?: unknown; teacher?: unknown };
@@ -93,7 +97,8 @@ function cellsOfGrid(days: unknown[], rows: unknown[]) {
 				period,
 				span: 1,
 				room: c.room,
-				teachers: typeof c.teacher === 'string' ? splitTeachers(c.teacher) : []
+				teachers: typeof c.teacher === 'string' ? splitTeachers(c.teacher) : [],
+				...(unsure ? { check: true } : {})
 			});
 		});
 	}
@@ -156,7 +161,8 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 				? [...new Set(c.teachers.filter((t): t is string => typeof t === 'string').map((t) => clip(t, TEACHER_MAX)))]
 						.filter(Boolean)
 						.slice(0, TEACHERS_MAX)
-				: []
+				: [],
+			...(c.check === true ? { check: true as const } : {})
 		});
 	}
 
@@ -173,6 +179,8 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 		) {
 			prev.span += c.span;
 			prev.room ||= c.room;
+			prev.teachers = [...new Set([...prev.teachers, ...c.teachers])].slice(0, TEACHERS_MAX);
+			if (c.check) prev.check = true;
 			continue;
 		}
 		// The same slot twice is a misread; the first stays.
@@ -189,7 +197,7 @@ export function groupImported(courses: ImportedCourse[]) {
 	for (const c of courses) {
 		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], slots: [] };
 		group.teachers = [...new Set([...group.teachers, ...c.teachers])];
-		group.slots.push({ weekday: c.weekday, period: c.period, span: c.span, room: c.room });
+		group.slots.push({ weekday: c.weekday, period: c.period, span: c.span, room: c.room, ...(c.check ? { check: true as const } : {}) });
 		groups.set(key(c.title), group);
 	}
 	return [...groups.values()];
