@@ -88,6 +88,14 @@
 		</section>
 
 		<section class="ui-section">
+			<h2 class="ui-section-title">アプリ</h2>
+			<div class="ui-list">
+				{@render link('/more/notifications', '通知')}
+				{@render link('/install', 'ホーム画面に追加')}
+			</div>
+		</section>
+
+		<section class="ui-section">
 			<h2 class="ui-section-title">アカウント</h2>
 			<div class="ui-list">
 				<a class="ui-row" href="/more/icon">

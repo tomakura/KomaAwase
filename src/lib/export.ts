@@ -28,7 +28,8 @@ export type ExportCourse = {
 
 export type ExportData = {
 	title: string; // はるとの時間割
-	icon: { hex: string; text: string } | null;
+	// `image`: the photo, loaded by the page, drawn in place of the text
+	icon: { hex: string; text: string; image?: CanvasImageSource } | null;
 	termLabel: string; // 2026 後期 Q3
 	days: number[];
 	periods: { number: number; start: string; end: string }[];
@@ -245,8 +246,15 @@ export function drawTimetable(ctx: CanvasRenderingContext2D, data: ExportData, o
 			ctx.arc(x + r, headY, r, 0, Math.PI * 2);
 			ctx.fillStyle = data.icon.hex;
 			ctx.fill();
-			const iconFont = `700 ${Math.round(r * (data.icon.text.length > 1 ? 0.8 : 1))}px ${BODY}`;
-			text(ctx, data.icon.text, x + r, headY + 1, iconFont, '#fffdf8', 'center', 'middle');
+			if (data.icon.image) {
+				ctx.save();
+				ctx.clip();
+				ctx.drawImage(data.icon.image, x, headY - r, r * 2, r * 2);
+				ctx.restore();
+			} else {
+				const iconFont = `700 ${Math.round(r * (data.icon.text.length > 1 ? 0.8 : 1))}px ${BODY}`;
+				text(ctx, data.icon.text, x + r, headY + 1, iconFont, '#fffdf8', 'center', 'middle');
+			}
 			x += r * 2 + 16 * s;
 		}
 		text(ctx, data.title, x, headY, `700 ${Math.round(38 * s)}px ${DISPLAY}`, INK, 'left', 'middle');

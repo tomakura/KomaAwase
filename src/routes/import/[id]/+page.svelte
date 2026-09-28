@@ -4,11 +4,12 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import { DAY_NAMES, periodLabel } from '$lib/courses';
+	import { splitTeachers } from '$lib/import';
 	import { normalizeTitle } from '$lib/overlay';
 
 	let { data, form } = $props();
 
-	type Slot = { weekday: number; period: number; span: number; room: string };
+	type Slot = { weekday: number; period: number; span: number; room: string; check?: true };
 
 	// Courses already in the chosen terms at a slot a row wants
 	function takenBy(slot: Slot, terms: string[]) {
@@ -58,7 +59,7 @@
 		JSON.stringify(
 			included.map((r) => ({
 				title: r.title.trim(),
-				teachers: r.teachers.split(/[、,，\s]+/).filter(Boolean),
+				teachers: splitTeachers(r.teachers),
 				slots: r.slots,
 				sharedId: r.sharedId
 			}))
@@ -178,6 +179,9 @@
 								{/if}
 							</div>
 							{@const taken = takenBy(slot, termIds)}
+							{#if slot.check}
+								<p class="taken">曜日の見出しとマスの数が合わない行から読み取りました。曜日を確かめてください</p>
+							{/if}
 							{#if !fits(slot)}
 								<p class="taken">この時間割にない時限です。時限かコマ数を選び直してください</p>
 							{:else if taken}
@@ -186,7 +190,7 @@
 								</p>
 							{/if}
 						{/each}
-						<input class="teachers" bind:value={row.teachers} maxlength="200" placeholder="先生（なくてもOK・「、」で区切る）" aria-label="先生" />
+						<input class="teachers" bind:value={row.teachers} maxlength="200" placeholder="先生（なくてもOK・2人以上は「、」で区切る）" aria-label="先生" />
 					{/if}
 				</div>
 			{/each}

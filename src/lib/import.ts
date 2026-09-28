@@ -9,42 +9,109 @@ export type ImportedCourse = {
 	span: number;
 	room: string;
 	teachers: string[];
+	// Read from a row whose cells didn't match the weekday headings: the weekday is a guess
+	check?: true;
 };
 
+// The AI copies the table out row by row, cell by cell, as it looks; weekdays and periods
+// come from its headers here. Asked for each course's weekday instead, models lost track
+// of the columns (a Monday class came back as Thursday) and skipped courses.
 // Strict mode needs every field required and no extra ones.
+const CELL = {
+	type: 'object',
+	properties: {
+		title: { type: 'string', description: '授業名。空いているマスは空文字' },
+		room: { type: 'string', description: '教室。なければ空文字' },
+		teacher: { type: 'string', description: '先生の名前。なければ空文字' }
+	},
+	required: ['title', 'room', 'teacher'],
+	additionalProperties: false
+} as const;
+
 export const IMPORT_SCHEMA = {
 	type: 'object',
 	properties: {
-		courses: {
+		days: { type: 'array', items: { type: 'string' }, description: '曜日の見出し。左から順に' },
+		rows: {
 			type: 'array',
 			items: {
 				type: 'object',
 				properties: {
-					title: { type: 'string', description: '授業名' },
-					weekday: { type: 'integer', enum: [1, 2, 3, 4, 5, 6, 7], description: '曜日。月=1 … 日=7' },
-					period: { type: 'integer', description: '時限の番号。1限なら1' },
-					span: { type: 'integer', description: '続けて何コマか。ふつうは1' },
-					room: { type: 'string', description: '教室。書かれていなければ空文字' },
-					teachers: { type: 'array', items: { type: 'string' }, description: '先生の名前。なければ空' }
+					period: { type: 'integer', description: 'その行の時限の番号。1限なら1' },
+					cells: { type: 'array', items: CELL, description: 'その行のマス。左の列から順に days と同じ数' }
 				},
-				required: ['title', 'weekday', 'period', 'span', 'room', 'teachers'],
+				required: ['period', 'cells'],
 				additionalProperties: false
 			}
 		}
 	},
-	required: ['courses'],
+	required: ['days', 'rows'],
 	additionalProperties: false
 } as const;
 
+// Tried on real screenshots: one more rule (leave out notes and ads) made Llama 4 Scout
+// garble kanji, so the prompt stays this short.
 export const IMPORT_PROMPT = [
-	'これは大学の時間割アプリのスクリーンショットです。写っている授業を、曜日と時限ごとにJSONで返してください。',
-	'- 曜日は月=1、火=2、水=3、木=4、金=5、土=6、日=7',
-	'- 時限は画像にある番号（1限なら1）。番号がなく時刻だけなら、上から1、2、3…と数える',
-	'- 2コマ続きで1つの枠になっている授業は span を2にする。同じ授業が別の曜日にもあれば、それぞれ1件ずつ入れる',
-	'- 教室が書かれていなければ room は空文字、先生が書かれていなければ teachers は空の配列',
-	'- 空いているコマや、授業ではないもの（メモ、広告、アプリのボタン）は入れない',
-	'- 読めない文字を想像で埋めない。読めるとおりに書く'
+	'これは大学の時間割アプリのスクリーンショットです。表を上の行から順に、そのまま書き写してJSONで返してください。',
+	'- days: いちばん上の曜日の見出しを、左から順に（例: ["月","火","水","木","金"]）',
+	'- rows: 時限の行ごとに1つ。period はその行の時限の番号（1限なら1）。番号がなく時刻だけなら、上から1、2、3…と数える',
+	'- cells: その行のマスを、左の列から順に days と同じ数だけ。授業が入っていないマスは title・room・teacher を空文字',
+	'- title はマスの授業名。マスの中で改行されていても1つにつなげる',
+	'- room はマスにある教室、teacher は先生の名前。なければ空文字',
+	'- 同じ授業が上下のマスに続いていても、それぞれの行に書く',
+	'- 読めない文字を想像で埋めない'
 ].join('\n');
+
+const DAYS = '月火水木金土日';
+const DAYS_EN = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+// 1 = Monday … 7 = Sunday, from a header like 「月」「月曜」「Mon」
+function weekdayOf(header: unknown) {
+	if (typeof header !== 'string') return null;
+	const ja = [...header].find((c) => DAYS.includes(c));
+	if (ja) return DAYS.indexOf(ja) + 1;
+	const en = DAYS_EN.findIndex((d) => header.trim().toLowerCase().startsWith(d));
+	return en >= 0 ? en + 1 : null;
+}
+
+/** The copied table as one entry per filled cell. A header it can't read follows the one before it. */
+function cellsOfGrid(days: unknown[], rows: unknown[]) {
+	let previous = 0;
+	const weekdays = days.map((d) => (previous = weekdayOf(d) ?? previous + 1));
+	const out: Record<string, unknown>[] = [];
+	let lastPeriod = 0;
+	for (const row of rows) {
+		if (typeof row !== 'object' || row === null) continue;
+		const r = row as { period?: unknown; cells?: unknown };
+		const period = Number.isInteger(r.period) ? (r.period as number) : lastPeriod + 1;
+		lastPeriod = period;
+		if (!Array.isArray(r.cells)) continue;
+		// A row with more or fewer cells than headings may have its courses in the wrong columns
+		const unsure = r.cells.length !== weekdays.length;
+		r.cells.forEach((cell, i) => {
+			if (typeof cell !== 'object' || cell === null) return;
+			const c = cell as { title?: unknown; room?: unknown; teacher?: unknown };
+			out.push({
+				title: c.title,
+				weekday: weekdays[i] ?? i + 1,
+				period,
+				span: 1,
+				room: c.room,
+				teachers: typeof c.teacher === 'string' ? splitTeachers(c.teacher) : [],
+				...(unsure ? { check: true } : {})
+			});
+		});
+	}
+	return out;
+}
+
+/** Names separated by 、 , ／ or a new line. A space stays inside a name (「山田 太郎」). */
+export function splitTeachers(text: string) {
+	return text
+		.split(/[、,，/／\n]+/)
+		.map((t) => t.trim())
+		.filter(Boolean);
+}
 
 const TITLE_MAX = 60;
 const ROOM_MAX = 20;
@@ -67,11 +134,15 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 			return null;
 		}
 	}
-	const list = (raw as { courses?: unknown } | null)?.courses;
+	const answer = raw as { courses?: unknown; days?: unknown; rows?: unknown } | null;
+	const list =
+		Array.isArray(answer?.days) && Array.isArray(answer?.rows)
+			? cellsOfGrid(answer.days, answer.rows)
+			: answer?.courses;
 	if (!Array.isArray(list)) return null;
 
 	const out: ImportedCourse[] = [];
-	for (const item of list.slice(0, IMPORT_COURSES_MAX * 2)) {
+	for (const item of list.slice(0, IMPORT_COURSES_MAX * 4)) {
 		if (typeof item !== 'object' || item === null) continue;
 		const c = item as Record<string, unknown>;
 		const title = typeof c.title === 'string' ? clip(c.title, TITLE_MAX) : '';
@@ -90,7 +161,8 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 				? [...new Set(c.teachers.filter((t): t is string => typeof t === 'string').map((t) => clip(t, TEACHER_MAX)))]
 						.filter(Boolean)
 						.slice(0, TEACHERS_MAX)
-				: []
+				: [],
+			...(c.check === true ? { check: true as const } : {})
 		});
 	}
 
@@ -107,6 +179,8 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 		) {
 			prev.span += c.span;
 			prev.room ||= c.room;
+			prev.teachers = [...new Set([...prev.teachers, ...c.teachers])].slice(0, TEACHERS_MAX);
+			if (c.check) prev.check = true;
 			continue;
 		}
 		// The same slot twice is a misread; the first stays.
@@ -123,7 +197,7 @@ export function groupImported(courses: ImportedCourse[]) {
 	for (const c of courses) {
 		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], slots: [] };
 		group.teachers = [...new Set([...group.teachers, ...c.teachers])];
-		group.slots.push({ weekday: c.weekday, period: c.period, span: c.span, room: c.room });
+		group.slots.push({ weekday: c.weekday, period: c.period, span: c.span, room: c.room, ...(c.check ? { check: true as const } : {}) });
 		groups.set(key(c.title), group);
 	}
 	return [...groups.values()];

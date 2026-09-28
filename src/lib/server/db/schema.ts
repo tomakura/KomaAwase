@@ -13,14 +13,18 @@ const createdAt = () =>
 
 // --- accounts & auth ---
 
-export type UserIcon = { color: string; text: string };
+// Which notifications to send; a missing key means on
+export type NotifySettings = Partial<Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin', boolean>>;
+
+// `photo` is when the user's photo (user_photos) was last set, which also busts caches
+export type UserIcon = { color: string; text: string; photo?: number };
 
 export const users = sqliteTable('users', {
 	id: id(),
 	email: text('email').notNull().unique(),
 	nickname: text('nickname'),
 	googleSub: text('google_sub').unique(),
-	// A character on a color; null until the user picks one (the nickname's first character is shown)
+	// A character on a color, or a photo; null until the user picks one (the nickname's first character is shown)
 	icon: text('icon', { mode: 'json' }).$type<UserIcon>(),
 	theme: text('theme', { enum: ['system', 'light', 'dark'] })
 		.notNull()
@@ -38,8 +42,36 @@ export const users = sqliteTable('users', {
 	// In the link friends open to send a request. Made the first time it is needed.
 	friendCode: text('friend_code').unique(),
 	role: text('role', { enum: ['admin'] }),
+	notify: text('notify', { mode: 'json' }).$type<NotifySettings>(),
 	createdAt: createdAt()
 });
+
+// The icon photo: a 256px square JPEG made in the browser, base64. Kept apart from users,
+// which every request reads.
+export const userPhotos = sqliteTable('user_photos', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	jpeg: text('jpeg').notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+// A browser that agreed to receive notifications (Web Push). The keys are the browser's
+// public ones for encrypting to it.
+export const pushSubscriptions = sqliteTable(
+	'push_subscriptions',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		endpoint: text('endpoint').notNull().unique(),
+		p256dh: text('p256dh').notNull(),
+		auth: text('auth').notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [index('push_subscriptions_user_idx').on(t.userId)]
+);
 
 export const passkeys = sqliteTable(
 	'passkeys',

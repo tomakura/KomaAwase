@@ -3,6 +3,7 @@ import { readImport } from '$lib/import';
 import { addDays, tokyoTime } from '$lib/time';
 import type { Db } from '../db';
 import { authChallenges, emailTokens, importJobs, sessions } from '../db/schema';
+import { notify } from '../notify';
 import { Busy, OutOfQuota, readWithGroq, readWithWorkersAi } from './providers';
 
 // The free tiers read about 150 screenshots a day between them, so each person gets a few.
@@ -84,8 +85,9 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 		const now = await db.select({ status: importJobs.status }).from(importJobs).where(eq(importJobs.id, jobId)).get();
 		return now?.status === 'processing' ? { status: 'busy', seconds: 60 } : { status: 'skipped' };
 	}
+	let outcome: Outcome;
 	try {
-		return await readJob(env, db, job);
+		outcome = await readJob(env, db, job);
 	} catch (e) {
 		// Something other than the AIs failed (D1, say): back in line, and the message is retried.
 		await db
@@ -95,6 +97,28 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 			.catch(() => {});
 		throw e;
 	}
+	if (outcome.status === 'done' || outcome.status === 'failed') {
+		await notify(
+			env,
+			db,
+			[job.userId],
+			'importDone',
+			outcome.status === 'done'
+				? {
+						title: 'スクショの読み取りが終わりました',
+						body: '読み取った授業を見直して、時間割に保存してください',
+						url: `/import/${job.id}`,
+						tag: `import-${job.id}`
+					}
+				: {
+						title: 'スクショを読み取れませんでした',
+						body: '画像を切り抜き直すか、授業を自分で入力してください',
+						url: '/import',
+						tag: `import-${job.id}`
+					}
+		);
+	}
+	return outcome;
 }
 
 async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): Promise<Outcome> {

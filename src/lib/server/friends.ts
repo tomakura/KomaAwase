@@ -65,6 +65,27 @@ export function friendshipBetween(db: Db, a: string, b: string) {
 	return db.select().from(friendships).where(eq(friendships.pair, pairKey(a, b))).get();
 }
 
+/**
+ * Whether `viewerId` may see `ownerId`'s icon photo: themselves, anyone with a request or
+ * friendship between them, or a member of a group they share, unless either blocked the
+ * other. Others (someone opening a friend link, say) see the letters.
+ */
+export async function canSeePhoto(db: Db, viewerId: string, ownerId: string) {
+	if (viewerId === ownerId) return true;
+	const theirs = alias(groupMembers, 'theirs');
+	const [blocked, friendship, group] = await Promise.all([
+		isBlocked(db, viewerId, ownerId),
+		friendshipBetween(db, viewerId, ownerId),
+		db
+			.select({ groupId: groupMembers.groupId })
+			.from(groupMembers)
+			.innerJoin(theirs, and(eq(theirs.groupId, groupMembers.groupId), eq(theirs.userId, ownerId)))
+			.where(eq(groupMembers.userId, viewerId))
+			.get()
+	]);
+	return !blocked && (!!friendship || !!group);
+}
+
 export type RequestResult = 'sent' | 'accepted' | 'friends' | 'pending' | 'unavailable' | 'limit';
 
 /** Asks `targetId` to be friends; accepts instead if they already asked. */
@@ -92,8 +113,9 @@ export async function sendRequest(db: Db, meId: string, targetId: string): Promi
 	return 'sent';
 }
 
+/** True when there was a request from them to accept */
 export async function acceptRequest(db: Db, meId: string, requesterId: string) {
-	await db
+	const accepted = await db
 		.update(friendships)
 		.set({ status: 'accepted', acceptedAt: new Date() })
 		.where(
@@ -102,7 +124,9 @@ export async function acceptRequest(db: Db, meId: string, requesterId: string) {
 				eq(friendships.addresseeId, meId),
 				eq(friendships.status, 'pending')
 			)
-		);
+		)
+		.returning({ id: friendships.id });
+	return accepted.length > 0;
 }
 
 // Declines, cancels or ends a friendship, whichever side asked.

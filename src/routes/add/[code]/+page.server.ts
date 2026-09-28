@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { rememberNext, requireUser } from '$lib/server/auth/next';
 import { findByFriendCode, friendshipBetween, isBlocked, readCode, sendRequest } from '$lib/server/friends';
+import { notifyLater } from '$lib/server/notify';
 import { verifiedIds } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -48,12 +49,29 @@ const MESSAGES = {
 };
 
 export const actions: Actions = {
-	default: async ({ locals, params, url }) => {
+	default: async ({ locals, params, url, platform }) => {
 		const me = requireUser(locals, url);
 		const person = await target(locals.db, params.code);
 		const result = await sendRequest(locals.db, me.id, person.id);
 		const message = MESSAGES[result];
 		if (message) return fail(400, { message });
+		const name = me.nickname ?? 'だれか';
+		if (result === 'sent') {
+			notifyLater(platform, locals.db, [person.id], 'friendRequest', {
+				title: `${name}さんから友だち申請が届きました`,
+				body: '承認すると、おたがいの時間割が見られるようになります',
+				url: '/friends',
+				tag: `friend-${me.id}`
+			});
+		} else if (result === 'accepted') {
+			// They had asked first, so this accepted their request
+			notifyLater(platform, locals.db, [person.id], 'friendAccepted', {
+				title: `${name}さんが友だち申請を承認しました`,
+				body: 'おたがいの時間割が見られるようになりました',
+				url: `/friends/${me.id}`,
+				tag: `friend-${me.id}`
+			});
+		}
 		return { result };
 	}
 };

@@ -21,6 +21,8 @@
 		year: number;
 		// The shared course this one is linked to
 		shared: { id: string; source: 'syllabus' | 'user'; version: number; values: SharedValues } | null;
+		// Whether this person's changes reach the shared course (see canEditShared)
+		canEdit: boolean;
 	};
 
 	let {
@@ -31,6 +33,7 @@
 		initial,
 		terms,
 		periods,
+		others = [],
 		message
 	}: {
 		heading: string;
@@ -40,6 +43,8 @@
 		initial: CourseValues;
 		terms: { id: string; name: string }[];
 		periods: { number: number }[];
+		// The timetable's other courses, which a slot's length stops short of
+		others?: { weekday: number; period: number; span: number; week: WeekPattern; termIds: string[] }[];
 		message?: string;
 	} = $props();
 
@@ -81,7 +86,9 @@
 	const syncNote = $derived(
 		v.syncMode === 'personal'
 			? '授業名や教室を自分用に変えられます。ほかの人が直しても反映されません。'
-			: sync.shared
+			: sync.shared && !sync.canEdit
+				? '教室の変更などをだれかが直したときに自動で反映されます。みんなの授業データを直せるのは、この授業を時間割に入れていて在籍確認をした人です。ここで内容を変えて保存すると、この授業は「自分だけで使う」になります。'
+				: sync.shared
 				? '教室の変更などをだれかが直したときに自動で反映されます。コマを重ねたときも、同じ授業としてまとまります。ここで直した内容は、同期しているみんなにも反映されます。'
 				: '同じ大学の人が授業をさがしたときに出てくるようになり、コマを重ねたときも同じ授業としてまとまります。'
 	);
@@ -98,6 +105,36 @@
 	// svelte-ignore state_referenced_locally
 	const pick = $state({ weekday: 1, period: periods[0]?.number ?? 1, span: 1 });
 	const maxSpan = $derived(periodNumbers.length - periodNumbers.indexOf(pick.period));
+
+	// Odd and even weeks can share a slot; anything else meets in the same week
+	const sameWeeks = (a: WeekPattern | undefined, b: WeekPattern | undefined) =>
+		!((a === 'odd' && b === 'even') || (a === 'even' && b === 'odd'));
+
+	// How many periods the slot can run to: up to the end of the day, or the next class that
+	// day, of this course or of another one in the same terms
+	function spanChoices(index: number) {
+		const slot = v.slots[index];
+		const start = periodNumbers.indexOf(slot.period);
+		const overlaps = (s: { period: number; span: number }, n: number) => {
+			const other = periodNumbers.indexOf(s.period);
+			return other >= 0 && other <= start + n - 1 && start <= other + s.span - 1;
+		};
+		const choices: number[] = [];
+		for (let n = 1; start >= 0 && start + n <= periodNumbers.length; n++) {
+			const clash =
+				v.slots.some((s, j) => j !== index && s.weekday === slot.weekday && overlaps(s, n)) ||
+				others.some(
+					(o) =>
+						o.weekday === slot.weekday &&
+						o.termIds.some((t) => v.termIds.includes(t)) &&
+						sameWeeks(o.week, slot.week) &&
+						overlaps(o, n)
+				);
+			if (clash) break;
+			choices.push(n);
+		}
+		return choices.length ? choices : [slot.span];
+	}
 
 	function addSlot() {
 		const start = periodNumbers.indexOf(pick.period);
@@ -236,14 +273,18 @@
 					{@const label = `${DAY_NAMES[slot.weekday]} ${periodLabel(slot.period, slot.span, periodNumbers)}`}
 					<div class="slot-row">
 						<span class="slot-label">{label}</span>
+						<!-- Longer or shorter in place, without taking the slot out and adding it again -->
+						<select class="span" bind:value={slot.span} aria-label="{label}のコマ数">
+							{#each spanChoices(i) as n (n)}<option value={n}>{n}コマ</option>{/each}
+						</select>
+						<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
+							<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+						</button>
 						<!-- Classes on alternate weeks share a slot with another course -->
 						<select class="week" bind:value={slot.week} aria-label="{label}の週">
 							{#each WEEK_PATTERNS as w (w.id)}<option value={w.id}>{w.label}</option>{/each}
 						</select>
 						<input bind:value={slot.room} placeholder="教室" aria-label="{label}の教室" maxlength="20" autocomplete="off" />
-						<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
-							<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-						</button>
 						<input type="hidden" name="slot" value={JSON.stringify(slot)} />
 					</div>
 				{/each}
@@ -568,8 +609,10 @@
 		font-weight: 700;
 	}
 
+	/* Two lines: the slot, its length and the remove button; then the weeks and the room */
 	.slot-row {
-		display: flex;
+		display: grid;
+		grid-template-columns: auto 1fr auto;
 		align-items: center;
 		gap: 8px;
 		padding: 6px 6px 6px 12px;
@@ -585,6 +628,16 @@
 		font-weight: 700;
 	}
 
+	.slot-row .span {
+		justify-self: start;
+		width: 88px;
+		height: 36px;
+		padding: 0 4px;
+		border-color: var(--line);
+		border-radius: 9px;
+		background: var(--bg);
+	}
+
 	/* 16px like the other fields, so iOS doesn't zoom in on it */
 	.slot-row .week {
 		width: 88px;
@@ -597,7 +650,7 @@
 	}
 
 	.slot-row input {
-		flex: 1 1 0;
+		grid-column: 2 / 4;
 		min-width: 0;
 		height: 36px;
 		padding: 0 10px;

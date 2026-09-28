@@ -57,7 +57,7 @@ erDiagram
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |
 | `SHARED_COURSE_EDITS` | shared_course_id, user_id, diff, created_at | 変更履歴（`diff` は前後の値）。「みんなの授業データ」から前の内容に戻せる。戻すことも1つの変更として残る |
 
-共有データを直せるのは、その大学の在籍確認バッジを持つ人だけにする予定（細かいルールは未決）。在籍確認ができるまでは、その大学の時間割を持つ人ならだれでも直せる。変更はすべて `SHARED_COURSE_EDITS` に残るので、荒らされても戻せる。
+共有データを直せる（元に戻せる）のは、その授業を自分の時間割に「みんなと同期」で入れていて、その大学の在籍確認が切れていない人（と運営）。ほかの人も授業の追加・そのまま使う・報告はできる。直せない人が同期中の授業を直すと、その授業は共有とのつながりを残したまま「自分だけで使う」になる（編集画面で先に伝える）。変更はすべて `SHARED_COURSE_EDITS` に残るので、荒らされても戻せる。
 
 「授業をさがす」は、同じ大学・年度の共有授業から、タップした曜日・時限にあって選んでいる学期に開講するものを出す（名前で検索したときは学期でしぼらない）。自分の時間割にもう入れた授業は出さない。D1 は1つのクエリに値を100個までしか渡せないので、候補は60件までにしている。共有授業を id でまとめて読むときも90個ずつに分ける。
 
@@ -76,7 +76,8 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `USERS` | email, nickname, google_sub, icon, theme, days_shown, university_id, setup_at, friend_code, role | `icon` は `{"color": "ai", "text": "は"}`（なければニックネームの1文字目と、id から決めた色）。`university_id` は本人の大学で、新しい年度の時間割のひな形に使う（外部キーにはしていない。足すと users を作り直すことになるため）。`setup_at` ははじめの設定を終えた時刻。`friend_code` は友だちリンクの10文字（初めて要るときに作る。作り直せる）。`role` は `admin` だけ |
+| `USERS` | email, nickname, google_sub, icon, theme, days_shown, university_id, setup_at, friend_code, role | `icon` は `{"color": "ai", "text": "は"}`（なければニックネームの1文字目と、id から決めた色）。`university_id` は本人の大学で、新しい年度の時間割のひな形に使う（外部キーにはしていない。足すと users を作り直すことになるため）。`setup_at` ははじめの設定を終えた時刻。`friend_code` は友だちリンクの10文字（初めて要るときに作る。作り直せる）。`role` は `admin` だけ。写真のアイコンは `icon.photo`（設定した時刻）があるときだけ |
+| `USER_PHOTOS` | user_id, jpeg, updated_at | アイコンの写真。端末で作った256ピクセル四方の JPEG を base64 で持つ（毎回読む users とは分ける）。退会で消える |
 | `PASSKEYS` | id, user_id, public_key, counter, name | 1人で複数持てる。`name` は作ったときに AAGUID（パスワードマネージャー）か端末から付け、本人が変えられる |
 | `UNIV_VERIFICATIONS` | user_id, university_id, email, verified_at, expires_at | 1人1件（user_id が主キー）。`email` は一意で、同じアドレスで別のアカウントを確認すると前のアカウントから外れる。毎年5月1日に切れる（4月に確認し直す） |
 | `VERIFY_TOKENS` | id, user_id, university_id, email, expires_at | 在籍確認のメールのリンク。`id` はトークンの SHA-256。1日で切れ、1回だけ使える。1人3件まで |

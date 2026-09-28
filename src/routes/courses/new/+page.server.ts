@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { timetableHref } from '$lib/courses';
-import { nextColor, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
+import { nextColor, otherSlots, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
 import { loadSharedCourse } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import type { Actions, PageServerLoad } from './$types';
@@ -9,10 +9,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
 	const timetable = await currentTimetable(locals.db, locals.user);
 	const sharedId = url.searchParams.get('shared');
-	const [shape, color, found] = await Promise.all([
+	const [shape, color, found, others] = await Promise.all([
 		loadShape(locals.db, timetable.id),
 		nextColor(locals.db, timetable.id),
-		sharedId ? loadSharedCourse(locals.db, sharedId) : null
+		sharedId ? loadSharedCourse(locals.db, sharedId) : null,
+		otherSlots(locals.db, timetable.id, null)
 	]);
 	const shared =
 		found && found.universityId === timetable.universityId && found.year === timetable.year ? found : null;
@@ -40,11 +41,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		...shape,
 		termParam: term?.id ?? null,
+		others,
 		backHref: inTimetable ? `/courses/search?${search}` : timetableHref(term?.id ?? null),
 		sync: {
 			canSync: !!timetable.universityId,
 			year: timetable.year,
-			shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values }
+			shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values },
+			// Only someone who already has it (and is verified) changes it for everyone
+			canEdit: !shared
 		},
 		initial: {
 			...values,

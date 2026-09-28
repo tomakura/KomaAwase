@@ -106,6 +106,20 @@
       "when": 1790580816188,
       "tag": "0014_feedback_by_user",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1790611144822,
+      "tag": "0015_user_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1790611814459,
+      "tag": "0016_push",
+      "breakpoints": true
     }
   ]
 }

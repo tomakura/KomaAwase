@@ -80,3 +80,47 @@ sw.addEventListener('fetch', (event) => {
 		event.respondWith(networkFirst(request));
 	}
 });
+
+// Notifications (see src/lib/server/push.ts): the message says what to show and which page
+// to open. Opening focuses a window of the app that is already there when it can.
+sw.addEventListener('push', (event) => {
+	let message: { title?: string; body?: string; url?: string; tag?: string } = {};
+	try {
+		message = event.data?.json() ?? {};
+	} catch {
+		// Not ours to read; show the name so the user still sees something arrived
+	}
+	event.waitUntil(
+		sw.registration.showNotification(message.title ?? 'コマあわせ', {
+			body: message.body,
+			tag: message.tag,
+			icon: '/icons/icon-192.png',
+			data: { url: message.url ?? '/' },
+			lang: 'ja'
+		})
+	);
+});
+
+sw.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	// Only pages of this app, judged after the address is read (\ counts as / there)
+	let url = new URL('/', sw.location.origin).href;
+	try {
+		const target = new URL(String(event.notification.data?.url ?? '/'), sw.location.origin);
+		if (target.origin === sw.location.origin) url = target.href;
+	} catch {
+		// Keep the top page
+	}
+	event.waitUntil(
+		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
+			const open = windows.find((w) => new URL(w.url).origin === sw.location.origin);
+			if (open) {
+				await open.focus();
+				// A window this worker doesn't control yet can't be moved; open a new one then
+				const moved = await open.navigate(url).catch(() => null);
+				if (moved) return moved;
+			}
+			return sw.clients.openWindow(url);
+		})
+	);
+});

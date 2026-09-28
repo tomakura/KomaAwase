@@ -30,11 +30,21 @@ export async function memberCount(db: Db, groupId: string) {
 	return row?.n ?? 0;
 }
 
-/** False when the group is full. Joining twice keeps the first choice of sharing. */
+/** 'full', or whether they were already in. Joining twice keeps the first choice of sharing. */
 export async function joinGroup(db: Db, groupId: string, userId: string, share: boolean) {
-	if ((await memberCount(db, groupId)) >= GROUP_MEMBERS_MAX) return false;
-	await db.insert(groupMembers).values({ groupId, userId, shareTimetable: share }).onConflictDoNothing();
-	return true;
+	if ((await memberCount(db, groupId)) >= GROUP_MEMBERS_MAX) return 'full';
+	const added = await db
+		.insert(groupMembers)
+		.values({ groupId, userId, shareTimetable: share })
+		.onConflictDoNothing()
+		.returning({ userId: groupMembers.userId });
+	return added.length ? 'joined' : 'member';
+}
+
+/** Everyone in the group but this person, for telling them someone joined */
+export async function otherMembers(db: Db, groupId: string, userId: string) {
+	const rows = await db.select({ userId: groupMembers.userId }).from(groupMembers).where(eq(groupMembers.groupId, groupId));
+	return rows.map((r) => r.userId).filter((id) => id !== userId);
 }
 
 export function membership(db: Db, groupId: string, userId: string) {

@@ -1,7 +1,8 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { rememberNext, requireUser } from '$lib/server/auth/next';
 import { readCode } from '$lib/server/friends';
-import { findGroupByInvite, joinGroup, loadGroup, membership, memberCount } from '$lib/server/groups';
+import { findGroupByInvite, joinGroup, loadGroup, membership, memberCount, otherMembers } from '$lib/server/groups';
+import { notifyLater } from '$lib/server/notify';
 import type { Actions, PageServerLoad } from './$types';
 
 async function invited(db: App.Locals['db'], code: string) {
@@ -24,12 +25,18 @@ export const load: PageServerLoad = async ({ locals, params, url, cookies }) => 
 };
 
 export const actions: Actions = {
-	default: async ({ locals, params, url, request }) => {
+	default: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const group = await invited(locals.db, params.code);
 		const share = (await request.formData()).get('share') === 'on';
-		if (!(await joinGroup(locals.db, group.id, me.id, share))) {
-			return fail(400, { message: 'このグループは人数がいっぱいです' });
+		const joined = await joinGroup(locals.db, group.id, me.id, share);
+		if (joined === 'full') return fail(400, { message: 'このグループは人数がいっぱいです' });
+		if (joined === 'joined') {
+			notifyLater(platform, locals.db, await otherMembers(locals.db, group.id, me.id), 'groupJoin', {
+				title: `${me.nickname ?? 'だれか'}さんが「${group.name}」に参加しました`,
+				url: `/groups/${group.id}`,
+				tag: `group-${group.id}`
+			});
 		}
 		// A member can't be missing here, but a group deleted in between would be.
 		if (!(await loadGroup(locals.db, group.id, me.id))) error(404, 'グループが見つかりません');
