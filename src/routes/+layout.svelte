@@ -1,9 +1,29 @@
 <script lang="ts">
 	import '../app.css';
-	import { onNavigate } from '$app/navigation';
+	import { invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
 
-	let { children } = $props();
+	let { data, children } = $props();
+
+	// Back in the app after a while (it stays open in the background on a phone): show what
+	// changed meanwhile, such as a friend's timetable or a finished screenshot.
+	const STALE_AFTER = 60 * 1000;
+	$effect(() => {
+		let hiddenAt = 0;
+		const changed = () => {
+			if (document.hidden) hiddenAt = Date.now();
+			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER) invalidateAll();
+		};
+		document.addEventListener('visibilitychange', changed);
+		return () => document.removeEventListener('visibilitychange', changed);
+	});
+
+	// Friend requests waiting, on the app's icon on the home screen
+	$effect(() => {
+		const n = data.pendingRequests;
+		if (!('setAppBadge' in navigator)) return;
+		(n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+	});
 
 	// How a navigation moves: between the tabs it fades, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
