@@ -58,7 +58,7 @@ export const actions: Actions = {
 		const me = requireUser(locals, url);
 		const course = await usable(locals.db, me, params.id);
 		if (!(await canEditShared(locals.db, me.id, course))) {
-			return fail(403, { message: '元に戻せるのは、この授業を時間割に入れていて在籍確認をした人です' });
+			return fail(403, { message: '元に戻せるのは、この授業を同期していて在籍確認済みの人です' });
 		}
 		const form = await request.formData();
 		const result = await restoreShared(locals.db, {

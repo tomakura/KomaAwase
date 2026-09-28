@@ -84,20 +84,22 @@ sw.addEventListener('fetch', (event) => {
 // Notifications (see src/lib/server/push.ts): the message says what to show and which page
 // to open. Opening focuses a window of the app that is already there when it can.
 sw.addEventListener('push', (event) => {
-	let message: { title?: string; body?: string; url?: string; tag?: string } = {};
+	let message: { title?: string; body?: string; url?: string; tag?: string; badge?: number } = {};
 	try {
 		message = event.data?.json() ?? {};
 	} catch {
 		// Not ours to read; show the name so the user still sees something arrived
 	}
+	// The icon's number, while the app is closed (the page sets it again when opened)
+	const badge = typeof message.badge === 'number' && 'setAppBadge' in navigator ? navigator.setAppBadge(message.badge).catch(() => {}) : null;
 	event.waitUntil(
-		sw.registration.showNotification(message.title ?? 'コマあわせ', {
+		Promise.all([badge, sw.registration.showNotification(message.title ?? 'コマあわせ', {
 			body: message.body,
 			tag: message.tag,
 			icon: '/icons/icon-192.png',
 			data: { url: message.url ?? '/' },
 			lang: 'ja'
-		})
+		})])
 	);
 });
 

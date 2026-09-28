@@ -44,7 +44,7 @@
 
 	{#if form?.sent}
 		<div class="body">
-			<p class="thanks" role="status">送りました。ありがとうございます。いただいた内容は開発者が読んで、改善に使います。</p>
+			<p class="thanks" role="status">送信しました。ありがとうございます。</p>
 			<a class="btn" href={data.from || '/more'}>もどる</a>
 		</div>
 	{:else}
@@ -75,7 +75,7 @@
 					</dl>
 				{/if}
 			</div>
-			<p class="ui-note">付けると、不具合の原因を見つけやすくなります。上に出ているものだけが送られます。</p>
+			<p class="ui-note">原因を探すのに役立ちます。送られるのは上に表示されている内容だけです。</p>
 
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 			<button class="btn btn-primary" type="submit">送る</button>

@@ -27,7 +27,7 @@
 			};
 		}}
 	>
-		<p class="ui-note">時間割の左に出る時刻です。今の授業の表示や、友だちと重ねるときにも使います。</p>
+		<p class="ui-note">時間割の左に表示され、友だちと重ねるときにも使います。</p>
 		<PeriodsEditor bind:periods usedNumbers={data.usedPeriods} name="periods" collapsible={false} />
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		<button class="btn btn-primary" type="submit" disabled={saving || !!periodsProblem(periods)}>

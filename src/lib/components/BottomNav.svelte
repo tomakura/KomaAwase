@@ -53,6 +53,7 @@
 		padding: 8px 8px max(22px, env(safe-area-inset-bottom));
 		background: var(--surface);
 		border-top: 1px solid var(--line);
+		view-transition-name: bottom-nav;
 	}
 
 	nav > a {

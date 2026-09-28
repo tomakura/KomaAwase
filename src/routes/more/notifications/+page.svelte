@@ -106,7 +106,7 @@
 
 	<div class="body">
 		{#if !data.available}
-			<p class="ui-note">通知はまだ使えません。準備ができたら、ここから受け取れるようになります。</p>
+			<p class="ui-note">通知は準備中です。</p>
 		{:else}
 			<section class="device">
 				<h2>この端末</h2>
@@ -116,10 +116,10 @@
 					<p>iPhone・iPad では、ホーム画面に追加したコマあわせから通知を受け取れます。</p>
 					<a class="btn" href="/install">ホーム画面に追加する方法</a>
 				{:else if device === 'unsupported'}
-					<p>このブラウザは通知に対応していません。ほかのブラウザか、ホーム画面に追加したアプリでお試しください。</p>
+					<p>このブラウザでは通知を受け取れません。ホーム画面に追加したアプリからお試しください。</p>
 					<a class="btn" href="/install">ホーム画面に追加する方法</a>
 				{:else if device === 'denied'}
-					<p>ブラウザの設定で、このサイトの通知が止められています。端末やブラウザの設定で「通知」を許可してから、ここを開き直してください。</p>
+					<p>このサイトの通知がオフになっています。端末の設定で通知を許可してから、もう一度開いてください。</p>
 				{:else if device === 'on'}
 					<p>この端末で通知を受け取っています。</p>
 					<div class="row">
@@ -128,9 +128,9 @@
 						</form>
 						<button class="btn" type="button" onclick={turnOff} disabled={busy}>この端末ではやめる</button>
 					</div>
-					{#if form?.tested}<p class="ui-note" role="status">送りました。数秒で届きます。</p>{/if}
+					{#if form?.tested}<p class="ui-note" role="status">送信しました。</p>{/if}
 				{:else}
-					<p>友だち申請や、スクショの読み取りが終わったことを、この端末に知らせます。</p>
+					<p>友だち申請やスクショの読み取り完了などをお知らせします。</p>
 					<button class="btn btn-primary" type="button" onclick={turnOn} disabled={busy}>この端末で通知を受け取る</button>
 				{/if}
 				{#if message || form?.message}<p class="error" role="alert">{message ?? form?.message}</p>{/if}
@@ -158,7 +158,7 @@
 						</div>
 					{/each}
 				</form>
-				<p class="ui-note">この設定は、通知を受け取っているすべての端末に効きます。</p>
+				<p class="ui-note">設定はすべての端末で共通です。</p>
 			</section>
 		{/if}
 	</div>

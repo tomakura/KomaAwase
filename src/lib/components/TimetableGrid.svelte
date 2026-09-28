@@ -13,6 +13,7 @@
 </script>
 
 <script lang="ts">
+	import { wrapTitle } from '$lib/wrap-title';
 	import { DAY_NAMES, courseColor, meetsInWeek } from '$lib/courses';
 	import { addDays, monthDay, toMinutes, type TokyoTime, weekdayOf } from '$lib/time';
 
@@ -126,9 +127,12 @@
 		style:--c={courseColor(course.color)}
 		style:--progress={live ? `${live.progress * 100}%` : undefined}
 	>
-		<span class="title">
-			{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}
-		</span>
+		<!-- Recreated when the title changes, since wrapTitle replaces the text it was given -->
+		{#key course.titleParts.join('|')}
+			<span class="title" use:wrapTitle={course.titleParts}>
+				{#each course.titleParts as part, k}{#if k}<wbr />{/if}{part}{/each}
+			</span>
+		{/key}
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
 		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{/if}
 		{#if slot.room && week}
@@ -258,6 +262,19 @@
 		background: var(--slot-today);
 	}
 
+	/* A tap presses the cell in a little */
+	@media (prefers-reduced-motion: no-preference) {
+		a.slot,
+		a.course {
+			transition: transform 0.12s ease;
+		}
+
+		a.slot:active,
+		a.course:active {
+			transform: scale(0.95);
+		}
+	}
+
 	.place {
 		min-width: 0;
 		min-height: 0;
@@ -315,6 +332,8 @@
 		line-height: 1.25;
 		word-break: keep-all;
 		overflow-wrap: anywhere;
+		/* A word too long for the cell still never starts a line with ー or a small kana */
+		line-break: strict;
 	}
 
 	.cancel {

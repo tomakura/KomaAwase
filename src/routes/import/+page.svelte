@@ -94,17 +94,17 @@
 				<div class="status-text">
 					{#if job.status === 'queued' && job.ahead}
 						<b>順番待ち中（前にあと{job.ahead}件）</b>
-						<span>ほかの人の画像を読み取っています。目安はあと{minutes}分くらいです。</span>
+						<span>あと{minutes}分ほどで始まります。</span>
 					{:else if job.status === 'queued'}
 						<b>まもなく読み取りを始めます</b>
-						<span>AIの準備ができしだい始まります。</span>
+						<span>少しお待ちください。</span>
 					{:else if job.status === 'processing'}
 						<b>AIが読み取っています</b>
-						<span>表のマスを1つずつ書き写しています。ふつうは30秒〜1分ほどで終わります。</span>
+						<span>30秒〜1分ほどで終わります。</span>
 					{:else if job.status === 'retry'}
 						<b>明日もう一度読み取ります</b>
 						<span>
-							今日は読み取れなかったので、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度読み取ります（AIが混んでいたり、1日の無料枠を使い切ったりしたときに起きます）。終わったら時間割の画面でお知らせします。
+							今日は読み取れなかったため、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度試します。終わったらお知らせします。
 						</span>
 					{:else if job.status === 'done'}
 						<b>読み取りが終わりました</b>
@@ -117,15 +117,15 @@
 			</div>
 			{#if job.status === 'queued' || job.status === 'processing'}
 				<ol class="steps" aria-label="読み取りの進み具合">
-					<li class="done">画像を受け取りました</li>
+					<li class="done">受け取り</li>
 					<li class:done={job.status === 'processing'} class:now={job.status === 'queued'}>
-						{job.ahead ? '順番待ち' : '読み取りの準備'}
+						{job.ahead ? '順番待ち' : '準備'}
 					</li>
-					<li class:now={job.status === 'processing'}>AIが表を書き写す</li>
-					<li>読み取った授業を見直して、時間割に保存</li>
+					<li class:now={job.status === 'processing'}>読み取り</li>
+					<li>確認して保存</li>
 				</ol>
 				<p class="ui-note">
-					送ってから{elapsed}。この画面を閉じても読み取りは続きます。終わったら時間割の画面でお知らせします（通知をオンにしていれば通知も届きます）。
+					送信から{elapsed}。この画面は閉じても大丈夫です。終わったらお知らせします。
 				</p>
 			{/if}
 			{#if job.status === 'done' || job.status === 'failed'}
@@ -143,7 +143,7 @@
 					<button class="small" type="button" onclick={() => cropper?.reset()}>切り抜きを戻す</button>
 					<button class="small" type="button" onclick={() => fileInput?.click()}>別の画像にする</button>
 				</div>
-				<p class="ui-note">時間割の部分だけを枠で囲むと、読み取りやすくなります。</p>
+				<p class="ui-note">時間割の部分だけを囲むと、読み取りの精度が上がります。</p>
 			{:else}
 				<button class="pick" type="button" onclick={() => fileInput?.click()}>
 					<Icon name="image" size={32} />
@@ -161,12 +161,12 @@
 				<div class="item">
 					<span class="num">2</span>
 					<span>
-						画像は読み取りのために外部のサービス（Groq・Cloudflare）へ送られます。AIの学習には使われず、送った先でも保存しない設定で使います。こちらでも読み取りが終わったらすぐ消します（読めなかったときも3日で消します）。
+						画像は読み取りのためにGroq・Cloudflareへ送られます。AIの学習には使われず、読み取りが終わるとすぐに削除します（読み取れなかったときも3日で削除します）。
 					</span>
 				</div>
 				<div class="item">
 					<span class="num">3</span>
-					<span>読み取りはふつう1分ほどです。ほかの人と重なると順番待ちになります。終わったら、時間割の画面でお知らせします（通知をオンにしていれば通知も届きます）。</span>
+					<span>読み取りは1分ほどで終わります。混んでいるときは順番待ちになります。終わったらお知らせします。</span>
 				</div>
 			</div>
 

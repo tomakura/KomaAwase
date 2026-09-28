@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { swipeDown } from '$lib/swipe';
 
 	// A sheet that slides up from the bottom, on the native <dialog> so focus and Escape work.
 	let {
@@ -20,6 +21,7 @@
 
 <dialog
 	bind:this={dialog}
+	use:swipeDown={() => dialog?.close()}
 	aria-label={title}
 	onclose={() => {
 		open = false;
@@ -83,13 +85,22 @@
 
 	@media (prefers-reduced-motion: no-preference) {
 		dialog[open] {
-			animation: up 0.2s ease-out;
+			animation: up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+		}
+
+		dialog[open]::backdrop {
+			animation: fade 0.24s ease-out;
+		}
+
+		@keyframes fade {
+			from {
+				opacity: 0;
+			}
 		}
 
 		@keyframes up {
 			from {
-				transform: translateY(24px);
-				opacity: 0.6;
+				transform: translateY(100%);
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { swipeDown } from '$lib/swipe';
 	import {
 		DAY_NAMES,
 		actionHref,
@@ -106,7 +107,7 @@
 <div class="page">
 	<a class="scrim" href={timetableHref(data.termParam)} aria-label="閉じて時間割にもどる"></a>
 
-	<div class="sheet">
+	<div class="sheet course-sheet" use:swipeDown={() => goto(timetableHref(data.termParam))}>
 		<div class="grabber"><span></span></div>
 
 		<div class="head">
@@ -217,7 +218,7 @@
 				{:else}
 					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
 					<label class="field">
-						メモ（補講の日など・なくてもOK）
+						メモ（任意）
 						<input name="body" maxlength="100" autocomplete="off" />
 					</label>
 				{/if}

@@ -190,7 +190,7 @@
 								</p>
 							{/if}
 						{/each}
-						<input class="teachers" bind:value={row.teachers} maxlength="200" placeholder="先生（なくてもOK・2人以上は「、」で区切る）" aria-label="先生" />
+						<input class="teachers" bind:value={row.teachers} maxlength="200" placeholder="先生（任意・複数は「、」で区切る）" aria-label="先生" />
 					{/if}
 				</div>
 			{/each}
