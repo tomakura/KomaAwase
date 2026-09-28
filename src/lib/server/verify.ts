@@ -54,8 +54,12 @@ export async function dropToken(db: Db, token: string) {
 /** Uses the link: the account gets the check (moved from any other account with that address). */
 export async function finishVerification(db: Db, token: string) {
 	const id = await hashToken(token);
-	const row = await db.delete(verifyTokens).where(eq(verifyTokens.id, id)).returning().get();
-	if (!row || row.expiresAt.getTime() <= Date.now()) return null;
+	const row = await db.select().from(verifyTokens).where(eq(verifyTokens.id, id)).get();
+	if (!row) return null;
+	if (row.expiresAt.getTime() <= Date.now()) {
+		await db.delete(verifyTokens).where(eq(verifyTokens.id, id));
+		return null;
+	}
 	const values = {
 		userId: row.userId,
 		universityId: row.universityId,
@@ -63,12 +67,15 @@ export async function finishVerification(db: Db, token: string) {
 		verifiedAt: new Date(),
 		expiresAt: verificationExpiry()
 	};
+	// The link is used up in the same batch, so if saving fails it still works. Two uses at
+	// once both write the same check.
 	await db.batch([
 		db.delete(univVerifications).where(eq(univVerifications.email, row.email)),
 		db
 			.insert(univVerifications)
 			.values(values)
-			.onConflictDoUpdate({ target: univVerifications.userId, set: values })
+			.onConflictDoUpdate({ target: univVerifications.userId, set: values }),
+		db.delete(verifyTokens).where(eq(verifyTokens.id, id))
 	]);
 	const university = await db.select({ name: universities.name }).from(universities).where(eq(universities.id, row.universityId)).get();
 	return { university: university?.name ?? '' };
