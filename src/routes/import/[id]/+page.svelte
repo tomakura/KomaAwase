@@ -4,6 +4,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import { DAY_NAMES, periodLabel } from '$lib/courses';
+	import { splitTeachers } from '$lib/import';
 	import { normalizeTitle } from '$lib/overlay';
 
 	let { data, form } = $props();
@@ -58,7 +59,7 @@
 		JSON.stringify(
 			included.map((r) => ({
 				title: r.title.trim(),
-				teachers: r.teachers.split(/[、,，\s]+/).filter(Boolean),
+				teachers: splitTeachers(r.teachers),
 				slots: r.slots,
 				sharedId: r.sharedId
 			}))
@@ -186,7 +187,7 @@
 								</p>
 							{/if}
 						{/each}
-						<input class="teachers" bind:value={row.teachers} maxlength="200" placeholder="先生（なくてもOK・「、」で区切る）" aria-label="先生" />
+						<input class="teachers" bind:value={row.teachers} maxlength="200" placeholder="先生（なくてもOK・2人以上は「、」で区切る）" aria-label="先生" />
 					{/if}
 				</div>
 			{/each}
