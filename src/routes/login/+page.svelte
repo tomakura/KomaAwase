@@ -9,6 +9,7 @@
 	let busy = $state(false);
 	let sending = $state(false);
 	let passkeyError = $state<string | null>(null);
+	let blocked = $state(false);
 
 	// Signed out: the pages kept for offline use hold the last person's timetable.
 	$effect(() => {
@@ -72,8 +73,12 @@
 				action="?/email"
 				use:enhance={() => {
 					sending = true;
-					return async ({ update }) => {
-						await update();
+					blocked = false;
+					return async ({ result, update }) => {
+						// Cloudflare's rate limit answers with its own page, which isn't a form result;
+						// the form stays and says to wait instead of the whole screen being replaced.
+						if (result.type === 'error') blocked = true;
+						else await update();
 						sending = false;
 					};
 				}}
@@ -82,7 +87,11 @@
 					メールアドレス
 					<input name="email" type="email" autocomplete="email" required />
 				</label>
-				{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
+				{#if blocked}
+					<p class="error" role="alert">送れませんでした。しばらく待ってから、もう一度お試しください</p>
+				{:else if form?.message}
+					<p class="error" role="alert">{form.message}</p>
+				{/if}
 				<button class="btn" type="submit" disabled={sending}>
 					{sending ? '送信中…' : 'メールでログイン・登録'}
 				</button>
