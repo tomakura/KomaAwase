@@ -157,3 +157,24 @@ export async function deleteCourseFiles(env: Env, db: Db, courseId: string) {
 		files.map((f) => f.storageKey)
 	);
 }
+
+/**
+ * Deletes up to `limit` of the user's stored files (the rental server first, then the rows)
+ * and says how many are left. One call stays under the Free plan's 50 outside requests.
+ */
+export async function removeUserFiles(env: Env, db: Db, userId: string, limit = 40) {
+	const files = await db
+		.select({ id: courseFiles.id, storageKey: courseFiles.storageKey })
+		.from(courseFiles)
+		.innerJoin(courses, eq(courses.id, courseFiles.courseId))
+		.innerJoin(timetables, eq(timetables.id, courses.timetableId))
+		.where(eq(timetables.userId, userId))
+		.limit(limit + 1);
+	const batch = files.slice(0, limit);
+	if (batch.length && !filesEnabled(env)) throw new Error('File storage is not configured');
+	for (const file of batch) {
+		await removeStored(env, [file.storageKey]);
+		await db.delete(courseFiles).where(eq(courseFiles.id, file.id));
+	}
+	return files.length - batch.length;
+}

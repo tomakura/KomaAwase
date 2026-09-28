@@ -1,13 +1,13 @@
 import { error } from '@sveltejs/kit';
 import { and, asc, count, eq } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { COURSE_COLORS, isCourseColor, type Delivery } from '$lib/courses';
+import { COURSE_COLORS, isCourseColor, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
-import { loadSharedCourse, writeShared } from './shared-courses';
+import { loadSharedCourse, writeShared, type SharedCourse } from './shared-courses';
 import { loadShape, titleParts } from './timetable';
 
 const TITLE_MAX = 60;
@@ -16,7 +16,7 @@ const TEACHERS_MAX = 10;
 const ROOM_MAX = 20;
 const SLOTS_MAX = 14;
 
-export type SlotInput = { weekday: number; period: number; span: number; room: string | null };
+export type SlotInput = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
 
 export type CourseInput = {
 	title: string;
@@ -93,7 +93,7 @@ function parseSlots(values: FormDataEntryValue[], periods: number[]): SlotInput[
 	if (values.length > SLOTS_MAX) return `曜日・時限は${SLOTS_MAX}個までです`;
 	const slots: (SlotInput & { start: number })[] = [];
 	for (const value of values) {
-		let raw: { weekday?: unknown; period?: unknown; span?: unknown; room?: unknown };
+		let raw: { weekday?: unknown; period?: unknown; span?: unknown; week?: unknown; room?: unknown };
 		try {
 			raw = JSON.parse(String(value)) ?? {};
 		} catch {
@@ -106,11 +106,14 @@ function parseSlots(values: FormDataEntryValue[], periods: number[]): SlotInput[
 		if (start < 0 || start + span > periods.length) return invalid;
 		const room = typeof raw.room === 'string' ? raw.room.trim() : '';
 		if (length(room) > ROOM_MAX) return `教室は${ROOM_MAX}文字までです`;
+		// Slots sent without it (older pages, imports) meet every week.
+		const week = raw.week === undefined ? 'every' : raw.week;
+		if (!isWeekPattern(week)) return invalid;
 		const overlaps = slots.some(
 			(s) => s.weekday === weekday && s.start <= start + span - 1 && start <= s.start + s.span - 1
 		);
 		if (overlaps) return '同じ曜日で時限が重なっています';
-		slots.push({ weekday, period: period as number, span, room: room || null, start });
+		slots.push({ weekday, period: period as number, span, week, room: room || null, start });
 	}
 	return slots
 		.sort((a, b) => a.weekday - b.weekday || a.start - b.start)
@@ -127,26 +130,31 @@ export async function nextColor(db: Db, timetableId: string) {
 const CONFLICT =
 	'ほかの人が先にこの授業を直しました。画面を読み込み直すと最新の内容になるので、もう一度直して保存してください';
 
+type SaveArgs = {
+	userId: string;
+	timetable: { id: string; year: number; universityId: string | null };
+	terms: { id: string; name: string }[];
+	courseId: string | null;
+	input: CourseInput;
+};
+
+type PreparedCourse = { id: string; existing: SharedCourse | null; statements: BatchItem<'sqlite'>[] };
+
 // Saves the course in the timetable. A synced course also adds itself to the shared data, or
 // updates the shared course it is linked to. The local copy is always written, so switching to
 // 自分だけで使う keeps the latest values. Returns a message instead when the shared course
 // changed after the form was opened, so nobody overwrites an edit they haven't seen.
-export async function saveCourse(
+export async function saveCourse(db: Db, args: SaveArgs) {
+	const prepared = await prepareCourse(db, args);
+	if ('message' in prepared) return prepared;
+	return (await commitCourses(db, [prepared])) ?? { id: prepared.id };
+}
+
+/** The statements that save one course, so several can go in one batch (commitCourses). */
+export async function prepareCourse(
 	db: Db,
-	{
-		userId,
-		timetable,
-		terms,
-		courseId,
-		input
-	}: {
-		userId: string;
-		timetable: { id: string; year: number; universityId: string | null };
-		terms: { id: string; name: string }[];
-		courseId: string | null;
-		input: CourseInput;
-	}
-) {
+	{ userId, timetable, terms, courseId, input }: SaveArgs
+): Promise<PreparedCourse | { message: string }> {
 	const existing = input.sharedCourseId ? await loadSharedCourse(db, input.sharedCourseId) : null;
 	if (
 		input.sharedCourseId &&
@@ -201,6 +209,7 @@ export async function saveCourse(
 					weekday: s.weekday,
 					periodNumber: s.period,
 					span: s.span,
+					weekPattern: s.week,
 					room: s.room
 				}))
 			)
@@ -213,21 +222,36 @@ export async function saveCourse(
 				.values(input.teachers.map((name, sortOrder) => ({ courseId: id, name, sortOrder })))
 		);
 	}
-	try {
-		await db.batch([
+	return {
+		id,
+		existing,
+		statements: [
 			courseId
 				? db.update(courses).set(values).where(eq(courses.id, id))
 				: db.insert(courses).values({ id, timetableId: timetable.id, ...values }),
 			...shared,
 			...rest
-		]);
+		]
+	};
+}
+
+/**
+ * Writes prepared courses in one batch, after any `first` statements: all of it is saved or
+ * none. A message comes back when a shared course changed after it was read.
+ */
+export async function commitCourses(db: Db, prepared: PreparedCourse[], first: BatchItem<'sqlite'>[] = []) {
+	const [head, ...tail] = [...first, ...prepared.flatMap((p) => p.statements)];
+	try {
+		await db.batch([head, ...tail]);
 	} catch (e) {
-		// Someone saved the shared course between reading it and writing (the batch was rolled back).
-		const now = existing && (await loadSharedCourse(db, existing.id));
-		if (now && now.version !== existing.version) return { message: CONFLICT };
+		// Someone saved a shared course between reading it and writing (the batch was rolled back).
+		for (const { existing } of prepared) {
+			const now = existing && (await loadSharedCourse(db, existing.id));
+			if (now && now.version !== existing.version) return { message: CONFLICT };
+		}
 		throw e;
 	}
-	return { id };
+	return null;
 }
 
 // The course, only if it is in one of the user's timetables
@@ -258,6 +282,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 					weekday: courseSlots.weekday,
 					period: courseSlots.periodNumber,
 					span: courseSlots.span,
+					week: courseSlots.weekPattern,
 					room: courseSlots.room
 				})
 				.from(courseSlots)

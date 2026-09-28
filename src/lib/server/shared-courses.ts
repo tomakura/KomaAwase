@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import type { Delivery } from '$lib/courses';
+import type { Delivery, WeekPattern } from '$lib/courses';
 import type { Db } from './db';
 import {
 	courses,
@@ -10,7 +10,7 @@ import {
 	sharedCourses
 } from './db/schema';
 
-type Slot = { weekday: number; period: number; span: number; room: string | null };
+type Slot = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
 
 // What everyone syncing a course shares. Colors, terms taken and notes stay personal.
 export type SharedValues = {
@@ -27,7 +27,7 @@ function normalize(v: SharedValues): SharedValues {
 	return {
 		title: v.title,
 		teachers: v.teachers,
-		slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, room: s.room })),
+		slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, week: s.week ?? 'every', room: s.room })),
 		delivery: v.delivery,
 		intensiveFrom: v.intensiveFrom,
 		intensiveTo: v.intensiveTo
@@ -45,21 +45,34 @@ export type SharedCourse = {
 	values: SharedValues;
 };
 
+// D1 takes at most 100 bound values per query, so many ids are read 90 at a time.
+const CHUNK = 90;
+
 export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<string, SharedCourse>> {
-	if (!ids.length) return new Map();
-	const [rows, slots, teachers] = await db.batch([
-		db.select().from(sharedCourses).where(inArray(sharedCourses.id, ids)),
-		db
-			.select()
-			.from(sharedCourseSlots)
-			.where(inArray(sharedCourseSlots.sharedCourseId, ids))
-			.orderBy(asc(sharedCourseSlots.weekday), asc(sharedCourseSlots.periodNumber)),
-		db
-			.select()
-			.from(sharedCourseTeachers)
-			.where(inArray(sharedCourseTeachers.sharedCourseId, ids))
-			.orderBy(asc(sharedCourseTeachers.sortOrder))
-	]);
+	const unique = [...new Set(ids)];
+	if (!unique.length) return new Map();
+	const chunks = [];
+	for (let i = 0; i < unique.length; i += CHUNK) chunks.push(unique.slice(i, i + CHUNK));
+	const parts = await Promise.all(
+		chunks.map((part) =>
+			db.batch([
+				db.select().from(sharedCourses).where(inArray(sharedCourses.id, part)),
+				db
+					.select()
+					.from(sharedCourseSlots)
+					.where(inArray(sharedCourseSlots.sharedCourseId, part))
+					.orderBy(asc(sharedCourseSlots.weekday), asc(sharedCourseSlots.periodNumber)),
+				db
+					.select()
+					.from(sharedCourseTeachers)
+					.where(inArray(sharedCourseTeachers.sharedCourseId, part))
+					.orderBy(asc(sharedCourseTeachers.sortOrder))
+			])
+		)
+	);
+	const rows = parts.flatMap((p) => p[0]);
+	const slots = parts.flatMap((p) => p[1]);
+	const teachers = parts.flatMap((p) => p[2]);
 	return new Map(
 		rows.map((r) => [
 			r.id,
@@ -76,7 +89,7 @@ export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<stri
 					teachers: teachers.filter((t) => t.sharedCourseId === r.id).map((t) => t.name),
 					slots: slots
 						.filter((s) => s.sharedCourseId === r.id)
-						.map((s) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, room: s.room })),
+						.map((s) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, week: s.weekPattern, room: s.room })),
 					delivery: r.delivery,
 					intensiveFrom: r.intensiveFrom,
 					intensiveTo: r.intensiveTo
@@ -100,6 +113,7 @@ function insertDetails(db: Db, sharedCourseId: string, v: SharedValues): BatchIt
 					weekday: s.weekday,
 					periodNumber: s.period,
 					span: s.span,
+					weekPattern: s.week,
 					room: s.room
 				}))
 			)
@@ -259,4 +273,61 @@ export async function searchSharedCourses(
 				a.values.title.localeCompare(b.values.title, 'ja')
 		)
 		.slice(0, 30);
+}
+
+export const EDITS_PAGE = 50;
+
+/** One page of the course's changes, newest first, and whether older ones follow. Who made them is never shown. */
+export async function loadEdits(db: Db, sharedCourseId: string, page = 1) {
+	const rows = await db
+		.select({ id: sharedCourseEdits.id, diff: sharedCourseEdits.diff, createdAt: sharedCourseEdits.createdAt })
+		.from(sharedCourseEdits)
+		.where(eq(sharedCourseEdits.sharedCourseId, sharedCourseId))
+		// Times are to the second; rowid keeps edits within one second in the order they were saved.
+		.orderBy(desc(sharedCourseEdits.createdAt), desc(sql`rowid`))
+		.limit(EDITS_PAGE + 1)
+		.offset((page - 1) * EDITS_PAGE);
+	return { edits: rows.slice(0, EDITS_PAGE), more: rows.length > EDITS_PAGE };
+}
+
+/**
+ * Puts the course back to how it was after an earlier edit, as a new edit (so that can be
+ * undone too). A message comes back when someone changed it since the page was opened.
+ */
+export async function restoreShared(
+	db: Db,
+	{ userId, course, editId, version }: { userId: string; course: SharedCourse; editId: string; version: number }
+) {
+	if (course.version !== version) return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度お試しください' };
+	const edit = await db
+		.select({ diff: sharedCourseEdits.diff })
+		.from(sharedCourseEdits)
+		.where(and(eq(sharedCourseEdits.id, editId), eq(sharedCourseEdits.sharedCourseId, course.id)))
+		.get();
+	const values = edit?.diff.after as SharedValues | null | undefined;
+	if (!values) return { message: 'その版が見つかりません' };
+	const written = writeShared(db, {
+		userId,
+		universityId: course.universityId,
+		year: course.year,
+		termNames: course.terms,
+		existing: course,
+		values
+	});
+	if (!written.changed) return { message: 'いまの内容と同じです' };
+	try {
+		await db.batch(written.statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+	} catch {
+		return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度お試しください' };
+	}
+	return { restored: true };
+}
+
+/** How many timetables sync the course */
+export async function syncedCount(db: Db, sharedCourseId: string) {
+	const [row] = await db
+		.select({ n: count() })
+		.from(courses)
+		.where(and(eq(courses.sharedCourseId, sharedCourseId), eq(courses.syncMode, 'synced')));
+	return row?.n ?? 0;
 }

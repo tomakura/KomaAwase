@@ -44,17 +44,18 @@ export async function consumeEmailToken(db: Db, token: string): Promise<string |
 }
 
 /**
- * Sends the sign-in link through the relay on the rental server (relay/send.php).
- * Workers can't reach its SMTP ports, so the relay sends from the server itself.
+ * Sends a message through the relay on the rental server (relay/send.php). Workers can't
+ * reach its SMTP ports, so the relay sends from the server itself. It only knows fixed
+ * messages: `kind` picks one, and the link must be the app's own page for it.
  */
-export async function sendSignInEmail(env: Env, to: string, link: string) {
+export async function sendRelayMail(env: Env, kind: 'signin' | 'verify', to: string, link: string) {
 	if (dev) {
-		console.log(`[dev] sign-in link for ${to}: ${link}`);
+		console.log(`[dev] ${kind} link for ${to}: ${link}`);
 		return;
 	}
 	if (!env.RELAY_URL || !env.RELAY_SECRET) throw new Error('Mail relay is not configured');
 
-	const body = JSON.stringify({ to, link });
+	const body = JSON.stringify({ to, link, kind });
 	const timestamp = String(Math.floor(Date.now() / 1000));
 	const res = await fetch(env.RELAY_URL, {
 		method: 'POST',
@@ -68,3 +69,5 @@ export async function sendSignInEmail(env: Env, to: string, link: string) {
 	});
 	if (!res.ok) throw new Error(`Mail relay responded ${res.status}: ${await res.text()}`);
 }
+
+export const sendSignInEmail = (env: Env, to: string, link: string) => sendRelayMail(env, 'signin', to, link);

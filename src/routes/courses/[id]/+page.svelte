@@ -8,7 +8,8 @@
 		courseHref,
 		deliveryLabel,
 		periodLabel,
-		timetableHref
+		timetableHref,
+		weekLabel
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
@@ -18,7 +19,9 @@
 	const course = $derived(data.course);
 	const periodNumbers = $derived(data.periods.map((p) => p.number));
 	const slotLabels = $derived(
-		course.slots.map((s) => `${DAY_NAMES[s.weekday]} ${periodLabel(s.period, s.span, periodNumbers)}`)
+		course.slots.map(
+			(s) => `${DAY_NAMES[s.weekday]} ${periodLabel(s.period, s.span, periodNumbers)}${weekLabel(s.week) ? `（${weekLabel(s.week)}）` : ''}`
+		)
 	);
 	const termNames = $derived(
 		data.terms
@@ -136,6 +139,11 @@
 			</div>
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
+			{/if}
+			{#if data.shared}
+				<a class="shared-link" href="/shared/{data.shared.id}?back={encodeURIComponent(courseHref(course.id, data.termParam))}">
+					みんなの授業データ（変更の履歴・報告）
+				</a>
 			{/if}
 		</div>
 
@@ -457,6 +465,11 @@
 	.teachers {
 		font-size: 13px;
 		color: var(--ink-soft);
+	}
+
+	.shared-link {
+		align-self: flex-start;
+		font-size: 12px;
 	}
 
 	.add-heading,

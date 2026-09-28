@@ -1,14 +1,16 @@
 <?php
-// Sign-in mail relay for コマあわせ, hosted on シンレンタルサーバー.
+// Mail relay for コマあわせ, hosted on シンレンタルサーバー.
 //
 // Cloudflare Workers can't reach the rental server's SMTP ports, so the Worker
 // POSTs here over HTTPS and this script sends the mail from the server itself.
-// It only ever sends the fixed sign-in message, so it can't be used as an open relay:
+// It only ever sends the fixed messages below, so it can't be used as an open relay:
 //   - requests must carry an HMAC-SHA256 signature made with the shared secret
 //   - signatures older than 5 minutes are rejected
-//   - the link must be a コマあわせ sign-in URL; subject and body are fixed here
+//   - each kind of message has a fixed subject and body, and takes only a link to
+//     コマあわせ's own page for that kind
 //
-// Request:  POST, body {"to": "...", "link": "..."}
+// Request:  POST, body {"to": "...", "link": "...", "kind": "signin" | "verify"}
+//           ("kind" may be left out for signin, as older Workers do)
 //           headers X-Koma-Timestamp: <unix seconds>
 //                   X-Koma-Signature: hex(HMAC-SHA256(secret, "<timestamp>.<body>"))
 
@@ -17,8 +19,34 @@ declare(strict_types=1);
 const MAX_AGE_SECONDS = 300;
 const FROM_ADDRESS = 'noreply@koma.tomakura.com';
 const FROM_NAME = 'コマあわせ';
-const ALLOWED_LINK_PREFIXES = [
-	'https://koma.tomakura.com/auth/email/',
+const MESSAGES = [
+	// Sign-in and sign-up links
+	'signin' => [
+		'prefix' => 'https://koma.tomakura.com/auth/email/',
+		'subject' => 'コマあわせのログイン用リンク',
+		'lines' => [
+			'コマあわせにログインするには、下のリンクを開いてください。',
+			'',
+			'{link}',
+			'',
+			'リンクは15分間、1回だけ使えます。',
+			'このメールに心当たりがない場合は、何もせずに削除してください。',
+		],
+	],
+	// Enrollment checks sent to a university address
+	'verify' => [
+		'prefix' => 'https://koma.tomakura.com/verify/',
+		'subject' => 'コマあわせの在籍確認',
+		'lines' => [
+			'コマあわせで、このメールアドレスでの在籍確認が申し込まれました。',
+			'ご本人の場合は、下のリンクを開いて確認を終えてください。',
+			'',
+			'{link}',
+			'',
+			'リンクは1日、1回だけ使えます。',
+			'このメールに心当たりがない場合は、何もせずに削除してください。',
+		],
+	],
 ];
 
 header('Content-Type: application/json; charset=utf-8');
@@ -59,21 +87,21 @@ if (!is_string($signature) || !hash_equals($expected, $signature)) {
 $data = json_decode((string) $body, true);
 $to = is_array($data) ? ($data['to'] ?? null) : null;
 $link = is_array($data) ? ($data['link'] ?? null) : null;
+$kind = is_array($data) ? ($data['kind'] ?? 'signin') : null;
 
 if (!is_string($to) || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
 	respond(400, ['error' => 'bad address']);
 }
-$linkOk = false;
-if (is_string($link)) {
-	foreach (ALLOWED_LINK_PREFIXES as $prefix) {
-		$token = substr($link, strlen($prefix));
-		if (str_starts_with($link, $prefix) && preg_match('/^[A-Za-z0-9_-]{20,100}$/', $token) === 1) {
-			$linkOk = true;
-			break;
-		}
-	}
+if (!is_string($kind) || !isset(MESSAGES[$kind])) {
+	respond(400, ['error' => 'bad kind']);
 }
-if (!$linkOk) {
+$message = MESSAGES[$kind];
+$prefix = $message['prefix'];
+if (
+	!is_string($link)
+	|| !str_starts_with($link, $prefix)
+	|| preg_match('/^[A-Za-z0-9_-]{20,100}$/', substr($link, strlen($prefix))) !== 1
+) {
 	respond(400, ['error' => 'bad link']);
 }
 
@@ -83,17 +111,9 @@ if (!function_exists('mb_send_mail')) {
 mb_language('uni');
 mb_internal_encoding('UTF-8');
 
-$subject = 'コマあわせのログイン用リンク';
-$message = implode("\n", [
-	'コマあわせにログインするには、下のリンクを開いてください。',
-	'',
-	$link,
-	'',
-	'リンクは15分間、1回だけ使えます。',
-	'このメールに心当たりがない場合は、何もせずに削除してください。',
-]);
+$text = implode("\n", array_map(fn (string $line) => $line === '{link}' ? $link : $line, $message['lines']));
 $headers = 'From: ' . mb_encode_mimeheader(FROM_NAME) . ' <' . FROM_ADDRESS . '>';
 
 // -f sets the envelope sender so SPF is checked against koma.tomakura.com.
-$sent = mb_send_mail($to, $subject, $message, $headers, '-f' . FROM_ADDRESS);
+$sent = mb_send_mail($to, $message['subject'], $text, $headers, '-f' . FROM_ADDRESS);
 respond($sent ? 200 : 502, ['ok' => $sent]);

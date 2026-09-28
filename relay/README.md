@@ -4,7 +4,7 @@ Cloudflare Workers だけではできないことを、シンレンタルサー�
 
 | ファイル | 役目 |
 |---|---|
-| `send.php` | ログイン用のメールを送る。Workers からはシンの SMTP に接続できないため |
+| `send.php` | ログイン用と在籍確認用のメールを送る。Workers からはシンの SMTP に接続できないため |
 | `files.php` | 授業の資料（PDF・写真など）のファイルを保存する。R2 は無料枠でもカードの登録が要るため、シンに置く |
 
 ## 置き方
@@ -19,8 +19,9 @@ Cloudflare Workers だけではできないことを、シンレンタルサー�
 
 - `koma-relay-secret.php` と `koma-files-secret.php` は Git に入れない。`*.example.php` を元に作る。2つには別々の値を使い、それぞれ Worker の `RELAY_SECRET`・`FILES_SECRET` と同じ値にする
 - PHP 8 以上と mbstring が必要（シンは標準で入っている）
-- 中継は `send.php` の `ALLOWED_LINK_PREFIXES` にある本番の URL のリンクしか受け付けない。Cloudflare のプレビュー URL は本番の D1 と鍵を共有してしまうので、`wrangler.jsonc` で無効にしている
-- アプリの URL を増やしたり変えたりしたときは、`ALLOWED_LINK_PREFIXES` も直してアップロードし直す
+- 中継が送るのは `send.php` の `MESSAGES` にある決まった文面だけ（`signin`：ログイン用、`verify`：在籍確認用）。それぞれ本番の URL の決まったページへのリンクしか受け付けない。Cloudflare のプレビュー URL は本番の D1 と鍵を共有してしまうので、`wrangler.jsonc` で無効にしている
+- アプリの URL を増やしたり変えたりしたときは、`MESSAGES` の `prefix` も直してアップロードし直す
+- `send.php` を新しくしたら、シンの同じ場所に上書きする。古い `send.php` のままだと在籍確認のメールは `bad kind` で断られる（ログインのメールは送れる）
 
 ## 資料のファイル（files.php）
 

@@ -11,7 +11,10 @@ export default defineConfig({
 			},
 			// Local secrets for `npm run dev` (see relay/README.md). Not .dev.vars, which
 			// `wrangler types` would read into worker-configuration.d.ts.
-			adapter: adapter({ platformProxy: { envFiles: ['.dev.local.vars'] } })
+			adapter: adapter({
+				config: 'svelte-kit.wrangler.jsonc',
+				platformProxy: { configPath: 'wrangler.jsonc', envFiles: ['.dev.local.vars'] }
+			})
 		})
 	]
 });

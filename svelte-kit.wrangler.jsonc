@@ -1,0 +1,12 @@
+{
+	// Only for @sveltejs/adapter-cloudflare, which writes its worker to `main`. Deploys and
+	// `wrangler dev` use wrangler.jsonc, whose entry (worker/entry.js) wraps that worker.
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "komaawase",
+	"compatibility_date": "2026-09-27",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	}
+}

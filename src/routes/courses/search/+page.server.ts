@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { universities } from '$lib/server/db/schema';
+import { loadPeople, peopleTaking, visibleUserIds } from '$lib/server/friends';
 import { searchSharedCourses } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import type { PageServerLoad } from './$types';
@@ -9,7 +10,7 @@ const QUERY_MAX = 50;
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
-	const timetable = await currentTimetable(locals.db, locals.user.id);
+	const timetable = await currentTimetable(locals.db, locals.user);
 	const shape = await loadShape(locals.db, timetable.id);
 
 	const term = shape.terms.find((t) => t.id === url.searchParams.get('term')) ?? null;
@@ -38,6 +39,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			])
 		: [null, []];
 
+	// Friends (and group members who show their timetable) already taking each course
+	const visible = results.length ? await visibleUserIds(locals.db, locals.user.id) : new Set<string>();
+	const taking = await peopleTaking(
+		locals.db,
+		results.map((r) => r.id),
+		timetable.year,
+		visible
+	);
+	const people = new Map(
+		(await loadPeople(locals.db, [...new Set([...taking.values()].flat())].slice(0, 90))).map((p) => [
+			p.id,
+			{ id: p.id, nickname: p.nickname, icon: p.icon }
+		])
+	);
+
 	return {
 		termParam: term?.id ?? null,
 		termName: term?.name ?? null,
@@ -52,7 +68,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			teachers: r.values.teachers,
 			slots: r.values.slots,
 			source: r.source,
-			users: r.users
+			users: r.users,
+			friends: (taking.get(r.id) ?? []).flatMap((id) => people.get(id) ?? [])
 		}))
 	};
 };

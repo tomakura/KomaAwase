@@ -13,12 +13,15 @@ const createdAt = () =>
 
 // --- accounts & auth ---
 
+export type UserIcon = { color: string; text: string };
+
 export const users = sqliteTable('users', {
 	id: id(),
 	email: text('email').notNull().unique(),
 	nickname: text('nickname'),
 	googleSub: text('google_sub').unique(),
-	icon: text('icon'),
+	// A character on a color; null until the user picks one (the nickname's first character is shown)
+	icon: text('icon', { mode: 'json' }).$type<UserIcon>(),
 	theme: text('theme', { enum: ['system', 'light', 'dark'] })
 		.notNull()
 		.default('system'),
@@ -27,6 +30,14 @@ export const users = sqliteTable('users', {
 		.$type<number[]>()
 		.notNull()
 		.default(sql`'[1,2,3,4,5]'`),
+	// The user's university; new timetables start from its preset. Not a foreign key: adding
+	// one would rebuild the users table, which everything else references.
+	universityId: text('university_id'),
+	// Set when はじめの設定 is done
+	setupAt: integer('setup_at', { mode: 'timestamp_ms' }),
+	// In the link friends open to send a request. Made the first time it is needed.
+	friendCode: text('friend_code').unique(),
+	role: text('role', { enum: ['admin'] }),
 	createdAt: createdAt()
 });
 
@@ -81,17 +92,26 @@ export const emailTokens = sqliteTable('email_tokens', {
 
 // --- universities & timetables ---
 
-export const universities = sqliteTable('universities', {
-	id: id(),
-	name: text('name').notNull(),
-	// matched exactly or as dot-separated subdomains, never by plain suffix
-	emailDomains: text('email_domains', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
-	// Dates are for one academic year and are copied only into a timetable of that year.
-	termPreset: text('term_preset', { mode: 'json' }).$type<
-		{ name: string; group?: string; start?: string; end?: string }[]
-	>(),
-	periodPreset: text('period_preset', { mode: 'json' }).$type<{ number: number; start: string; end: string }[]>()
-});
+export type TermPreset = { name: string; group?: string; start?: string; end?: string }[];
+export type PeriodPreset = { number: number; start: string; end: string }[];
+
+export const universities = sqliteTable(
+	'universities',
+	{
+		id: id(),
+		name: text('name').notNull(),
+		// matched exactly or as dot-separated subdomains, never by plain suffix
+		emailDomains: text('email_domains', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+		// Dates are for one academic year and are copied only into a timetable of that year.
+		termPreset: text('term_preset', { mode: 'json' }).$type<TermPreset>(),
+		periodPreset: text('period_preset', { mode: 'json' }).$type<PeriodPreset>(),
+		// 'user' for a university someone typed in; it has no presets
+		source: text('source', { enum: ['preset', 'user'] })
+			.notNull()
+			.default('preset')
+	},
+	(t) => [uniqueIndex('universities_name_idx').on(t.name)]
+);
 
 export const timetables = sqliteTable(
 	'timetables',
@@ -287,6 +307,10 @@ export const sharedCourseSlots = sqliteTable(
 		weekday: integer('weekday').notNull(),
 		periodNumber: integer('period_number').notNull(),
 		span: integer('span').notNull().default(1),
+		// Every week, or only odd or even weeks of the term
+		weekPattern: text('week_pattern', { enum: ['every', 'odd', 'even'] })
+			.notNull()
+			.default('every'),
 		room: text('room')
 	},
 	(t) => [
@@ -322,4 +346,175 @@ export const sharedCourseEdits = sqliteTable(
 		createdAt: createdAt()
 	},
 	(t) => [index('shared_course_edits_course_idx').on(t.sharedCourseId)]
+);
+
+// --- friends & groups ---
+
+// One row per pair of people, whoever asked; `pair` is the two ids in order.
+// Timetables are visible to each other only once the request is accepted.
+export const friendships = sqliteTable(
+	'friendships',
+	{
+		id: id(),
+		requesterId: text('requester_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		addresseeId: text('addressee_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		pair: text('pair').notNull().unique(),
+		status: text('status', { enum: ['pending', 'accepted'] })
+			.notNull()
+			.default('pending'),
+		createdAt: createdAt(),
+		acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' })
+	},
+	(t) => [
+		index('friendships_requester_idx').on(t.requesterId),
+		index('friendships_addressee_idx').on(t.addresseeId)
+	]
+);
+
+// Blocking wins over friendships and groups: neither sees the other's timetable.
+export const blocks = sqliteTable(
+	'blocks',
+	{
+		blockerId: text('blocker_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		blockedId: text('blocked_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.blockerId, t.blockedId] }), index('blocks_blocked_idx').on(t.blockedId)]
+);
+
+// Circles and seminars. The table isn't called `groups`, which SQLite also uses as a keyword.
+export const groups = sqliteTable('friend_groups', {
+	id: id(),
+	name: text('name').notNull(),
+	// Passed to the longest-standing member when the owner leaves
+	ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+	inviteCode: text('invite_code').notNull().unique(),
+	createdAt: createdAt()
+});
+
+export const groupMembers = sqliteTable(
+	'group_members',
+	{
+		groupId: text('group_id')
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		// Whether the other members see this member's timetable; chosen when joining
+		shareTimetable: integer('share_timetable', { mode: 'boolean' }).notNull().default(true),
+		joinedAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_members_user_idx').on(t.userId)]
+);
+
+// --- operations ---
+
+// Reports about people, groups and shared course data. The reporter is cleared, not the
+// report, when their account is deleted.
+export const reports = sqliteTable(
+	'reports',
+	{
+		id: id(),
+		reporterId: text('reporter_id').references(() => users.id, { onDelete: 'set null' }),
+		targetType: text('target_type', { enum: ['user', 'group', 'shared_course'] }).notNull(),
+		targetId: text('target_id').notNull(),
+		reason: text('reason').notNull(),
+		detail: text('detail'),
+		status: text('status', { enum: ['open', 'closed'] })
+			.notNull()
+			.default('open'),
+		createdAt: createdAt()
+	},
+	(t) => [index('reports_status_idx').on(t.status)]
+);
+
+// Screenshot imports waiting for, or back from, the AI. This table is the queue's source of
+// truth: Queues messages only say which job to work on and last a day at most.
+export const importJobs = sqliteTable(
+	'import_jobs',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		timetableId: text('timetable_id')
+			.notNull()
+			.references(() => timetables.id, { onDelete: 'cascade' }),
+		status: text('status', { enum: ['queued', 'processing', 'retry', 'done', 'failed'] })
+			.notNull()
+			.default('queued'),
+		// The cropped screenshot as a JPEG data URL, cleared as soon as it has been read
+		image: text('image'),
+		provider: text('provider', { enum: ['groq', 'workers-ai'] }),
+		result: text('result', { mode: 'json' }).$type<import('$lib/import').ImportedCourse[]>(),
+		error: text('error'),
+		attempts: integer('attempts').notNull().default(0),
+		retryAt: integer('retry_at', { mode: 'timestamp_ms' }),
+		createdAt: createdAt(),
+		finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+		// When the results were saved to the timetable or put aside
+		closedAt: integer('closed_at', { mode: 'timestamp_ms' })
+	},
+	(t) => [index('import_jobs_user_idx').on(t.userId), index('import_jobs_status_idx').on(t.status)]
+);
+
+// Bug reports and requests from the app. The sender is cleared, not the message, when their
+// account is deleted.
+export const feedback = sqliteTable(
+	'feedback',
+	{
+		id: id(),
+		userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+		kind: text('kind', { enum: ['bug', 'request', 'other'] }).notNull(),
+		body: text('body').notNull(),
+		// Browser, screen and page, attached only if the sender agreed after seeing them
+		env: text('env', { mode: 'json' }).$type<Record<string, string>>(),
+		status: text('status', { enum: ['open', 'closed'] })
+			.notNull()
+			.default('open'),
+		createdAt: createdAt()
+	},
+	(t) => [
+		index('feedback_status_idx').on(t.status),
+		// For the daily limit on sending
+		index('feedback_user_created_idx').on(t.userId, t.createdAt)
+	]
+);
+
+// Enrollment checks: a link sent to a university address was opened. One address
+// verifies one account at a time. Checks lapse each spring, when students re-confirm.
+export const univVerifications = sqliteTable('univ_verifications', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	universityId: text('university_id')
+		.notNull()
+		.references(() => universities.id),
+	email: text('email').notNull().unique(),
+	verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }).notNull(),
+	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+// Links sent for enrollment checks. id is the SHA-256 of the token in the link.
+export const verifyTokens = sqliteTable(
+	'verify_tokens',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		universityId: text('university_id').notNull(),
+		email: text('email').notNull(),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(t) => [index('verify_tokens_user_idx').on(t.userId)]
 );

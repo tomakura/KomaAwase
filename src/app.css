@@ -8,6 +8,9 @@
 	--line: #e4ddcf;
 	--line-strong: #d8d0c0;
 	--line-bold: #b8ae9c;
+	--switch-off: #cfc6b5;
+	/* A card sitting on a slot, as in the overlay */
+	--raised: #fffdf8;
 	--scrim: #8f887d;
 	--slot: #ede7da;
 	--slot-today: #e6dac4;
@@ -50,6 +53,8 @@
 		--line: #3a3531;
 		--line-strong: #4a443d;
 		--line-bold: #5e564d;
+		--switch-off: #5e564d;
+		--raised: #45403a;
 		--scrim: #0e0d0c;
 		--slot: #2e2a26;
 		--slot-today: #3a3329;
@@ -88,6 +93,8 @@
 	--line: #3a3531;
 	--line-strong: #4a443d;
 	--line-bold: #5e564d;
+	--switch-off: #5e564d;
+	--raised: #45403a;
 	--scrim: #0e0d0c;
 	--slot: #2e2a26;
 	--slot-today: #3a3329;
@@ -190,4 +197,89 @@ a {
 	margin: 0;
 	color: var(--accent-text);
 	font-size: 13px;
+}
+
+/* A page with a back button and no bottom menu */
+.ui-page {
+	max-width: 480px;
+	margin: 0 auto;
+	padding-bottom: 40px;
+}
+
+/* Groups of rows, as in その他 */
+.ui-section {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 18px 16px 0;
+}
+
+.ui-section-title {
+	margin: 0;
+	padding-left: 4px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--ink-sub);
+}
+
+.ui-list {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 14px;
+	background: var(--surface);
+}
+
+.ui-list > * + * {
+	border-top: 1px solid var(--slot);
+}
+
+.ui-row {
+	min-height: 48px;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 0 14px;
+	color: var(--ink);
+	font-size: 14px;
+	text-align: left;
+	text-decoration: none;
+}
+
+button.ui-row {
+	width: 100%;
+	border: none;
+	background: none;
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.ui-row-value {
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 13px;
+	color: var(--ink-sub);
+	text-align: right;
+}
+
+.ui-note {
+	margin: 0;
+	padding: 0 4px;
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--ink-sub);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }

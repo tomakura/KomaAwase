@@ -1,10 +1,20 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { consumeEmailToken, createEmailToken, normalizeEmail, sendSignInEmail } from '$lib/server/auth/email';
+import { googleEnabled } from '$lib/server/auth/google';
+import { rememberNext, safeNext } from '$lib/server/auth/next';
 import { RATE_LIMITED_MESSAGE, isRateLimited } from '$lib/server/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ locals }) => {
-	if (locals.user) redirect(303, '/');
+export const load: PageServerLoad = ({ locals, url, cookies, platform }) => {
+	const next = url.searchParams.get('next');
+	if (locals.user) redirect(303, safeNext(next) ?? '/');
+	return {
+		next: rememberNext(cookies, next),
+		bye: url.searchParams.has('bye'),
+		google: googleEnabled(platform?.env),
+		googleFailed: url.searchParams.get('error') === 'google',
+		googleUseMail: url.searchParams.get('error') === 'google-mail'
+	};
 };
 
 export const actions: Actions = {

@@ -1,6 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { SESSION_COOKIE, clearSessionCookie, setSessionCookie, validateSession } from '$lib/server/auth/session';
+import { themeColorTags } from '$lib/theme';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const d1 = event.platform?.env.DB;
@@ -19,5 +20,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	return resolve(event);
+	// The theme is in the HTML from the start, so a dark page never flashes light.
+	const theme = event.locals.user?.theme ?? 'system';
+	return resolve(event, {
+		transformPageChunk: ({ html }) =>
+			html.replace('%koma.theme%', theme).replace('%koma.themeColor%', themeColorTags(theme))
+	});
 };
