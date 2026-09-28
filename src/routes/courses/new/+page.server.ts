@@ -7,7 +7,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
-	const timetable = await currentTimetable(locals.db, locals.user.id);
+	const timetable = await currentTimetable(locals.db, locals.user);
 	const sharedId = url.searchParams.get('shared');
 	const [shape, color, found] = await Promise.all([
 		loadShape(locals.db, timetable.id),
@@ -58,7 +58,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 export const actions: Actions = {
 	default: async ({ locals, request, url }) => {
 		if (!locals.user) redirect(303, '/login');
-		const timetable = await currentTimetable(locals.db, locals.user.id);
+		const timetable = await currentTimetable(locals.db, locals.user);
 		const shape = await loadShape(locals.db, timetable.id);
 		const parsed = parseCourseForm(await request.formData(), shapeOf(shape));
 		if ('message' in parsed) return fail(400, { message: parsed.message });

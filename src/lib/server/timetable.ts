@@ -1,13 +1,15 @@
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, eq } from 'drizzle-orm';
-import { academicYear, tokyoTime } from '$lib/time';
+import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
+import { DEFAULT_PERIODS, termTemplate, type PeriodInput, type TermInput } from '$lib/presets';
+import { remapTerm } from '$lib/terms';
+import { academicYear, isDate, tokyoTime } from '$lib/time';
 import type { Db } from './db';
-import { courseSlots, courseTerms, courses, periods, terms, timetables, universities } from './db/schema';
+import { courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
 import { upcomingCancellations } from './notes';
 import { loadSharedCourses } from './shared-courses';
+import { getUniversity } from './universities';
 
-// The only preset so far. Picking a university comes with the setup screen.
-const DEFAULT_UNIVERSITY_ID = 'dhw';
+export type Owner = { id: string; universityId: string | null };
 
 function findTimetable(db: Db, userId: string, year: number) {
 	return db
@@ -17,65 +19,181 @@ function findTimetable(db: Db, userId: string, year: number) {
 		.get();
 }
 
-// Returns the user's timetable for the year, copying terms and periods from the preset
-// the first time.
-export async function getOrCreateTimetable(db: Db, userId: string, year: number) {
-	const existing = await findTimetable(db, userId, year);
-	if (existing) return existing;
+// 2026-04-01 a year on is 2027-04-01; 2/29 becomes 2/28.
+function shiftYear(date: string | null, years: number) {
+	if (!date) return null;
+	const shifted = `${Number(date.slice(0, 4)) + years}${date.slice(4)}`;
+	return isDate(shifted) ? shifted : `${shifted.slice(0, 8)}28`;
+}
 
-	const university = await db
-		.select()
-		.from(universities)
-		.where(eq(universities.id, DEFAULT_UNIVERSITY_ID))
-		.get();
-	if (!university) throw new Error(`University preset "${DEFAULT_UNIVERSITY_ID}" is missing`);
+// Terms and periods for a new timetable: the university's preset, else the shape of the
+// user's latest timetable a year on, else 2学期制 with six 90-minute periods.
+export async function startingShape(db: Db, owner: Owner, year: number) {
+	const university = owner.universityId ? await getUniversity(db, owner.universityId) : undefined;
+	let termRows: TermInput[] | null = null;
+	let periodRows: PeriodInput[] | null = null;
 
-	const timetableId = crypto.randomUUID();
-	const termRows = (university.termPreset ?? []).map((t, i) => {
-		// Preset dates are for one year; an outdated preset still gives the term names.
-		const dated = !!t.start && academicYear(t.start) === year;
-		return {
-			timetableId,
-			name: t.name,
-			groupName: t.group ?? null,
-			startDate: dated ? t.start : null,
-			endDate: dated ? (t.end ?? null) : null,
-			sortOrder: i
-		};
+	if (university?.termPreset?.length) {
+		termRows = university.termPreset.map((t) => {
+			// Preset dates are for one year; an outdated preset still gives the term names.
+			const dated = !!t.start && academicYear(t.start) === year;
+			return {
+				name: t.name,
+				group: t.group ?? null,
+				start: dated ? (t.start ?? null) : null,
+				end: dated ? (t.end ?? null) : null
+			};
+		});
+	}
+	if (university?.periodPreset?.length) {
+		periodRows = university.periodPreset.map((p) => ({ number: p.number, start: p.start, end: p.end }));
+	}
+	if (!termRows || !periodRows) {
+		const previous = await db
+			.select({ id: timetables.id, year: timetables.year })
+			.from(timetables)
+			.where(and(eq(timetables.userId, owner.id), lt(timetables.year, year)))
+			.orderBy(desc(timetables.year))
+			.get();
+		if (previous) {
+			const shape = await loadShape(db, previous.id);
+			const years = year - previous.year;
+			if (!termRows && shape.terms.length) {
+				termRows = shape.terms.map((t) => ({
+					name: t.name,
+					group: t.groupName,
+					start: shiftYear(t.startDate, years),
+					end: shiftYear(t.endDate, years)
+				}));
+			}
+			if (!periodRows && shape.periods.length) periodRows = shape.periods;
+		}
+	}
+	return {
+		universityId: university?.id ?? null,
+		terms: termRows ?? termTemplate('semester', year),
+		periods: periodRows ?? DEFAULT_PERIODS
+	};
+}
+
+// Inserts of many rows are split to stay under D1's 100 bound values per query.
+export function chunks<T>(rows: T[], size: number) {
+	const out: T[][] = [];
+	for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
+	return out;
+}
+
+const termRow = (timetableId: string, t: TermInput, sortOrder: number) => ({
+	timetableId,
+	name: t.name,
+	groupName: t.group,
+	startDate: t.start,
+	endDate: t.end,
+	sortOrder
+});
+
+/**
+ * Statements that make the timetable's terms `input`. Terms keep their id when `input`
+ * names it; courses in a removed term move to the terms that replace it (see remapTerm).
+ */
+export async function termStatements(db: Db, timetableId: string, input: TermInput[]) {
+	const existing = await db
+		.select({ id: terms.id, start: terms.startDate, end: terms.endDate })
+		.from(terms)
+		.where(eq(terms.timetableId, timetableId))
+		.orderBy(asc(terms.sortOrder));
+	const existingIds = new Set(existing.map((t) => t.id));
+	const next = input.map((t) => {
+		const kept = !!t.id && existingIds.has(t.id);
+		return { ...t, id: kept && t.id ? t.id : crypto.randomUUID(), kept };
 	});
-	const periodRows = (university.periodPreset ?? []).map((p) => ({
-		timetableId,
-		number: p.number,
-		startTime: p.start,
-		endTime: p.end
-	}));
+	const keptIds = new Set(next.filter((t) => t.kept).map((t) => t.id));
+	const removed = existing.filter((t) => !keptIds.has(t.id));
 
-	const rest: BatchItem<'sqlite'>[] = [];
-	if (termRows.length) rest.push(db.insert(terms).values(termRows));
-	if (periodRows.length) rest.push(db.insert(periods).values(periodRows));
+	const statements: BatchItem<'sqlite'>[] = [];
+	next.forEach((t, i) => {
+		if (t.kept) statements.push(db.update(terms).set(termRow(timetableId, t, i)).where(eq(terms.id, t.id)));
+	});
+	const inserts = next.flatMap((t, i) => (t.kept ? [] : [{ id: t.id, ...termRow(timetableId, t, i) }]));
+	if (inserts.length) statements.push(db.insert(terms).values(inserts));
+
+	if (removed.length) {
+		const removedIds = removed.map((t) => t.id);
+		const links = await db
+			.select({ courseId: courseTerms.courseId, termId: courseTerms.termId })
+			.from(courseTerms)
+			.where(inArray(courseTerms.termId, removedIds));
+		const moved = new Map<string, { courseId: string; termId: string }>();
+		for (const link of links) {
+			const index = existing.findIndex((t) => t.id === link.termId);
+			for (const j of remapTerm({ ...existing[index], index }, existing.length, next)) {
+				const termId = next[j].id;
+				moved.set(`${link.courseId} ${termId}`, { courseId: link.courseId, termId });
+			}
+		}
+		for (const rows of chunks([...moved.values()], 40)) {
+			statements.push(db.insert(courseTerms).values(rows).onConflictDoNothing());
+		}
+		statements.push(db.delete(terms).where(inArray(terms.id, removedIds)));
+	}
+	return statements;
+}
+
+// Slots keep their period numbers, so a period that comes back shows its courses again.
+export function periodStatements(db: Db, timetableId: string, input: PeriodInput[]): BatchItem<'sqlite'>[] {
+	return [
+		db.delete(periods).where(eq(periods.timetableId, timetableId)),
+		db
+			.insert(periods)
+			.values(input.map((p) => ({ timetableId, number: p.number, startTime: p.start, endTime: p.end })))
+	];
+}
+
+/** Creates the timetable for `year` and marks the older ones as past. */
+export async function createTimetable(
+	db: Db,
+	owner: Owner,
+	year: number,
+	shape: { universityId: string | null; terms: TermInput[]; periods: PeriodInput[] }
+) {
+	const timetableId = crypto.randomUUID();
+	await db.batch([
+		db.insert(timetables).values({
+			id: timetableId,
+			userId: owner.id,
+			universityId: shape.universityId,
+			year,
+			name: `${year}年度`
+		}),
+		db.insert(terms).values(shape.terms.map((t, i) => termRow(timetableId, t, i))),
+		db
+			.insert(periods)
+			.values(shape.periods.map((p) => ({ timetableId, number: p.number, startTime: p.start, endTime: p.end }))),
+		db
+			.update(timetables)
+			.set({ archived: true })
+			.where(and(eq(timetables.userId, owner.id), lt(timetables.year, year)))
+	]);
+	return { id: timetableId, year, universityId: shape.universityId };
+}
+
+// Returns the user's timetable for the year, making it the first time.
+export async function getOrCreateTimetable(db: Db, owner: Owner, year: number) {
+	const existing = await findTimetable(db, owner.id, year);
+	if (existing) return existing;
 	try {
-		await db.batch([
-			db.insert(timetables).values({
-				id: timetableId,
-				userId,
-				universityId: university.id,
-				year,
-				name: `${year}年度`
-			}),
-			...rest
-		]);
+		return await createTimetable(db, owner, year, await startingShape(db, owner, year));
 	} catch (e) {
 		// A parallel request (a link preload, say) created it first.
-		const created = await findTimetable(db, userId, year);
+		const created = await findTimetable(db, owner.id, year);
 		if (created) return created;
 		throw e;
 	}
-	return { id: timetableId, year, universityId: university.id };
 }
 
 // The timetable for this academic year
-export function currentTimetable(db: Db, userId: string) {
-	return getOrCreateTimetable(db, userId, academicYear(tokyoTime(Date.now()).date));
+export function currentTimetable(db: Db, owner: Owner) {
+	return getOrCreateTimetable(db, owner, academicYear(tokyoTime(Date.now()).date));
 }
 
 const termsQuery = (db: Db, timetableId: string) =>

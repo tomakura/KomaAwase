@@ -9,7 +9,7 @@ const QUERY_MAX = 50;
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
-	const timetable = await currentTimetable(locals.db, locals.user.id);
+	const timetable = await currentTimetable(locals.db, locals.user);
 	const shape = await loadShape(locals.db, timetable.id);
 
 	const term = shape.terms.find((t) => t.id === url.searchParams.get('term')) ?? null;

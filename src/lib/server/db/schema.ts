@@ -13,12 +13,15 @@ const createdAt = () =>
 
 // --- accounts & auth ---
 
+export type UserIcon = { color: string; text: string };
+
 export const users = sqliteTable('users', {
 	id: id(),
 	email: text('email').notNull().unique(),
 	nickname: text('nickname'),
 	googleSub: text('google_sub').unique(),
-	icon: text('icon'),
+	// A character on a color; null until the user picks one (the nickname's first character is shown)
+	icon: text('icon', { mode: 'json' }).$type<UserIcon>(),
 	theme: text('theme', { enum: ['system', 'light', 'dark'] })
 		.notNull()
 		.default('system'),
@@ -27,6 +30,14 @@ export const users = sqliteTable('users', {
 		.$type<number[]>()
 		.notNull()
 		.default(sql`'[1,2,3,4,5]'`),
+	// The user's university; new timetables start from its preset. Not a foreign key: adding
+	// one would rebuild the users table, which everything else references.
+	universityId: text('university_id'),
+	// Set when はじめの設定 is done
+	setupAt: integer('setup_at', { mode: 'timestamp_ms' }),
+	// In the link friends open to send a request. Made the first time it is needed.
+	friendCode: text('friend_code').unique(),
+	role: text('role', { enum: ['admin'] }),
 	createdAt: createdAt()
 });
 
@@ -81,17 +92,26 @@ export const emailTokens = sqliteTable('email_tokens', {
 
 // --- universities & timetables ---
 
-export const universities = sqliteTable('universities', {
-	id: id(),
-	name: text('name').notNull(),
-	// matched exactly or as dot-separated subdomains, never by plain suffix
-	emailDomains: text('email_domains', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
-	// Dates are for one academic year and are copied only into a timetable of that year.
-	termPreset: text('term_preset', { mode: 'json' }).$type<
-		{ name: string; group?: string; start?: string; end?: string }[]
-	>(),
-	periodPreset: text('period_preset', { mode: 'json' }).$type<{ number: number; start: string; end: string }[]>()
-});
+export type TermPreset = { name: string; group?: string; start?: string; end?: string }[];
+export type PeriodPreset = { number: number; start: string; end: string }[];
+
+export const universities = sqliteTable(
+	'universities',
+	{
+		id: id(),
+		name: text('name').notNull(),
+		// matched exactly or as dot-separated subdomains, never by plain suffix
+		emailDomains: text('email_domains', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+		// Dates are for one academic year and are copied only into a timetable of that year.
+		termPreset: text('term_preset', { mode: 'json' }).$type<TermPreset>(),
+		periodPreset: text('period_preset', { mode: 'json' }).$type<PeriodPreset>(),
+		// 'user' for a university someone typed in; it has no presets
+		source: text('source', { enum: ['preset', 'user'] })
+			.notNull()
+			.default('preset')
+	},
+	(t) => [uniqueIndex('universities_name_idx').on(t.name)]
+);
 
 export const timetables = sqliteTable(
 	'timetables',
