@@ -28,8 +28,10 @@
 			</div>
 			<p class="ui-note">毎年5月1日に切れます。4月になったら、もう一度確認してください。卒業したあともメールが使える大学があるためです。</p>
 		{:else}
-			{#if data.verification}
+			{#if data.verification && data.verification.days <= 0}
 				<p class="lapsed" role="status">在籍確認の期限が切れています（{day(data.verification.expiresAt)}まで）。</p>
+			{:else if data.verification}
+				<p class="lapsed" role="status">所属大学の変更後は、再度在籍確認が必要です。</p>
 			{/if}
 			<p class="lead">大学のメールアドレスに確認リンクを送ります。確認すると、次のことができます。</p>
 			<VerifyBenefits />
