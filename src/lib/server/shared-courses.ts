@@ -344,7 +344,7 @@ export async function restoreShared(
 	db: Db,
 	{ userId, course, editId, version }: { userId: string; course: SharedCourse; editId: string; version: number }
 ) {
-	if (course.version !== version) return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度お試しください' };
+	if (course.version !== version) return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください' };
 	const edit = await db
 		.select({ diff: sharedCourseEdits.diff })
 		.from(sharedCourseEdits)
@@ -364,7 +364,7 @@ export async function restoreShared(
 	try {
 		await db.batch(written.statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 	} catch {
-		return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度お試しください' };
+		return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください' };
 	}
 	return { restored: true };
 }

@@ -18,7 +18,7 @@ export const actions: Actions = {
 			result = await deleteAccount(platform.env, locals.db, locals.user.id);
 		} catch (e) {
 			console.error('account deletion failed', e);
-			return fail(502, { message: '資料のファイルを消せませんでした。時間をおいてもう一度お試しください' });
+			return fail(502, { message: '資料のファイルを消せませんでした。時間をおいてもう一度やり直してください' });
 		}
 		// Many files take several rounds; the page sends the form again.
 		if (result === 'more') return { more: true };

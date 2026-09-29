@@ -14,7 +14,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 	});
 	if (!res.ok) {
 		const data = (await res.json().catch(() => null)) as { message?: string } | null;
-		throw new Error(data?.message ?? 'うまくいきませんでした。もう一度お試しください');
+		throw new Error(data?.message ?? 'うまくいきませんでした。もう一度やり直してください');
 	}
 	return (await res.json()) as T;
 }

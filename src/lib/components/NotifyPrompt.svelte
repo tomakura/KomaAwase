@@ -86,14 +86,14 @@
 			if (!result.ok) {
 				message =
 					result.state === 'denied'
-						? 'この端末では通知が許可されていません。端末の設定で許可してから、もう一度お試しください'
+						? 'この端末では通知が許可されていません。端末の設定で許可してから、もう一度やり直してください'
 						: (result.message ?? null);
 				busy = false;
 				return;
 			}
 		}
 		if (await reminderOn()) done = true;
-		else message = '設定できませんでした。「その他」→「通知」からお試しください';
+		else message = '設定できませんでした。「その他」→「通知」から設定してください';
 		busy = false;
 	}
 </script>

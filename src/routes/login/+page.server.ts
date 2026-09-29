@@ -39,7 +39,7 @@ export const actions: Actions = {
 			console.error('sign-in mail failed', e);
 			// Drop the unsent link so it doesn't count toward the per-address limit.
 			await consumeEmailToken(locals.db, token);
-			return fail(502, { message: 'メールを送れませんでした。時間をおいてもう一度お試しください' });
+			return fail(502, { message: 'メールを送れませんでした。時間をおいてもう一度やり直してください' });
 		}
 		return { sentTo: email };
 	}

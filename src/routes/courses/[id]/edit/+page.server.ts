@@ -45,7 +45,7 @@ export const actions: Actions = {
 		} catch (e) {
 			if (isHttpError(e)) throw e;
 			console.error('course delete failed', e);
-			return fail(502, { message: '資料を消せなかったので、授業も消していません。時間をおいてもう一度お試しください' });
+			return fail(502, { message: '資料を消せなかったので、授業も消していません。時間をおいてもう一度やり直してください' });
 		}
 		redirect(303, timetableHref(url.searchParams.get('term')));
 	}

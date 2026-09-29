@@ -27,7 +27,7 @@ export const actions: Actions = {
 		if ('message' in shape) return fail(400, { message: shape.message });
 		const days = readDays(form);
 		const theme = readTheme(form);
-		if (!days || !theme) return fail(400, { message: '入力を読み取れませんでした。もう一度お試しください' });
+		if (!days || !theme) return fail(400, { message: '入力を読み取れませんでした。もう一度やり直してください' });
 
 		const name = String(form.get('university') ?? '').trim();
 		const university = name ? await findOrCreateUniversity(locals.db, name) : null;

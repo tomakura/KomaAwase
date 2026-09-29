@@ -26,7 +26,7 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 		console.error('import enqueue failed', e);
 		// Out of line it would only hold one of the user's places, so it goes (and isn't counted).
 		await locals.db.delete(importJobs).where(eq(importJobs.id, created.id));
-		return json({ message: '混み合っています。少し待ってからもう一度お試しください' }, { status: 503 });
+		return json({ message: '混み合っています。少し待ってからもう一度やり直してください' }, { status: 503 });
 	}
 	return json({ id: created.id });
 };

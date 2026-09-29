@@ -108,11 +108,11 @@ export const actions: Actions = {
 		try {
 			raw = JSON.parse(String(form.get('rows') ?? '[]'));
 		} catch {
-			return fail(400, { message: '入力を読み取れませんでした。もう一度お試しください' });
+			return fail(400, { message: '入力を読み取れませんでした。もう一度やり直してください' });
 		}
 		if (!Array.isArray(raw) || !raw.length) return fail(400, { message: '追加する授業を1つ以上選んでください' });
 		if (!raw.every((r) => isObject(r) && (r.slots === undefined || (Array.isArray(r.slots) && r.slots.every(isObject))))) {
-			return fail(400, { message: '入力を読み取れませんでした。もう一度お試しください' });
+			return fail(400, { message: '入力を読み取れませんでした。もう一度やり直してください' });
 		}
 		// Checked field by field again below (parseCourseForm); here only the shape
 		const rows: Row[] = raw.slice(0, IMPORT_COURSES_MAX).map((r) => ({

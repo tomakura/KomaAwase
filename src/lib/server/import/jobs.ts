@@ -19,7 +19,7 @@ export const IMAGE_MAX = 1_500_000;
 
 export async function createImportJob(db: Db, userId: string, timetableId: string, image: string, tiled = false) {
 	if (image.length > IMAGE_MAX || !IMAGE_PATTERN.test(image)) {
-		return { message: '画像を読み込めませんでした。別の画像でお試しください' };
+		return { message: '画像を読み込めませんでした。別の画像でやり直してください' };
 	}
 	const since = new Date(Date.now() - DAY);
 	const [[today], [active]] = await db.batch([
@@ -32,7 +32,7 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 			.from(importJobs)
 			.where(and(eq(importJobs.userId, userId), inArray(importJobs.status, ['queued', 'processing', 'retry'])))
 	]);
-	if ((today?.n ?? 0) >= DAILY_LIMIT) return { message: `読み込みは1日${DAILY_LIMIT}回までです。明日またお試しください` };
+	if ((today?.n ?? 0) >= DAILY_LIMIT) return { message: `読み込みは1日${DAILY_LIMIT}回までです。明日またやり直してください` };
 	if ((active?.n ?? 0) >= ACTIVE_LIMIT) return { message: '読み込み中のものが終わってから、次の画像を送ってください' };
 	const row = await db
 		.insert(importJobs)

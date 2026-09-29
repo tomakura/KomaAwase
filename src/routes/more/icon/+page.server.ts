@@ -25,7 +25,7 @@ export const actions: Actions = {
 		const sent = String(form.get('photo') ?? '');
 		if (sent) {
 			const base64 = photoFromDataUrl(sent);
-			if (!base64) return fail(400, { message: '写真を読み込めませんでした。別の写真でお試しください' });
+			if (!base64) return fail(400, { message: '写真を読み込めませんでした。別の写真でやり直してください' });
 			await setPhoto(locals.db, locals.user, base64, { color, text });
 		} else {
 			// The photo already set stays; the letters show while it loads
