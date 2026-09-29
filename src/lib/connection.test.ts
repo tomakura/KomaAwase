@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Connection, type Env } from './connection.svelte';
-import { SAVED_AT_HEADER, SYNCED_KEY, SYNC_HEADER } from './offline';
+import { FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER } from './offline';
+import { SYNC_KEYS } from './sync';
 
 const ORIGIN = 'https://koma.test';
 
@@ -10,13 +11,18 @@ class FakeForm {
 
 // The browser, as far as the connection reaches it: the page, the window's events, storage
 // and a network that can be up, down, or so slow that nothing comes back.
-function setup(opts: { onLine?: boolean; cachedAt?: number; signedIn?: boolean; cached?: string[]; synced?: boolean } = {}) {
+// Every page of a sync fetched just now, as the app keeps the record
+const allFresh = (ago = 0) => JSON.stringify({ version: 'v1', at: Object.fromEntries([...SYNC_KEYS].map((key) => [key, Date.now() - ago])) });
+
+function setup(
+	opts: { onLine?: boolean; cachedAt?: number; signedIn?: boolean; cached?: string[]; synced?: boolean | string; path?: string; saveData?: boolean } = {}
+) {
 	const page = new Map<string, (e?: unknown) => void>();
 	const win = new Map<string, () => void>();
 	const stored = new Map<string, string>();
-	if (opts.synced) stored.set(SYNCED_KEY, String(Date.now()));
+	if (opts.synced) stored.set(FRESH_KEY, typeof opts.synced === 'string' ? opts.synced : allFresh());
 	const root = { dataset: {} as Record<string, string>, style: { setProperty() {}, removeProperty() {} } };
-	const browser = { onLine: opts.onLine ?? true };
+	const browser = { onLine: opts.onLine ?? true, connection: { saveData: opts.saveData ?? false } };
 	const attributes = new Map<string, string>([['data-sveltekit-preload-data', 'hover']]);
 	vi.stubGlobal('document', {
 		hidden: false,
@@ -61,7 +67,7 @@ function setup(opts: { onLine?: boolean; cachedAt?: number; signedIn?: boolean; 
 		return new Response(url === '/' ? '<html></html>' : '{"type":"data","nodes":[]}');
 	});
 	const invalidate = vi.fn(async () => {});
-	const env: Env = { origin: ORIGIN, fetch: fetcher as unknown as typeof fetch, invalidate, signedIn: opts.signedIn ?? true };
+	const env: Env = { origin: ORIGIN, path: opts.path ?? '/friends', version: 'v1', fetch: fetcher as unknown as typeof fetch, invalidate, signedIn: opts.signedIn ?? true };
 	const connection = new Connection();
 	const stop = connection.start(env);
 	return { connection, net, asked, fetcher, invalidate, page, win, stored, browser, root: document.documentElement, stop, saved: opts.cached, attributes };
@@ -85,30 +91,100 @@ describe('starting', () => {
 		expect(connection.visible).toBe(false);
 	});
 
-	it('refreshes when a tab has no copy, even if the last refresh was recent (a new version clears them)', async () => {
+	it('fetches only the tab whose copy is gone, even if the last sync was recent (a new version clears them)', async () => {
 		const { asked } = setup({ synced: true, cached: ['/', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
-		expect(asked).toHaveLength(5);
+		expect(asked).toEqual(['/overlay/__data.json']);
 	});
 
-	it('takes what is on screen as fetched now', () => {
-		vi.setSystemTime(new Date('2026-09-29T03:30:00Z'));
-		const { connection } = setup();
-		expect(connection.shownAt).toBe(Date.now());
+	it('fetches only what is out of date: the timetable after 15 minutes, the other tabs after 3 hours', async () => {
+		const ago = (minutes: number) => allFresh(minutes * 60_000);
+		const quarter = setup({ synced: ago(16), cached: ['/', '/overlay', '/friends', '/more'] });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(quarter.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/']);
+		quarter.stop();
+
+		const hours = setup({ synced: ago(181), cached: ['/', '/overlay', '/friends', '/more'] });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(hours.asked).toHaveLength(5);
+		hours.stop();
+
+		const recent = setup({ synced: ago(14), cached: ['/', '/overlay', '/friends', '/more'] });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(recent.asked).toEqual([]);
 	});
 
-	it('refreshes the copies a few seconds after opening when they are old', async () => {
-		const { asked } = setup({ cached: ['/'] });
-		await vi.advanceTimersByTimeAsync(3_000);
-		expect(asked).toEqual([]);
+	it('does not fetch a page that was just opened: its answer counts, and so does a page loaded from the server', async () => {
+		const opened = setup({ path: '/', synced: false, cached: ['/', '/overlay', '/friends', '/more'] });
+		// The top page came with the app: its HTML is fresh, its data is not yet
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(opened.asked).toContain('/__data.json?x-sveltekit-trailing-slash=1');
+		expect(opened.asked).not.toContain('/');
+		opened.stop();
+
+		const s = setup({ synced: ago(200), cached: ['/', '/overlay', '/friends', '/more'] });
+		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
+		// Opened by a link: SvelteKit asks with the parts to reload, which is the same page
+		await fetch('/friends/__data.json?x-sveltekit-invalidated=01');
+		await fetch('/overlay/__data.json?x-sveltekit-invalidated=11');
+		await vi.advanceTimersByTimeAsync(5_000);
+		// The timetable and 'その他' are out of date; the two tabs just opened are not fetched again
+		expect(s.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/', '/more/__data.json']);
+		function ago(minutes: number) {
+			return allFresh(minutes * 60_000);
+		}
+	});
+
+	it('makes the overlay and その他 out of date after a change, whatever their age, for the next sync', async () => {
+		const s = setup({ synced: true });
+		await flush(); // the decision made when the app opens comes first
+		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
+		await fetch('/courses/abc/edit', { method: 'POST' });
+		const recorded = JSON.parse(s.stored.get(FRESH_KEY)!).at;
+		expect(Object.keys(recorded)).not.toContain('/overlay/__data.json');
+		expect(Object.keys(recorded)).not.toContain('/more/__data.json');
+		expect(Object.keys(recorded)).toContain('/friends/__data.json');
+
+		// The timetable is refreshed once things settle; the two tabs wait for the next sync
+		await vi.advanceTimersByTimeAsync(7_000);
+		expect(s.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/']);
+		s.asked.length = 0;
+		s.page.get('visibilitychange')!();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(s.asked).toEqual(['/overlay/__data.json', '/more/__data.json']);
+	});
+
+	it('does not count an answer from a saved copy as fresh', async () => {
+		const s = setup({ synced: allFresh(200 * 60_000), cached: ['/', '/overlay', '/friends', '/more'] });
+		const fetch = s.connection.observe(
+			(async () => new Response('{}', { headers: { [SAVED_AT_HEADER]: String(Date.now() - 1000) } })) as typeof globalThis.fetch,
+			ORIGIN
+		);
+		s.net.hang = true;
+		await fetch('/friends/__data.json');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(JSON.parse(s.stored.get(FRESH_KEY)!).at['/friends/__data.json']).toBeLessThan(Date.now() - 100 * 60_000);
+	});
+
+	it('remembers the pages by the version of the app: a new one starts again', async () => {
+		const s = setup({ synced: JSON.stringify({ version: 'v0', at: JSON.parse(allFresh()).at }), cached: ['/', '/overlay', '/friends', '/more'] });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(s.asked).toHaveLength(5);
+	});
+
+	it('syncs only the timetable when the browser asks to spare data, but everything when the button is pressed', async () => {
+		const s = setup({ saveData: true, synced: false, cached: ['/', '/overlay', '/friends', '/more'] });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(s.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/']);
+
+		s.asked.length = 0;
+		s.net.up = false;
+		s.connection.link = 'offline';
+		await flush();
+		s.net.up = true;
+		s.connection.refresh();
 		await vi.advanceTimersByTimeAsync(2_000);
-		expect(asked).toEqual([
-			'/__data.json?x-sveltekit-trailing-slash=1',
-			'/',
-			'/overlay/__data.json',
-			'/friends/__data.json',
-			'/more/__data.json'
-		]);
+		expect(s.asked.filter((u) => !u.startsWith('/api/ping'))).toHaveLength(5);
 	});
 
 	it('does not touch the network for a signed-out user', async () => {
@@ -158,7 +234,7 @@ describe('when the connection is down', () => {
 			'/more/__data.json'
 		]);
 		expect(document.documentElement.dataset.offline).toBeUndefined();
-		expect(s.stored.get(SYNCED_KEY)).toBeTruthy();
+		expect(JSON.parse(s.stored.get(FRESH_KEY)!).at['/more/__data.json']).toBeGreaterThan(0);
 		// It says so for a moment
 		expect(s.connection.recovered).toBe(true);
 		expect(s.connection.visible).toBe(true);
@@ -170,7 +246,7 @@ describe('when the connection is down', () => {
 	it('keeps trying, with longer waits, while nothing comes back', async () => {
 		const s = setup({ cachedAt: Date.UTC(2026, 8, 28, 3, 0) });
 		s.net.hang = true;
-		// Each check gives up after 6s; the waits between are 5s, 10s, 20s, then 30s every time
+		// Each check gives up after 6s; the waits between are 5s, 10s, 20s, 30s, then a minute each time
 		const at = async (seconds: number) => {
 			await vi.advanceTimersByTimeAsync(seconds * 1000 - (Date.now() - start));
 			return pings(s.asked);
@@ -186,14 +262,14 @@ describe('when the connection is down', () => {
 		expect(await at(53)).toBe(4);
 		expect(await at(88.9)).toBe(4);
 		expect(await at(89)).toBe(5);
-		expect(await at(124.9)).toBe(5);
-		expect(await at(125)).toBe(6);
+		expect(await at(154.9)).toBe(5);
+		expect(await at(155)).toBe(6);
 
-		// The try that started at 125s is stuck until 131s; the one after it, at 161s, gets through
+		// The try that started at 155s is stuck until 161s; the one after it, at 221s, gets through
 		s.net.hang = false;
-		await at(160.9);
+		await at(220.9);
 		expect(s.connection.link).toBe('poor');
-		await at(161);
+		await at(221);
 		expect(s.connection.link).toBe('online');
 	});
 
@@ -219,7 +295,7 @@ describe('when the connection is down', () => {
 		expect(s.connection.link).toBe('offline');
 	});
 
-	it('goes on when the refresh fails partway, and keeps the state', async () => {
+	it('keeps what a refresh got done when it fails partway', async () => {
 		const s = setup({ cachedAt: 1 });
 		s.fetcher.mockImplementation(async (input: RequestInfo | URL) => {
 			const url = String(input);
@@ -230,7 +306,9 @@ describe('when the connection is down', () => {
 		await flush();
 		expect(s.connection.link).toBe('offline');
 		expect(s.invalidate).not.toHaveBeenCalled();
-		expect(s.stored.get(SYNCED_KEY)).toBeUndefined();
+		// What was fetched before the failure is kept, so the next try starts where this one stopped
+		const fresh = Object.keys(JSON.parse(s.stored.get(FRESH_KEY)!).at);
+		expect(fresh).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/', '/overlay/__data.json']);
 	});
 
 	it('turns the refresh button around at least a moment, then says if it is still down', async () => {
@@ -455,6 +533,7 @@ describe('watching what goes by', () => {
 
 	it('refreshes the copy of the timetable once things settle after a change', async () => {
 		const s = setup({ synced: true });
+		await flush();
 		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
 		await fetch('/courses/new', { method: 'POST' });
 		await fetch('/courses/new', { method: 'POST' });

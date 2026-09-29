@@ -2,7 +2,9 @@
 	import '../app.css';
 	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
+	import { version } from '$app/environment';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
+	import NavigationWait from '$lib/components/NavigationWait.svelte';
 	import { connection } from '$lib/connection.svelte';
 	import { pageData } from '$lib/page-data';
 
@@ -66,6 +68,8 @@
 		const signedIn = data.signedIn;
 		return connection.start({
 			origin: location.origin,
+			path: location.pathname,
+			version,
 			fetch: (...args) => (browserFetch ?? fetch)(...args),
 			invalidate: () => invalidateAll(),
 			signedIn
@@ -116,4 +120,5 @@
 </svelte:head>
 
 <ConnectionBar />
+<NavigationWait />
 {@render children()}

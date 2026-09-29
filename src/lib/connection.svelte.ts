@@ -6,12 +6,26 @@
 // copies are refreshed as soon as the server answers again (a small request checks, backing off),
 // and whatever needs the server is switched off with a message instead of failing.
 // The service worker (src/service-worker.ts) keeps the copies; src/lib/sync.ts lists the pages.
-import { CACHED_AT_ATTRIBUTE, SAVED_AT_HEADER, SYNCED_KEY, SYNC_HEADER, cachedPaths } from './offline';
-import { SYNC_STEPS, TIMETABLE_STEPS, needsServer, openableOffline, runSync, type SyncProgress } from './sync';
+import { CACHED_AT_ATTRIBUTE, FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER, cachedPaths } from './offline';
+import {
+	SYNC_KEYS,
+	SYNC_STEPS,
+	TIMETABLE_STEPS,
+	dueSteps,
+	needsServer,
+	openableOffline,
+	runSync,
+	syncKey,
+	type SyncProgress
+} from './sync';
 
 export type Link = 'online' | 'poor' | 'offline';
 export type Env = {
 	origin: string;
+	/** The page the app was opened on */
+	path: string;
+	/** The app's version: a new one clears the copies on the device */
+	version: string;
 	/** The browser's own fetch, for the app's requests about the connection */
 	fetch: typeof fetch;
 	/** Loads what is on screen again */
@@ -22,11 +36,9 @@ export type Env = {
 // A check that takes longer than this counts as a poor connection
 const PING_TIMEOUT = 6_000;
 const REQUEST_TIMEOUT = 15_000;
-// The copies are refreshed when the app opens if they are older than this
-const FRESH_MS = 15 * 60_000;
 const START_DELAY = 4_000;
-// Between tries while the connection is down: quick at first, then every 30 seconds
-const RETRY_MS = [5_000, 10_000, 20_000, 30_000];
+// Between tries while the connection is down: quick at first, then once a minute
+const RETRY_MS = [5_000, 10_000, 20_000, 30_000, 60_000];
 // A quick sync shows no bar; one that takes longer than this does
 const PROGRESS_DELAY = 1_200;
 // The refresh button keeps turning at least this long, so a press is seen to do something
@@ -35,6 +47,7 @@ const RECOVERED_MS = 2_500;
 const TOAST_MS = 4_000;
 // After a change, the copy of the timetable is out of date; it is refreshed once things settle
 const CHANGE_DELAY = 6_000;
+const STALE_AFTER_CHANGE = ['/overlay/__data.json', '/more/__data.json'];
 
 // The attribute on <body> that has links prepare their page when the pointer nears (src/app.html)
 const PRELOAD = 'data-sveltekit-preload-data';
@@ -44,19 +57,15 @@ const CAUSE = { offline: 'オフラインのため', poor: '通信が不安定�
 const onLine = () => typeof navigator === 'undefined' || navigator.onLine !== false;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 
-function readSyncedAt() {
-	try {
-		return Number(localStorage.getItem(SYNCED_KEY)) || null;
-	} catch {
-		return null;
-	}
-}
+// Asked by the browser to spare data (Chrome on Android, mostly)
+const savingData = () => typeof navigator !== 'undefined' && (navigator as { connection?: { saveData?: boolean } }).connection?.saveData === true;
 
-function writeSyncedAt(ms: number) {
+function readFresh(version: string): Record<string, number> {
 	try {
-		localStorage.setItem(SYNCED_KEY, String(ms));
+		const saved = JSON.parse(localStorage.getItem(FRESH_KEY) ?? 'null');
+		return saved?.version === version && saved.at && typeof saved.at === 'object' ? saved.at : {};
 	} catch {
-		// Kept in memory only
+		return {};
 	}
 }
 
@@ -78,7 +87,8 @@ export class Connection {
 	#booted = false;
 	#running = false;
 	#failures = 0;
-	#syncedAt: number | null = null;
+	// When each page of a sync was last fetched, by syncKey: kept on the device
+	#fresh: Record<string, number> = {};
 	#cached: Set<string> | null = null;
 	#noticeId = 0;
 	#retry?: ReturnType<typeof setTimeout>;
@@ -128,12 +138,15 @@ export class Connection {
 	 */
 	start(env: Env) {
 		this.#env = env;
+		if (!env.signedIn) this.#fresh = {};
 		if (!this.#booted) {
 			this.#booted = true;
 			// A page opened from a copy says when the copy was saved
 			const stamp = Number(document.documentElement.getAttribute(CACHED_AT_ATTRIBUTE));
 			this.shownAt = stamp > 0 ? stamp : env.signedIn ? Date.now() : null;
-			this.#syncedAt = readSyncedAt();
+			if (env.signedIn) this.#fresh = readFresh(env.version);
+			// The page came from the server just now, and the service worker kept it
+			if (env.signedIn && stamp <= 0 && env.path === '/') this.#markFresh('/');
 			this.link = !onLine() ? 'offline' : stamp > 0 ? 'poor' : 'online';
 		}
 
@@ -154,7 +167,7 @@ export class Connection {
 
 		void this.#scan().then(() => {
 			if (this.link !== 'online') void this.attempt();
-			else if (env.signedIn && this.#stale()) this.#begin = setTimeout(() => void this.attempt(), START_DELAY);
+			else if (env.signedIn && this.#due().length) this.#begin = setTimeout(() => void this.attempt(), START_DELAY);
 		});
 
 		return () => {
@@ -239,7 +252,7 @@ export class Connection {
 		const slowTimer = setTimeout(() => (this.slow = true), PROGRESS_DELAY);
 		let ok = false;
 		try {
-			ok = await this.#connect(env, wasDown, opts.probe ?? false);
+			ok = await this.#connect(env, wasDown, opts.probe ?? false, opts.manual ?? false);
 			if (opts.manual) await pause(MIN_SPIN - (Date.now() - began));
 		} finally {
 			clearTimeout(slowTimer);
@@ -255,7 +268,7 @@ export class Connection {
 		}
 	}
 
-	async #connect(env: Env, wasDown: boolean, probe: boolean) {
+	async #connect(env: Env, wasDown: boolean, probe: boolean, force: boolean) {
 		if (wasDown || probe) {
 			this.phase = 'checking';
 			const ping = await this.#ping(env);
@@ -272,27 +285,29 @@ export class Connection {
 		}
 		if (!env.signedIn) return true;
 
-		this.phase = 'syncing';
-		const result = await runSync(SYNC_STEPS, {
-			fetch: env.fetch,
-			timeout: REQUEST_TIMEOUT,
-			progress: (progress) => (this.progress = progress)
-		});
-		if (!result.ok) {
-			if (result.reason === 'offline') this.link = 'offline';
-			else if (result.reason === 'slow') this.link = 'poor';
-			else if (result.reason === 'signed-out') {
-				// The server answered; there is just nothing to keep for a signed-out user
-				this.link = 'online';
-				return true;
+		// Only what is out of date (all of it when asked to, with the refresh button)
+		const steps = this.#due(force);
+		if (steps.length) {
+			this.phase = 'syncing';
+			const result = await runSync(steps, {
+				fetch: env.fetch,
+				timeout: REQUEST_TIMEOUT,
+				progress: (progress) => (this.progress = progress),
+				done: (url) => this.#markFresh(url)
+			});
+			if (!result.ok) {
+				if (result.reason === 'offline') this.link = 'offline';
+				else if (result.reason === 'slow') this.link = 'poor';
+				else if (result.reason === 'signed-out') {
+					// The server answered; there is just nothing to keep for a signed-out user
+					this.link = 'online';
+					return true;
+				}
+				return false;
 			}
-			return false;
+			await this.#scan();
 		}
-
-		this.#syncedAt = Date.now();
-		writeSyncedAt(this.#syncedAt);
 		this.#failures = 0;
-		await this.#scan();
 		if (wasDown) {
 			this.link = 'online';
 			this.recovered = true;
@@ -332,12 +347,38 @@ export class Connection {
 
 	#wake() {
 		if (this.blocked) void this.attempt();
-		else if (this.#env?.signedIn && this.#stale()) void this.attempt();
+		else if (this.#env?.signedIn && this.#due().length) void this.attempt();
 	}
 
-	#stale() {
-		const missing = this.#cached ? SYNC_STEPS.some((s) => !this.#cached!.has(s.path)) : false;
-		return missing || !this.#syncedAt || Date.now() - this.#syncedAt > FRESH_MS;
+	/** What a sync would fetch now; `force` fetches all of it */
+	#due(force = false, maxAge?: number, steps = SYNC_STEPS) {
+		return dueSteps(steps, {
+			now: Date.now(),
+			fresh: this.#fresh,
+			cached: this.#cached,
+			maxAge: force ? 0 : maxAge,
+			lean: !force && savingData()
+		});
+	}
+
+	#markFresh(key: string) {
+		if (!SYNC_KEYS.has(key)) return;
+		this.#fresh[key] = Date.now();
+		this.#remember();
+	}
+
+	/** Takes pages off the record of what is fresh: their copies are out of date, and the next sync fetches them */
+	#forget(keys: string[]) {
+		for (const key of keys) delete this.#fresh[key];
+		this.#remember();
+	}
+
+	#remember() {
+		try {
+			localStorage.setItem(FRESH_KEY, JSON.stringify({ version: this.#env?.version, at: this.#fresh }));
+		} catch {
+			// Kept in memory only
+		}
 	}
 
 	async #scan() {
@@ -358,6 +399,8 @@ export class Connection {
 			}
 		} else if (res.ok) {
 			this.shownAt = Date.now();
+			// The service worker kept this answer: it is as good as a sync of that page
+			this.#markFresh(syncKey(url));
 			// The server just answered; don't wait for the next try
 			if (this.blocked && !this.#running) void this.attempt();
 		}
@@ -369,6 +412,10 @@ export class Connection {
 	}
 
 	#changed() {
+		// Pages made from the timetable are out of date too: the overlay shows it beside friends',
+		// and その他 names the term and the periods. They wait for the next sync (3 hours is fine
+		// for a tab nobody changed, not for one this change touched).
+		this.#forget(STALE_AFTER_CHANGE);
 		clearTimeout(this.#change);
 		this.#change = setTimeout(() => void this.#refreshTimetable(), CHANGE_DELAY);
 	}
@@ -377,9 +424,9 @@ export class Connection {
 	async #refreshTimetable() {
 		const env = this.#env;
 		if (!env?.signedIn || this.#running || this.blocked) return;
-		await runSync(TIMETABLE_STEPS, { fetch: env.fetch, timeout: REQUEST_TIMEOUT });
-		this.#syncedAt = Date.now();
-		writeSyncedAt(this.#syncedAt);
+		// What was fetched since the change is already right (the page it left for, usually)
+		const steps = this.#due(false, CHANGE_DELAY, TIMETABLE_STEPS);
+		if (steps.length) await runSync(steps, { fetch: env.fetch, timeout: REQUEST_TIMEOUT, done: (url) => this.#markFresh(url) });
 	}
 
 	#guardSubmit(e: SubmitEvent) {
