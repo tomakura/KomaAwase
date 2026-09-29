@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { NICKNAME_MAX, isNickname } from '$lib/icons';
+import { readIcon, saveIcon } from '$lib/server/icon';
 import { passkeys, users } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -11,17 +12,21 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(passkeys)
 		.where(eq(passkeys.userId, locals.user.id))
 		.get();
-	return { nickname: locals.user.nickname, hasPasskey: !!passkey };
+	return { id: locals.user.id, nickname: locals.user.nickname, hasPasskey: !!passkey };
 };
 
 export const actions: Actions = {
 	nickname: async ({ request, locals }) => {
 		if (!locals.user) redirect(303, '/login');
-		const nickname = String((await request.formData()).get('nickname') ?? '').trim();
+		const form = await request.formData();
+		const nickname = String(form.get('nickname') ?? '').trim();
 		if (!isNickname(nickname)) {
 			return fail(400, { message: `ニックネームは1〜${NICKNAME_MAX}文字で入れてください` });
 		}
+		const icon = readIcon(form);
+		if ('message' in icon) return fail(400, { message: icon.message });
 		await locals.db.update(users).set({ nickname }).where(eq(users.id, locals.user.id));
+		await saveIcon(locals.db, { ...locals.user, nickname }, icon);
 		// locals.user is from before the update; a fresh request reads the saved nickname.
 		redirect(303, '/welcome');
 	}

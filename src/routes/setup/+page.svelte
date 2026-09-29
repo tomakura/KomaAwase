@@ -2,9 +2,7 @@
 	import { enhance } from '$app/forms';
 	import DayPicker from '$lib/components/DayPicker.svelte';
 	import PeriodsEditor from '$lib/components/PeriodsEditor.svelte';
-	import Segmented from '$lib/components/Segmented.svelte';
 	import TermsEditor from '$lib/components/TermsEditor.svelte';
-	import { THEMES, applyTheme, type Theme } from '$lib/theme';
 
 	let { data, form } = $props();
 
@@ -16,8 +14,6 @@
 	let periods = $state(data.periods);
 	// svelte-ignore state_referenced_locally
 	let days = $state(data.days);
-	// svelte-ignore state_referenced_locally
-	let theme = $state<Theme>(data.theme);
 	let saving = $state(false);
 
 	const normalized = (name: string) => name.normalize('NFKC').replace(/\s+/g, ' ').trim();
@@ -96,11 +92,6 @@
 		<div class="field">
 			<span class="label">表示する曜日</span>
 			<DayPicker bind:days name="days" />
-		</div>
-
-		<div class="field">
-			<span class="label">テーマ</span>
-			<Segmented options={THEMES} bind:value={theme} label="テーマ" name="theme" onchange={applyTheme} />
 		</div>
 
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
