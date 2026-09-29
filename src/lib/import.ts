@@ -62,6 +62,41 @@ export const IMPORT_PROMPT = [
 	'- 読めない文字を想像で埋めない'
 ].join('\n');
 
+// A screenshot whose cells the browser has cut out and stacked, each with a pink tag beside it
+// (see import-grid.ts). The tag says which column and row the cell came from, so the AI never
+// has to count columns. Tags ending in 0 are the weekday headings.
+export const IMPORT_TILE_SCHEMA = {
+	type: 'object',
+	properties: {
+		courses: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					cell: { type: 'string', description: 'そのマスの左にあるピンクの札の文字。例 B1' },
+					title: { type: 'string', description: '授業名。空のマスは空文字' },
+					teacher: { type: 'string', description: '先生の名前。なければ空文字' },
+					room: { type: 'string', description: '教室。なければ空文字' }
+				},
+				required: ['cell', 'title', 'teacher', 'room'],
+				additionalProperties: false
+			}
+		}
+	},
+	required: ['courses'],
+	additionalProperties: false
+} as const;
+
+export const IMPORT_TILE_PROMPT = [
+	'これは大学の時間割のマスを縦に並べた画像です。各マスの左に、ピンクの札で B1 のような印があります。',
+	'すべてのマスについて、次の4つを書き出してください。',
+	'- cell: そのマスの左にあるピンクの札の文字（例 B1）',
+	'- title: そのマスの太字の授業名の1行だけ（先生名・8桁の数字・N単位・複数回は含めない）。札が A0 のように0で終わるマスは曜日の見出しなので、title に曜日を書く',
+	'- teacher: 先生の名前（なければ空文字）',
+	'- room: 教室（なければ空文字）',
+	'読めない文字を想像で埋めない'
+].join('\n');
+
 const DAYS = '月火水木金土日';
 const DAYS_EN = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -74,10 +109,15 @@ function weekdayOf(header: unknown) {
 	return en >= 0 ? en + 1 : null;
 }
 
-/** The copied table as one entry per filled cell. A header it can't read follows the one before it. */
-function cellsOfGrid(days: unknown[], rows: unknown[]) {
+// The weekday of each column. A header it can't read follows the one before it.
+function weekdaysOf(days: unknown[]) {
 	let previous = 0;
-	const weekdays = days.map((d) => (previous = weekdayOf(d) ?? previous + 1));
+	return days.map((d) => (previous = weekdayOf(d) ?? previous + 1));
+}
+
+/** The copied table as one entry per filled cell. */
+function cellsOfGrid(days: unknown[], rows: unknown[]) {
+	const weekdays = weekdaysOf(days);
 	const out: Record<string, unknown>[] = [];
 	let lastPeriod = 0;
 	for (const row of rows) {
@@ -103,6 +143,37 @@ function cellsOfGrid(days: unknown[], rows: unknown[]) {
 		});
 	}
 	return out;
+}
+
+// A tag is the column as a letter and the row as a number: B3 is the second column, third row.
+// Row 0 is the weekday headings. The column decides the weekday, the row the period.
+const TAG = /^([A-H])(\d{1,2})$/;
+
+/** Reads what the AI wrote beside each tag of a stack of cells (IMPORT_TILE_PROMPT) */
+function cellsOfTiles(tiles: unknown[]) {
+	const headings: unknown[] = [];
+	const found: { col: number; period: number; cell: { title?: unknown; room?: unknown; teacher?: unknown } }[] = [];
+	for (const tile of tiles) {
+		if (typeof tile !== 'object' || tile === null) continue;
+		const t = tile as { cell?: unknown; title?: unknown; room?: unknown; teacher?: unknown };
+		const tag = typeof t.cell === 'string' ? TAG.exec(t.cell.normalize('NFKC').replace(/\s+/g, '').toUpperCase()) : null;
+		if (!tag) continue;
+		const col = tag[1].charCodeAt(0) - 65;
+		const period = Number(tag[2]);
+		if (period === 0) headings[col] = t.title;
+		else found.push({ col, period, cell: t });
+	}
+	// A column with no heading follows the one before it
+	const columns = Math.max(headings.length, ...found.map((f) => f.col + 1));
+	const weekdays = weekdaysOf(Array.from({ length: columns }, (_, i) => headings[i]));
+	return found.map(({ col, period, cell }) => ({
+		title: cell.title,
+		weekday: weekdays[col],
+		period,
+		span: 1,
+		room: cell.room,
+		teachers: typeof cell.teacher === 'string' ? splitTeachers(cell.teacher) : []
+	}));
 }
 
 /** Names separated by 、 , ／ or a new line. A space stays inside a name (「山田 太郎」). */
@@ -171,10 +242,13 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 		}
 	}
 	const answer = raw as { courses?: unknown; days?: unknown; rows?: unknown } | null;
+	const tiled = Array.isArray(answer?.courses) && answer.courses.some((c) => typeof (c as { cell?: unknown } | null)?.cell === 'string');
 	const list =
 		Array.isArray(answer?.days) && Array.isArray(answer?.rows)
 			? cellsOfGrid(answer.days, answer.rows)
-			: answer?.courses;
+			: tiled
+				? cellsOfTiles(answer!.courses as unknown[])
+				: answer?.courses;
 	if (!Array.isArray(list)) return null;
 
 	const out: ImportedCourse[] = [];

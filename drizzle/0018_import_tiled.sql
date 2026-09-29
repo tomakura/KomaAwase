@@ -1,0 +1,1 @@
+ALTER TABLE `import_jobs` ADD `tiled` integer DEFAULT false NOT NULL;
