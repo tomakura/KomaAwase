@@ -18,8 +18,6 @@
 		alt=""
 		width={size}
 		height={size}
-		loading="lazy"
-		decoding="async"
 		onerror={() => (failed = icon.photo)}
 	/>
 {:else}
