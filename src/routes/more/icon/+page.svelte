@@ -47,67 +47,67 @@
 	</div>
 	{#if form?.message}<p class="error top" role="alert">{form.message}</p>{/if}
 
-	<section class="photo">
-		<h2>写真</h2>
-		<input class="file" type="file" accept="image/*" bind:this={photoInput} onchange={(e) => pickPhoto(e.currentTarget.files)} />
-		{#if photoSrc}
-			<PhotoPicker src={photoSrc} bind:this={picker} />
-			<form
-				method="POST"
-				action="?/photo"
-				use:enhance={({ formData, cancel }) => {
-					const url = picker?.render();
-					photoError = null;
-					if (url) formData.set('photo', url);
-					else {
-						// Not loaded (HEIC outside Safari, say) or too big even at low quality
-						photoError = 'この写真は使えませんでした。別の写真でお試しください';
-						cancel();
-					}
-				}}
-			>
+	<!-- The button sits inside the save form but belongs to this one, so forms aren't nested -->
+	<form id="remove-photo" method="POST" action="?/removePhoto" use:enhance hidden></form>
+
+	<form
+		method="POST"
+		action="?/save"
+		use:enhance={({ formData, cancel }) => {
+			photoError = null;
+			if (!photoSrc) return;
+			const url = picker?.render();
+			if (url) formData.set('photo', url);
+			else {
+				// Not loaded (HEIC outside Safari, say) or too big even at low quality
+				photoError = 'この写真は使えませんでした。別の写真でお試しください';
+				cancel();
+			}
+		}}
+	>
+		<section class="photo">
+			<h2>写真</h2>
+			<input class="file" type="file" accept="image/*" bind:this={photoInput} onchange={(e) => pickPhoto(e.currentTarget.files)} />
+			{#if photoSrc}
+				<PhotoPicker src={photoSrc} bind:this={picker} />
 				{#if photoError}<p class="error" role="alert">{photoError}</p>{/if}
 				<div class="row">
 					<button class="btn" type="button" onclick={cancelPhoto}>やめる</button>
-					<button class="btn btn-primary" type="submit">この写真にする</button>
 				</div>
-			</form>
-		{:else}
-			<div class="row">
-				<button class="btn" type="button" onclick={() => photoInput?.click()}>
-					{data.user.icon?.photo ? '写真を変える' : '写真を選ぶ'}
-				</button>
-				{#if data.user.icon?.photo}
-					<form method="POST" action="?/removePhoto" use:enhance>
-						<button class="btn" type="submit">写真をやめる</button>
-					</form>
-				{/if}
-			</div>
-			<p class="ui-note">写真は友だちとグループのメンバーに表示されます。</p>
-		{/if}
-	</section>
+			{:else}
+				<div class="row">
+					<button class="btn" type="button" onclick={() => photoInput?.click()}>
+						{data.user.icon?.photo ? '写真を変える' : '写真を選ぶ'}
+					</button>
+					{#if data.user.icon?.photo}
+						<button class="btn" type="submit" form="remove-photo">写真をやめる</button>
+					{/if}
+				</div>
+				<p class="ui-note">写真は友だちとグループのメンバーに表示されます。</p>
+			{/if}
+		</section>
 
-	<form method="POST" action="?/letters" use:enhance>
+		<div class="letters">
+			{#if data.user.icon?.photo}<p class="ui-note">文字と色は、写真が表示されるまでの間に使われます。</p>{/if}
+			<label class="field">
+				文字（{ICON_TEXT_MAX}文字まで）
+				<input name="text" bind:value={text} autocomplete="off" required />
+			</label>
 
-		{#if data.user.icon?.photo}<p class="ui-note">文字と色は、写真が表示されるまでの間に使われます。</p>{/if}
-		<label class="field">
-			文字（{ICON_TEXT_MAX}文字まで）
-			<input name="text" bind:value={text} autocomplete="off" required />
-		</label>
+			<fieldset>
+				<legend>色</legend>
+				<div class="colors">
+					{#each ICON_COLORS as c (c.id)}
+						<label class="swatch" style:--c={c.hex}>
+							<input type="radio" name="color" value={c.id} bind:group={color} />
+							<span class="visually-hidden">{c.label}</span>
+						</label>
+					{/each}
+				</div>
+			</fieldset>
 
-		<fieldset>
-			<legend>色</legend>
-			<div class="colors">
-				{#each ICON_COLORS as c (c.id)}
-					<label class="swatch" style:--c={c.hex}>
-						<input type="radio" name="color" value={c.id} bind:group={color} />
-						<span class="visually-hidden">{c.label}</span>
-					</label>
-				{/each}
-			</div>
-		</fieldset>
-
-		<button class="btn btn-primary" type="submit" disabled={!valid}>保存する</button>
+			<button class="btn btn-primary" type="submit" disabled={!valid}>保存する</button>
+		</div>
 	</form>
 </div>
 
@@ -127,10 +127,6 @@
 		color: var(--ink-sub);
 	}
 
-	.photo form {
-		padding: 0;
-	}
-
 	.file {
 		display: none;
 	}
@@ -140,16 +136,11 @@
 		gap: 10px;
 	}
 
-	.row > *,
-	.row form .btn {
+	.row > * {
 		flex: 1;
 	}
 
-	.row form {
-		display: flex;
-	}
-
-	form {
+	.letters {
 		display: flex;
 		flex-direction: column;
 		gap: 18px;
