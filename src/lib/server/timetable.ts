@@ -1,5 +1,5 @@
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, type SQLWrapper } from 'drizzle-orm';
 import { DEFAULT_PERIODS, termTemplate, type PeriodInput, type TermInput } from '$lib/presets';
 import { remapTerm } from '$lib/terms';
 import { academicYear, isDate, tokyoTime } from '$lib/time';
@@ -7,7 +7,7 @@ import type { KnownTimetable } from './auth/session';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
 import { upcomingCancellations } from './notes';
-import { loadSharedCourses } from './shared-courses';
+import { sharedCourseQueries, sharedCoursesFrom } from './shared-courses';
 import { getUniversity } from './universities';
 
 export type Owner = { id: string; universityId: string | null };
@@ -199,7 +199,7 @@ export function currentTimetable(db: Db, owner: Owner, known?: KnownTimetable | 
 	return getOrCreateTimetable(db, owner, academicYear(tokyoTime(Date.now()).date), known);
 }
 
-const termsQuery = (db: Db, timetableId: string) =>
+const termsQuery = (db: Db, timetableId: string | SQLWrapper) =>
 	db
 		.select({
 			id: terms.id,
@@ -212,23 +212,32 @@ const termsQuery = (db: Db, timetableId: string) =>
 		.where(eq(terms.timetableId, timetableId))
 		.orderBy(asc(terms.sortOrder));
 
-const periodsQuery = (db: Db, timetableId: string) =>
+const periodsQuery = (db: Db, timetableId: string | SQLWrapper) =>
 	db
 		.select({ number: periods.number, start: periods.startTime, end: periods.endTime })
 		.from(periods)
 		.where(eq(periods.timetableId, timetableId))
 		.orderBy(asc(periods.number));
 
+// The queries behind loadShape, for a caller's own batch; the id can be a subquery.
+export const shapeQueries = (db: Db, timetableId: string | SQLWrapper) =>
+	[termsQuery(db, timetableId), periodsQuery(db, timetableId)] as const;
+
 // Terms and periods, for forms that place a course in the timetable
 export async function loadShape(db: Db, timetableId: string) {
-	const [termRows, periodRows] = await db.batch([termsQuery(db, timetableId), periodsQuery(db, timetableId)]);
+	const [termRows, periodRows] = await db.batch(shapeQueries(db, timetableId));
 	return { terms: termRows, periods: periodRows };
 }
 
 
 // `today` (YYYY-MM-DD) picks the cancellations still to come.
 export async function loadTimetable(db: Db, timetableId: string, today: string) {
-	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows] = await db.batch([
+	// Synced courses show the shared title, slots and rooms, read in the same batch.
+	const syncedIds = db
+		.select({ id: courses.sharedCourseId })
+		.from(courses)
+		.where(and(eq(courses.timetableId, timetableId), eq(courses.syncMode, 'synced')));
+	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows, sharedRows, sharedSlots, sharedTeachers] = await db.batch([
 		termsQuery(db, timetableId),
 		periodsQuery(db, timetableId),
 		db
@@ -262,14 +271,10 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 			.from(courseSlots)
 			.innerJoin(courses, eq(courseSlots.courseId, courses.id))
 			.where(eq(courses.timetableId, timetableId)),
-		upcomingCancellations(db, timetableId, today)
+		upcomingCancellations(db, timetableId, today),
+		...sharedCourseQueries(db, syncedIds)
 	]);
-
-	// Synced courses show the shared title, slots and rooms.
-	const shared = await loadSharedCourses(
-		db,
-		courseRows.flatMap((c) => (c.syncMode === 'synced' && c.sharedCourseId ? [c.sharedCourseId] : []))
-	);
+	const shared = sharedCoursesFrom(sharedRows, sharedSlots, sharedTeachers);
 
 	return {
 		terms: termRows,
@@ -295,14 +300,15 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 }
 
 /**
- * Several timetables at once, for laying them over each other: terms, periods and courses
- * (with the shared course they are linked to), but nothing private such as notes.
+ * Several timetables at once, for laying them over each other: whose each is, terms,
+ * periods and courses (with the shared course they are linked to), but nothing private
+ * such as notes. `timetableIds` can be a subquery, which saves looking the ids up first.
  */
-export async function loadTimetables(db: Db, timetableIds: string[]) {
-	const ids = [...new Set(timetableIds)];
+export async function loadTimetables(db: Db, timetableIds: string[] | SQLWrapper) {
 	const out = new Map<
 		string,
 		{
+			userId: string;
 			terms: Awaited<ReturnType<typeof termsQuery>>;
 			periods: Awaited<ReturnType<typeof periodsQuery>>;
 			courses: {
@@ -315,8 +321,15 @@ export async function loadTimetables(db: Db, timetableIds: string[]) {
 			}[];
 		}
 	>();
-	if (!ids.length) return out;
-	const [termRows, periodRows, courseRows, termLinks, slotRows] = await db.batch([
+	const syncedIds = db
+		.select({ id: courses.sharedCourseId })
+		.from(courses)
+		.where(and(inArray(courses.timetableId, timetableIds), eq(courses.syncMode, 'synced')));
+	const [found, termRows, periodRows, courseRows, termLinks, slotRows, sharedRows, sharedSlots, sharedTeachers] = await db.batch([
+		db
+			.select({ id: timetables.id, userId: timetables.userId })
+			.from(timetables)
+			.where(inArray(timetables.id, timetableIds)),
 		db
 			.select({
 				timetableId: terms.timetableId,
@@ -327,12 +340,12 @@ export async function loadTimetables(db: Db, timetableIds: string[]) {
 				endDate: terms.endDate
 			})
 			.from(terms)
-			.where(inArray(terms.timetableId, ids))
+			.where(inArray(terms.timetableId, timetableIds))
 			.orderBy(asc(terms.sortOrder)),
 		db
 			.select({ timetableId: periods.timetableId, number: periods.number, start: periods.startTime, end: periods.endTime })
 			.from(periods)
-			.where(inArray(periods.timetableId, ids))
+			.where(inArray(periods.timetableId, timetableIds))
 			.orderBy(asc(periods.number)),
 		db
 			.select({
@@ -344,13 +357,13 @@ export async function loadTimetables(db: Db, timetableIds: string[]) {
 				sharedCourseId: courses.sharedCourseId
 			})
 			.from(courses)
-			.where(inArray(courses.timetableId, ids))
+			.where(inArray(courses.timetableId, timetableIds))
 			.orderBy(asc(courses.createdAt)),
 		db
 			.select({ courseId: courseTerms.courseId, termId: courseTerms.termId })
 			.from(courseTerms)
 			.innerJoin(courses, eq(courseTerms.courseId, courses.id))
-			.where(inArray(courses.timetableId, ids)),
+			.where(inArray(courses.timetableId, timetableIds)),
 		db
 			.select({
 				courseId: courseSlots.courseId,
@@ -362,14 +375,13 @@ export async function loadTimetables(db: Db, timetableIds: string[]) {
 			})
 			.from(courseSlots)
 			.innerJoin(courses, eq(courseSlots.courseId, courses.id))
-			.where(inArray(courses.timetableId, ids))
+			.where(inArray(courses.timetableId, timetableIds)),
+		...sharedCourseQueries(db, syncedIds)
 	]);
-	const shared = await loadSharedCourses(
-		db,
-		courseRows.flatMap((c) => (c.syncMode === 'synced' && c.sharedCourseId ? [c.sharedCourseId] : []))
-	);
-	for (const id of ids) {
+	const shared = sharedCoursesFrom(sharedRows, sharedSlots, sharedTeachers);
+	for (const { id, userId } of found) {
 		out.set(id, {
+			userId,
 			terms: termRows.filter((t) => t.timetableId === id).map(({ timetableId: _, ...t }) => t),
 			periods: periodRows.filter((p) => p.timetableId === id).map(({ timetableId: _, ...p }) => p),
 			courses: courseRows
