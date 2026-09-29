@@ -26,6 +26,7 @@
 	{:else}
 		<form
 			method="POST"
+			action="?/send"
 			use:enhance={() => {
 				sending = true;
 				return async ({ update }) => {

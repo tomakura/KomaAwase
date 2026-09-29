@@ -278,6 +278,19 @@
 		gap: 12px;
 	}
 
+	textarea {
+		box-sizing: border-box;
+		padding: 10px 12px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 16px;
+		line-height: 1.6;
+		resize: vertical;
+	}
+
 	.done {
 		margin: 0;
 		font-size: 13px;

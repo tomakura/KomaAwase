@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 };
 
 export const actions: Actions = {
-	default: async (event) => {
+	send: async (event) => {
 		if (!event.locals.user) redirect(303, '/login');
 		const sent = await sendVerificationMail(event);
 		if ('message' in sent) return fail(sent.status, { message: sent.message });
