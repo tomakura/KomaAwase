@@ -8,6 +8,19 @@
 		<link rel="manifest" href="/manifest.webmanifest" />
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 		<meta name="apple-mobile-web-app-title" content="コマあわせ" />
+		<!-- What shows when a link is shared (LINE, X, Slack…). Crawlers don't run scripts, so it's
+			 here in the HTML; the image is drawn by scripts/make-og.mjs. -->
+		<meta name="description" content="友だちやサークルの仲間と時間割を重ねて、みんなが空いているコマがすぐわかる。授業は同じ大学の人の登録から選ぶだけ。無料・広告なし。" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="コマあわせ" />
+		<meta property="og:locale" content="ja_JP" />
+		<meta property="og:title" content="コマあわせ｜友だちと時間割を重ねて、空きコマを見つけよう" />
+		<meta property="og:description" content="友だちやサークルの仲間と時間割を重ねて、みんなが空いているコマがすぐわかる。無料・広告なし。" />
+		<meta property="og:image" content="https://koma.tomakura.com/og.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="コマあわせ。友だちと、時間割を共有しよう。" />
+		<meta name="twitter:card" content="summary_large_image" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 		<!-- Loaded without holding up the first paint: the page shows in the system font and

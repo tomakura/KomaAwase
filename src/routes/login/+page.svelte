@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms';
 	import { loginWithPasskey } from '$lib/passkey';
 	import logo from '$lib/assets/favicon.svg';
+	import Icon from '$lib/components/Icon.svelte';
 	import { clearPageCaches } from '$lib/offline';
 
 	let { data, form } = $props();
@@ -43,6 +44,7 @@
 		<img src={logo} alt="" width="88" height="88" />
 		<h1>コマあわせ</h1>
 		<p>友だちと、時間割を共有しよう。</p>
+		<a class="intro" href="/intro">コマあわせとは<Icon name="chevron" size={14} /></a>
 	</div>
 
 	<div class="actions">
@@ -142,6 +144,21 @@
 	.brand p {
 		margin: 0;
 		color: var(--ink-sub);
+	}
+
+	.brand .intro {
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		margin-top: -8px;
+		padding: 0 14px;
+		border: 1px solid var(--line-strong);
+		border-radius: 999px;
+		color: var(--ink);
+		font-size: 13px;
+		font-weight: 700;
+		text-decoration: none;
 	}
 
 	.actions,
