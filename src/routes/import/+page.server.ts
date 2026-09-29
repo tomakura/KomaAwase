@@ -3,7 +3,15 @@ import { requireUser, safeNext } from '$lib/server/auth/next';
 import { DAILY_LIMIT, latestJobs, queuePosition } from '$lib/server/import/jobs';
 import type { PageServerLoad } from './$types';
 
-const backTerm = (back: string | null) => (back ? new URL(back, 'https://x.invalid').searchParams.get('term') : null);
+// `back` is whatever the query said, so one that cannot be read as a URL (//, http://[) gives no term
+const backTerm = (back: string | null) => {
+	if (!back) return null;
+	try {
+		return new URL(back, 'https://x.invalid').searchParams.get('term');
+	} catch {
+		return null;
+	}
+};
 
 export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	const me = requireUser(locals, url);
