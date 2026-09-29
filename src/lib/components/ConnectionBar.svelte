@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import Icon from './Icon.svelte';
 	import { connection } from '$lib/connection.svelte';
 	import { savedAtLabel } from '$lib/sync';
@@ -35,18 +37,30 @@
 				: null
 	);
 
+	// The strip slides in and out, and the parts of it that come and go slide with it
+	const glide = () => ({
+		duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260,
+		easing: cubicOut
+	});
+
 	// The page's minimum height gives up the strip's height (--bar-h, see src/app.css), so that
-	// showing it doesn't make the page scroll
+	// showing it doesn't make the page scroll. It follows the strip while it slides.
 	let height = $state(0);
 	$effect(() => {
 		const root = document.documentElement;
-		root.style.setProperty('--bar-h', connection.visible ? `${height}px` : '0px');
+		root.style.setProperty('--bar-h', `${height}px`);
 		return () => root.style.removeProperty('--bar-h');
 	});
 </script>
 
 {#if connection.visible}
-	<div class="bar {mode}" bind:offsetHeight={height} aria-live="polite">
+	<div
+		class="bar {mode}"
+		bind:offsetHeight={height}
+		aria-live="polite"
+		transition:slide={glide()}
+		onoutroend={() => (height = 0)}
+	>
 		<div class="inner">
 			<div class="row">
 				<Icon name={mode === 'recovered' ? 'check' : mode === 'syncing' ? 'sync' : 'offline'} size={20} />
@@ -61,7 +75,7 @@
 				{/if}
 			</div>
 			{#if busy && step}
-				<div class="step">
+				<div class="step" transition:slide={glide()}>
 					<span>{step}</span>
 					{#if progress}
 						<div class="track" role="progressbar" aria-label="同期の進み具合" aria-valuemin="0" aria-valuemax={progress.total} aria-valuenow={progress.done}>
@@ -90,6 +104,15 @@
 		background: var(--course-blue);
 		color: var(--ink);
 		border-bottom: 1px solid var(--line-strong);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.bar {
+			transition:
+				background-color 0.3s,
+				color 0.3s,
+				border-color 0.3s;
+		}
 	}
 
 	.bar.offline {
