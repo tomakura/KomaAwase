@@ -386,11 +386,13 @@
 		gap: 12px;
 	}
 
+	/* Takes the room there is, so the title is wrapped to that and not to its own width */
 	.name {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		min-width: 0;
+		flex: 1;
 	}
 
 	.bar {
@@ -408,6 +410,8 @@
 		font-family: var(--font-display);
 		font-weight: 700;
 		font-size: 24px;
+		min-width: 0;
+		flex: 1;
 		word-break: keep-all;
 		overflow-wrap: anywhere;
 	}
