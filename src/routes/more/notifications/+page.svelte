@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Switch from '$lib/components/Switch.svelte';
+	import { REMINDERS_MAX, REMINDER_MINUTES, leadLabel } from '$lib/reminder';
 
 	let { data, form } = $props();
 
@@ -95,6 +96,10 @@
 	}
 
 	let settingsForm = $state<HTMLFormElement>();
+
+	// svelte-ignore state_referenced_locally
+	let picked = $state<number[]>(data.reminders);
+	let remindersForm = $state<HTMLFormElement>();
 </script>
 
 <svelte:head>
@@ -160,6 +165,31 @@
 				</form>
 				<p class="ui-note">設定はすべての端末で共通です。</p>
 			</section>
+
+			<section>
+				<h2>授業の前の通知</h2>
+				<form method="POST" action="?/reminders" bind:this={remindersForm} use:enhance={() => async ({ update }) => update({ reset: false })}>
+					<div class="chips">
+						{#each REMINDER_MINUTES as m (m)}
+							<label class="chip">
+								<input
+									type="checkbox"
+									name="minutes"
+									value={m}
+									bind:group={picked}
+									disabled={!picked.includes(m) && picked.length >= REMINDERS_MAX}
+									onchange={() => queueMicrotask(() => remindersForm?.requestSubmit())}
+								/>
+								<span>{leadLabel(m)}</span>
+							</label>
+						{/each}
+					</div>
+				</form>
+				<p class="ui-note">授業が始まる前に、授業名・教室・開始時刻をお知らせします。{REMINDERS_MAX}つまで選べます。</p>
+				{#if device !== 'on' && device !== 'checking'}
+					<p class="ui-note">通知をオンにした端末に届きます。</p>
+				{/if}
+			</section>
 		{/if}
 	</div>
 </div>
@@ -203,5 +233,54 @@
 
 	.row form .btn {
 		width: 100%;
+	}
+
+	.chips {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 8px;
+	}
+
+	.chip {
+		position: relative;
+	}
+
+	.chip input {
+		position: absolute;
+		inset: 0;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+
+	.chip span {
+		display: block;
+		padding: 11px 2px;
+		border: 1px solid var(--line-bold);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-size: 13px;
+		font-weight: 700;
+		text-align: center;
+	}
+
+	.chip:has(input:checked) span {
+		border-color: var(--ink);
+		background: var(--ink);
+		color: var(--surface);
+	}
+
+	.chip:has(input:disabled) {
+		opacity: 0.4;
+	}
+
+	.chip:has(input:disabled) input {
+		cursor: default;
+	}
+
+	.chip:has(input:focus-visible) span {
+		outline: 2px solid var(--accent-text);
+		outline-offset: 2px;
 	}
 </style>
