@@ -119,7 +119,7 @@ function cut(img: Pixels, colour: Colour, tolerance: number) {
 }
 
 /** Whether something is written in the cell, or it is coloured unlike the empty ones */
-function look(img: Pixels, col: Span, row: Span) {
+function look(img: Pixels, col: Span, row: Span): { colour: Colour; written: boolean } {
 	const { data, width } = img;
 	const inset = Math.max(2, Math.round(Math.min(col[1] - col[0], row[1] - row[0]) * 0.03));
 	const offsets: number[] = [];
@@ -164,7 +164,8 @@ export function findGrid(img: Pixels): Grid | null {
 	}
 	if (!best) return null;
 
-	const looks = best.rows.map((row) => best!.cols.map((col) => look(img, col, row)));
+	const { cols, rows } = best;
+	const looks = rows.map((row) => cols.map((col) => look(img, col, row)));
 	// The empty ones are the most common colour
 	const usual = mostCommon(looks.flat().map((l) => l.colour));
 	const filled = looks.map((row) =>
