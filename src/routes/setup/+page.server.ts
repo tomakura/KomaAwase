@@ -38,6 +38,8 @@ export const actions: Actions = {
 			{ ...shape, universityId: university?.id ?? null },
 			{ daysShown: days, setupAt: new Date() }
 		);
+		// A university whose enrollment can be checked is offered it first (it goes on to `next`)
+		if (university?.emailDomains.length) redirect(303, '/setup/verify');
 		redirect(303, takeNext(cookies) ?? '/');
 	}
 };

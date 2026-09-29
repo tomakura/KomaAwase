@@ -1,9 +1,8 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { sendRelayMail } from '$lib/server/auth/email';
 import { universities } from '$lib/server/db/schema';
-import { RATE_LIMITED_MESSAGE, isRateLimited } from '$lib/server/rate-limit';
-import { dropToken, startVerification, verificationOf } from '$lib/server/verify';
+import { daysLeft } from '$lib/verify-prompt';
+import { sendVerificationMail, verificationOf } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -21,6 +20,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				email: verification.email,
 				university: verification.university,
 				expiresAt: verification.expiresAt.getTime(),
+				days: daysLeft(verification.expiresAt.getTime(), Date.now()),
 				// A check for a university the user has since moved away from doesn't count.
 				current: verification.universityId === locals.user.universityId && verification.expiresAt.getTime() > Date.now()
 			}
@@ -29,20 +29,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	default: async (event) => {
-		const { locals, request, url, platform } = event;
-		if (!locals.user) redirect(303, '/login');
-		if (!platform) error(500);
-		if (await isRateLimited(event, platform.env.EMAIL_LINK_LIMITER)) return fail(429, { message: RATE_LIMITED_MESSAGE });
-
-		const started = await startVerification(locals.db, locals.user, String((await request.formData()).get('email') ?? ''));
-		if ('message' in started) return fail(400, { message: started.message });
-		try {
-			await sendRelayMail(platform.env, 'verify', started.email, `${url.origin}/verify/${started.token}`);
-		} catch (e) {
-			console.error('verification mail failed', e);
-			await dropToken(locals.db, started.token);
-			return fail(502, { message: 'メールを送れませんでした。時間をおいてもう一度やり直してください' });
-		}
-		return { sentTo: started.email };
+		if (!event.locals.user) redirect(303, '/login');
+		const sent = await sendVerificationMail(event);
+		if ('message' in sent) return fail(sent.status, { message: sent.message });
+		return { sentTo: sent.sentTo };
 	}
 };

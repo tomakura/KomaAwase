@@ -3,6 +3,7 @@
 	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
+	import VerifyPrompt from '$lib/components/VerifyPrompt.svelte';
 	import { version } from '$app/environment';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
@@ -125,4 +126,6 @@
 <NavigationWait />
 {@render children()}
 
-<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} />
+<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} />
+<!-- One screen at a time: the notification one waits while the enrollment one is due -->
+<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt} />

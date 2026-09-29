@@ -6,6 +6,7 @@ import { readTheme, thisYear } from '$lib/server/setup';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import { currentTerm } from '$lib/terms';
 import { tokyoTime } from '$lib/time';
+import { daysLeft } from '$lib/verify-prompt';
 import { verificationOf } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -43,7 +44,12 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		supportUrl: platform?.env.SUPPORT_URL || null,
 		isAdmin: user.role === 'admin',
 		verified:
-			!!verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now()
+			!!verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now(),
+		// Days until the check lapses, when there is one to lapse
+		verifyDays:
+			verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now()
+				? daysLeft(verification.expiresAt.getTime(), Date.now())
+				: null
 	};
 };
 

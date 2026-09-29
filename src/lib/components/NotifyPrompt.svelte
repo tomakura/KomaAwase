@@ -6,7 +6,7 @@
 
 	// Suggests turning notifications on: once per device, on a tab, a moment after opening.
 	// A new person sees it at the first open after signing up, everyone else at their next one.
-	let { signedIn, setupDone, publicKey }: { signedIn: boolean; setupDone: boolean; publicKey: string | null } = $props();
+	let { signedIn, setupDone, publicKey, hold = false }: { signedIn: boolean; setupDone: boolean; publicKey: string | null; hold?: boolean } = $props();
 
 	const KEY = 'koma:notify-prompt';
 	// Where storage is blocked (a private window) it is asked each time, which beats never
@@ -32,7 +32,7 @@
 	let message = $state<string | null>(null);
 	let decided = false;
 
-	const eligible = $derived(signedIn && setupDone && !!publicKey && PROMPT_ROUTES.includes(page.url.pathname));
+	const eligible = $derived(!hold && signedIn && setupDone && !!publicKey && PROMPT_ROUTES.includes(page.url.pathname));
 
 	async function decide() {
 		if (decided) return;
