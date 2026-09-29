@@ -16,7 +16,7 @@
 
 	const mode = $derived(link !== 'online' ? link : connection.recovered ? 'recovered' : 'syncing');
 	const title = $derived(
-		{ offline: 'オフライン', poor: '通信が不安定です', recovered: 'つながりました', syncing: '時間割を同期中' }[mode]
+		{ offline: 'オフライン', poor: '通信が不安定です', recovered: 'オンラインに復帰しました', syncing: '時間割を同期中' }[mode]
 	);
 	const detail = $derived(
 		mode === 'recovered'
