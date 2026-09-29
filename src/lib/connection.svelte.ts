@@ -59,6 +59,7 @@ const PRELOAD = 'data-sveltekit-preload-data';
 
 const OFFLINE_NOTICE = 'オフラインのため、その操作はできません';
 const POOR_NOTICE = '通信が不安定のため、更新できません';
+const REFRESH_FAILED_NOTICE = '更新に失敗しました';
 
 const onLine = () => typeof navigator === 'undefined' || navigator.onLine !== false;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
@@ -274,7 +275,7 @@ export class Connection {
 		if (ok) return;
 		if (this.blocked) {
 			this.#retrySoon();
-			if (opts.manual) this.tell(this.#say());
+			if (opts.manual) this.tell(REFRESH_FAILED_NOTICE);
 		}
 	}
 

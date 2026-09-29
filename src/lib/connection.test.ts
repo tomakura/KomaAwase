@@ -365,7 +365,7 @@ describe('when the connection is down', () => {
 		expect(pings(s.asked)).toBe(before + 1);
 		await vi.advanceTimersByTimeAsync(700);
 		expect(s.connection.phase).toBe('idle');
-		expect(s.connection.notice?.text).toBe('オフラインのため、その操作はできません');
+		expect(s.connection.notice?.text).toBe('更新に失敗しました');
 	});
 });
 
