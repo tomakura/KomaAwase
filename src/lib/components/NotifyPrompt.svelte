@@ -6,7 +6,7 @@
 
 	// Suggests turning notifications on: once per device, on a tab, a moment after opening.
 	// A new person sees it at the first open after signing up, everyone else at their next one.
-	let { signedIn, setupDone, publicKey }: { signedIn: boolean; setupDone: boolean; publicKey: string | null } = $props();
+	let { signedIn, setupDone, publicKey, hold = false }: { signedIn: boolean; setupDone: boolean; publicKey: string | null; hold?: boolean } = $props();
 
 	const KEY = 'koma:notify-prompt';
 	// Where storage is blocked (a private window) it is asked each time, which beats never
@@ -32,7 +32,7 @@
 	let message = $state<string | null>(null);
 	let decided = false;
 
-	const eligible = $derived(signedIn && setupDone && !!publicKey && PROMPT_ROUTES.includes(page.url.pathname));
+	const eligible = $derived(!hold && signedIn && setupDone && !!publicKey && PROMPT_ROUTES.includes(page.url.pathname));
 
 	async function decide() {
 		if (decided) return;
@@ -40,15 +40,20 @@
 		if (asked()) return;
 		const state = await pushState(4000);
 		let reminders: number | null = null;
-		if (state === 'on') {
+		let devices: number | null = null;
+		if (state === 'install' || state === 'off' || state === 'on') {
 			try {
 				const res = await fetch('/api/reminders');
-				if (res.ok) reminders = ((await res.json()) as { count: number }).count;
+				if (res.ok) {
+					const body = (await res.json()) as { count: number; devices: number };
+					reminders = body.count;
+					devices = body.devices;
+				}
 			} catch {
 				// Not known: nothing is shown
 			}
 		}
-		const next = promptKind({ state, asked: asked(), reminders });
+		const next = promptKind({ state, asked: asked(), reminders, devices });
 		// Gone from the tabs in the meantime: try again when back on one
 		if (next && !PROMPT_ROUTES.includes(location.pathname)) {
 			decided = false;

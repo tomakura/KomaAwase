@@ -39,6 +39,7 @@
 			くわしい内容（任意）
 			<textarea name="detail" rows="3" maxlength="500"></textarea>
 		</label>
+		<p class="note">確認のため、運営から連絡することがあります。そのため、登録しているメールアドレスも運営に送られます。</p>
 		{#if message}<p class="error" role="alert">{message}</p>{/if}
 		<button class="btn btn-primary" type="submit">送る</button>
 	</form>
@@ -49,6 +50,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+	}
+
+	.note {
+		margin: 0;
+		font-size: 12px;
+		line-height: 1.6;
+		color: var(--ink-sub);
 	}
 
 	fieldset {

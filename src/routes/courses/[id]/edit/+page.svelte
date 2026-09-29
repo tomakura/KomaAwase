@@ -14,7 +14,14 @@
 	heading="授業を編集"
 	backHref={courseHref(data.course.id, data.termParam)}
 	action={actionHref('save', data.termParam)}
-	sync={{ canSync: !!data.timetable.universityId, year: data.timetable.year, shared: data.shared, canEdit: data.canEditShared }}
+	sync={{
+		// Linked courses can still be switched to 自分だけで使う; new sharing needs an enrollment check
+		canSync: data.sharedAccess === 'ok' || !!data.shared,
+		locked: data.sharedAccess === 'need-verify' || data.sharedAccess === 'unsupported' ? data.sharedAccess : null,
+		year: data.timetable.year,
+		shared: data.shared,
+		canEdit: data.canEditShared
+	}}
 	initial={data.course}
 	terms={data.terms}
 	periods={data.periods}

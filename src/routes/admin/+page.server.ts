@@ -27,7 +27,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				reason: reports.reason,
 				detail: reports.detail,
 				createdAt: reports.createdAt,
-				reporter: users.nickname
+				reporter: users.nickname,
+				reporterEmail: users.email
 			})
 			.from(reports)
 			.leftJoin(users, eq(users.id, reports.reporterId))
@@ -42,7 +43,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				body: feedback.body,
 				env: feedback.env,
 				createdAt: feedback.createdAt,
-				sender: users.nickname
+				sender: users.nickname,
+				senderEmail: users.email
 			})
 			.from(feedback)
 			.leftJoin(users, eq(users.id, feedback.userId))

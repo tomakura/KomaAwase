@@ -42,7 +42,7 @@
 				</div>
 				<p class="reason">{r.reason}{r.detail ? `：${r.detail}` : ''}</p>
 				<div class="foot">
-					<span class="from">{r.reporter ?? '（退会した人）'}から</span>
+					<span class="from">{r.reporter ?? '（退会した人）'}{#if r.reporterEmail}（{r.reporterEmail}）{/if}から</span>
 					{#if r.targetType === 'shared_course'}<a href="/shared/{r.targetId}?back=/admin">変更の履歴</a>{/if}
 					<form method="POST" action="?/closeReport" use:enhance>
 						<input type="hidden" name="id" value={r.id} />
@@ -77,7 +77,7 @@
 					</details>
 				{/if}
 				<div class="foot">
-					<span class="from">{f.sender ?? '（退会した人）'}から</span>
+					<span class="from">{f.sender ?? '（退会した人）'}{#if f.senderEmail}（{f.senderEmail}）{/if}から</span>
 					<form method="POST" action="?/closeFeedback" use:enhance>
 						<input type="hidden" name="id" value={f.id} />
 						<button class="small" type="submit">対応済み</button>

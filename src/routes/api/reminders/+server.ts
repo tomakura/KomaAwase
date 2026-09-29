@@ -1,15 +1,19 @@
 import { error, json } from '@sveltejs/kit';
 import { count, eq } from 'drizzle-orm';
 import { REMINDER_DEFAULT } from '$lib/reminder';
-import { classReminders } from '$lib/server/db/schema';
+import { classReminders, pushSubscriptions } from '$lib/server/db/schema';
 import type { RequestHandler } from './$types';
 
-// How many times before a class this person chose. The screen that suggests turning
-// notifications on asks, to tell someone who has none from someone who has.
+// How many times before a class this person chose, and how many of their devices receive
+// notifications. The screen that suggests turning notifications on asks, to tell someone who
+// has none from someone who has (on this device or another).
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) error(401, 'ログインしてください');
-	const [row] = await locals.db.select({ n: count() }).from(classReminders).where(eq(classReminders.userId, locals.user.id));
-	return json({ count: row?.n ?? 0 });
+	const [[row], [devices]] = await locals.db.batch([
+		locals.db.select({ n: count() }).from(classReminders).where(eq(classReminders.userId, locals.user.id)),
+		locals.db.select({ n: count() }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, locals.user.id))
+	]);
+	return json({ count: row?.n ?? 0, devices: devices?.n ?? 0 });
 };
 
 // Turns on the usual time (REMINDER_DEFAULT) for someone who has none; nothing to those who chose

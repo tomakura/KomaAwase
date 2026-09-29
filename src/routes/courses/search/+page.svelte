@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import SharedLock from '$lib/components/SharedLock.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES, periodLabel, timetableHref, weekLabel } from '$lib/courses';
 
@@ -64,6 +65,9 @@
 	</header>
 
 	<div class="body">
+		{#if data.access !== 'ok'}
+			<SharedLock access={data.access} what="みんなの授業データ" from={page.url.pathname + page.url.search} />
+		{:else}
 		<form
 			role="search"
 			onsubmit={(e) => {
@@ -133,6 +137,7 @@
 				</p>
 			{/if}
 		</section>
+		{/if}
 
 		<section>
 			<h2>見つからないとき</h2>

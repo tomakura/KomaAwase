@@ -104,7 +104,17 @@
 				{@render link('/more/nickname', 'ニックネーム', data.user.nickname)}
 				{@render link('/more/university', '大学', data.universityName ?? '未設定')}
 				{@render link('/more/passkeys', 'パスキー', data.passkeyCount ? `${data.passkeyCount}台` : 'なし')}
-				{@render link('/more/verify', '在籍確認', data.verified ? '確認済み' : 'まだ')}
+				<a class="ui-row" href="/more/verify">
+					<span>在籍確認</span>
+					<span class="ui-row-value">
+						{#if data.verifyDays !== null}
+							<span class="value" class:soon={data.verifyDays <= 30}>確認済み · あと{data.verifyDays}日</span>
+						{:else}
+							<span class="value">まだ</span>
+						{/if}
+						<Icon name="chevron" size={16} />
+					</span>
+				</a>
 			</div>
 		</section>
 
@@ -121,7 +131,15 @@
 				{@render link('/terms', '利用規約')}
 				{@render link('/privacy', 'プライバシーポリシー')}
 				{@render link('/about', 'このアプリについて')}
-				{#if data.isAdmin}{@render link('/admin', '運営（通報・要望）')}{/if}
+				{#if data.isAdmin}
+					<a class="ui-row" href="/admin">
+						<span>運営（通報・要望）</span>
+						<span class="ui-row-value">
+							<span class="value" class:soon={data.openReports > 0}>{data.openReports ? `未対応 ${data.openReports}件` : 'なし'}</span>
+							<Icon name="chevron" size={16} />
+						</span>
+					</a>
+				{/if}
 			</div>
 		</section>
 
@@ -150,6 +168,11 @@
 
 	main {
 		padding-bottom: 28px;
+	}
+
+	.value.soon {
+		font-weight: 600;
+		color: var(--accent-text);
 	}
 
 	.value {

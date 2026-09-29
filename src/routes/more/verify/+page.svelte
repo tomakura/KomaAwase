@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import VerifyBenefits from '$lib/components/VerifyBenefits.svelte';
 	import { tokyoTime } from '$lib/time';
 
 	let { data, form } = $props();
@@ -23,12 +24,17 @@
 					<b>{data.verification.university}の在籍を確認済み</b>
 					<span>{data.verification.email} · {day(data.verification.expiresAt)}まで</span>
 				</div>
+				<b class="days" class:soon={data.verification.days <= 30}>あと{data.verification.days}日</b>
 			</div>
-			<p class="ui-note">毎年4月に、もう一度確認してください。卒業したあともメールが使える大学があるためです。</p>
+			<p class="ui-note">毎年5月1日に切れます。4月になったら、もう一度確認してください。卒業したあともメールが使える大学があるためです。</p>
 		{:else}
-			<p class="lead">
-				大学のメールアドレスに確認リンクを送ります。確認すると、友だちやグループのメンバーに「在籍確認済み」と表示されます（任意）。
-			</p>
+			{#if data.verification && data.verification.days <= 0}
+				<p class="lapsed" role="status">在籍確認の期限が切れています（{day(data.verification.expiresAt)}まで）。</p>
+			{:else if data.verification}
+				<p class="lapsed" role="status">所属大学の変更後は、再度在籍確認が必要です。</p>
+			{/if}
+			<p class="lead">大学のメールアドレスに確認リンクを送ります。確認すると、次のことができます。</p>
+			<VerifyBenefits />
 		{/if}
 
 		{#if !data.university}
@@ -104,6 +110,24 @@
 
 	.status b {
 		font-size: 14px;
+	}
+
+	.status .days {
+		margin-left: auto;
+		flex-shrink: 0;
+		font-size: 18px;
+		white-space: nowrap;
+	}
+
+	.status .days.soon {
+		color: var(--accent-text);
+	}
+
+	.lapsed {
+		margin: 0;
+		font-weight: 600;
+		font-size: 14px;
+		color: var(--accent-text);
 	}
 
 	.status span {

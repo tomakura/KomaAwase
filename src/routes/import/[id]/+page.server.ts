@@ -8,6 +8,7 @@ import { commitCourses, nextColor, parseCourseForm, prepareCourse, shapeOf } fro
 import { importJobs, sharedCourseSlots, sharedCourses, timetables } from '$lib/server/db/schema';
 import { loadSharedCourses } from '$lib/server/shared-courses';
 import { loadShape, loadTimetable } from '$lib/server/timetable';
+import { sharedAccess } from '$lib/server/verify';
 import { currentTerm } from '$lib/terms';
 import { tokyoTime } from '$lib/time';
 import type { Actions, PageServerLoad } from './$types';
@@ -74,11 +75,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const { job, timetable } = await ownJob(locals.db, me.id, params.id);
 	const today = tokyoTime(Date.now()).date;
 	const groups = groupImported(job.result ?? []);
+	// Shared courses are suggested to people with an enrollment check only
+	const access = await sharedAccess(locals.db, me.id, timetable.universityId);
 	const [loaded, suggested] = await Promise.all([
 		loadTimetable(locals.db, timetable.id, today),
-		suggestions(locals.db, timetable, groups)
+		access === 'ok' ? suggestions(locals.db, timetable, groups) : groups.map(() => [])
 	]);
 	return {
+		canShare: access === 'ok',
 		job: { id: job.id, status: job.status, closed: !!job.closedAt, provider: job.provider },
 		terms: loaded.terms,
 		periods: loaded.periods,
@@ -155,9 +159,10 @@ export const actions: Actions = {
 			inputs.push(parsed.input);
 		}
 
+		const sharedAllowed = (await sharedAccess(locals.db, me.id, timetable.universityId)) === 'ok';
 		const prepared = [];
 		for (const input of inputs) {
-			const course = await prepareCourse(locals.db, { userId: me.id, timetable, terms: shape.terms, courseId: null, input });
+			const course = await prepareCourse(locals.db, { userId: me.id, timetable, terms: shape.terms, courseId: null, input, sharedAllowed });
 			if ('message' in course) return fail(409, { message: course.message });
 			prepared.push(course);
 		}

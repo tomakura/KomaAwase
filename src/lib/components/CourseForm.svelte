@@ -18,6 +18,8 @@
 	};
 	type Sync = {
 		canSync: boolean;
+		// Why sharing isn't offered, when it is because of the enrollment check
+		locked?: 'need-verify' | 'unsupported' | null;
 		year: number;
 		// The shared course this one is linked to
 		shared: { id: string; source: 'syllabus' | 'user'; version: number; values: SharedValues } | null;
@@ -194,6 +196,23 @@
 					</button>
 				</div>
 				<span class="note">{syncNote}</span>
+			</div>
+		{:else if sync.locked}
+			<div class="sync">
+				<div class="sync-head">
+					<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+						<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+					</svg>
+					<span>授業を同じ大学のみんなと共有するには、在籍確認が必要です</span>
+				</div>
+				<span class="note">
+					{#if sync.locked === 'need-verify'}
+						この授業は自分だけで使います。<a href="/more/verify">在籍確認</a>をすると、共有できます。
+					{:else}
+						この大学は、まだ在籍確認に対応していません。この授業は自分だけで使います。
+					{/if}
+				</span>
 			</div>
 		{/if}
 		<input type="hidden" name="sync" value={sync.canSync ? v.syncMode : 'personal'} />

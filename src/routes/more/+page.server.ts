@@ -1,11 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { and, count, eq, lt } from 'drizzle-orm';
 import { TERM_SYSTEMS, parseDays, periodsRange, termSystemOf } from '$lib/presets';
-import { passkeys, timetables, universities, users } from '$lib/server/db/schema';
+import { feedback, passkeys, reports, timetables, universities, users } from '$lib/server/db/schema';
 import { readTheme, thisYear } from '$lib/server/setup';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import { currentTerm } from '$lib/terms';
 import { tokyoTime } from '$lib/time';
+import { daysLeft } from '$lib/verify-prompt';
 import { verificationOf } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -27,10 +28,22 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		verificationOf(locals.db, user.id)
 	]);
 
+	// What the runner of the app has left to answer
+	let openReports = 0;
+	if (user.role === 'admin') {
+		const [[r], [f]] = await locals.db.batch([
+			locals.db.select({ n: count() }).from(reports).where(eq(reports.status, 'open')),
+			locals.db.select({ n: count() }).from(feedback).where(eq(feedback.status, 'open'))
+		]);
+		openReports = (r?.n ?? 0) + (f?.n ?? 0);
+	}
+
 	// The term on now (or next), for 「2026年度 後期」
 	const today = tokyoTime(Date.now()).date;
 	const term = currentTerm(shape.terms, today);
 	const system = termSystemOf(shape.terms);
+
+	const valid = !!verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now();
 
 	return {
 		user: { id: user.id, nickname: user.nickname, icon: user.icon, theme: user.theme, days: user.daysShown },
@@ -42,8 +55,10 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		universityName: university?.name ?? null,
 		supportUrl: platform?.env.SUPPORT_URL || null,
 		isAdmin: user.role === 'admin',
-		verified:
-			!!verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now()
+		openReports,
+		verified: valid,
+		// Days until the check lapses, when there is one to lapse
+		verifyDays: valid && verification ? daysLeft(verification.expiresAt.getTime(), Date.now()) : null
 	};
 };
 

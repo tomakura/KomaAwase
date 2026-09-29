@@ -3,6 +3,8 @@
 	import Cropper from '$lib/components/Cropper.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import SharedLock from '$lib/components/SharedLock.svelte';
+	import { nextRetryTime } from '$lib/import-quota';
 	import { monthDay, tokyoTime } from '$lib/time';
 
 	let { data } = $props();
@@ -63,6 +65,14 @@
 		return () => clearInterval(timer);
 	});
 
+	// 「明日の朝」: when a screenshot that could not be read today is read (a few days on if those mornings are taken too)
+	const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000));
+	const deferredDays = (at: number | null) => daysBetween(tokyoTime(Date.now()).date, tokyoTime(at ?? nextRetryTime().getTime()).date);
+	function whenLabel(at: number | null) {
+		const days = deferredDays(at);
+		return `${days <= 0 ? '今日' : days === 1 ? '明日' : `${days}日後`}の朝`;
+	}
+
 	const minutes = $derived(Math.max(1, Math.ceil(((data.job?.ahead ?? 0) + 1) * 0.5)));
 
 	// How long ago it was sent, ticking while it waits or is read
@@ -101,10 +111,17 @@
 					{:else if job.status === 'processing'}
 						<b>AIが読み取っています</b>
 						<span>30秒〜1分ほどで終わります。</span>
-					{:else if job.status === 'retry'}
-						<b>明日もう一度読み取ります</b>
+					{:else if job.status === 'retry' && job.deferred}
+						<b>{whenLabel(job.retryAt)}に読み取ります</b>
 						<span>
-							今日は読み取れなかったため、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度試します。終わったらお知らせします。
+							{deferredDays(job.retryAt) <= 1
+								? '今日の読み取りは、アプリ全体の上限に達しました。'
+								: '混み合っているため、'}{whenLabel(job.retryAt)}（10時ごろ）に読み取って、終わったらお知らせします。{deferredDays(job.retryAt) <= 1 ? 'この画面は閉じても大丈夫です。' : ''}
+						</span>
+					{:else if job.status === 'retry'}
+						<b>あとでもう一度読み取ります</b>
+						<span>
+							今日は読み取れなかったため、{whenLabel(job.retryAt)}（10時ごろ）にもう一度読み取ります。終わったらお知らせします。
 						</span>
 					{:else if job.status === 'done'}
 						<b>読み取りが終わりました</b>
@@ -133,7 +150,11 @@
 			{/if}
 		{/if}
 
-		{#if !data.job || data.job.status === 'failed'}
+		{#if data.access !== 'ok' && !data.job}
+			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
+			<SharedLock access={data.access} what="スクショからの読み込み" from="/import" />
+			<p class="ui-note">授業は <a href="/courses/new">自分で入力</a> することもできます。</p>
+		{:else if !data.job || data.job.status === 'failed'}
 			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
 
 			<input class="file" type="file" accept="image/*" bind:this={fileInput} onchange={(e) => pick(e.currentTarget.files)} />
@@ -152,6 +173,12 @@
 				</button>
 			{/if}
 
+			{#if data.readAt}
+				<p class="crowded" role="status">
+					今日の読み取りは、アプリ全体の上限に達しました。いま送ると、{whenLabel(data.readAt)}に読み取って結果をお知らせします。
+				</p>
+			{/if}
+
 			<div class="notes">
 				<h2>読み込む前に</h2>
 				<div class="item">
@@ -167,6 +194,10 @@
 				<div class="item">
 					<span class="num">3</span>
 					<span>読み取りは1分ほどで終わります。混んでいるときは順番待ちになります。終わったらお知らせします。</span>
+				</div>
+				<div class="item">
+					<span class="num">4</span>
+					<span>この機能には、アプリ全体で1日の利用上限があります。混み合っているときは、結果が届くまで時間がかかることがあります。</span>
 				</div>
 			</div>
 
@@ -201,6 +232,17 @@
 
 	.file {
 		display: none;
+	}
+
+	.crowded {
+		margin: 0;
+		padding: 12px 14px;
+		border: 1px solid var(--line-bold);
+		border-radius: 12px;
+		background: var(--surface);
+		font-size: 13px;
+		line-height: 1.7;
+		color: var(--accent-text);
 	}
 
 	.pick {

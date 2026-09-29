@@ -79,16 +79,43 @@
 			</p>
 		</div>
 		<p class="ui-note">
-			直せるのは、この授業を同期していて在籍確認済みの人です。直した内容は同期しているみんなに反映され、履歴から元に戻せます。{data.canEdit
+			直せるのは、この授業を同期していて在籍確認済みの人と、運営です。直した内容は同期しているみんなに反映され、履歴から元に戻せます。{data.canEdit
 				? ''
 				: 'まちがいを見つけたら、報告してください。'}
 		</p>
 		<button class="btn" type="button" onclick={() => (reporting = true)}><Icon name="flag" size={18} />まちがい・荒らしを報告する</button>
 	</section>
 
+	{#if data.isAdmin}
+		<section class="ui-section">
+			<h2 class="ui-section-title">運営が直す</h2>
+			<form class="admin-edit" method="POST" action="?/edit" use:enhance={() => async ({ update }) => update({ reset: false })}>
+				<input type="hidden" name="version" value={data.course.version} />
+				<label class="field">
+					授業名
+					<input name="title" value={data.course.values.title} maxlength="60" required />
+				</label>
+				<label class="field">
+					先生（1行に1人）
+					<textarea name="teachers" rows="2">{data.course.values.teachers.join('\n')}</textarea>
+				</label>
+				{#each data.course.values.slots as slot, i (i)}
+					<label class="field">
+						教室（{slotText({ ...slot, room: null })}）
+						<input name="room" value={slot.room ?? ''} maxlength="20" />
+					</label>
+				{/each}
+				<p class="ui-note">同期しているみんなの時間割に反映され、履歴に残ります。</p>
+				{#if form?.message && form.edit}<p class="error" role="alert">{form.message}</p>{/if}
+				{#if form?.edited}<p class="done" role="status">直しました。</p>{/if}
+				<button class="btn btn-primary" type="submit">直す</button>
+			</form>
+		</section>
+	{/if}
+
 	<section class="ui-section">
 		<h2 class="ui-section-title">変更の履歴</h2>
-		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
+		{#if form?.message && !form.edit}<p class="error" role="alert">{form.message}</p>{/if}
 		{#if form?.restored}<p class="done" role="status">元に戻しました。</p>{/if}
 		<div class="ui-list">
 			{#each data.edits as edit, i (edit.id)}
@@ -244,6 +271,25 @@
 		font-size: 12px;
 		font-weight: 700;
 		cursor: pointer;
+	}
+
+	.admin-edit {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	textarea {
+		box-sizing: border-box;
+		padding: 10px 12px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 16px;
+		line-height: 1.6;
+		resize: vertical;
 	}
 
 	.done {

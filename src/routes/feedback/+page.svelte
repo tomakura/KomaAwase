@@ -54,7 +54,7 @@
 				{kind === 'bug' ? '何をしたら、どうなりましたか' : kind === 'request' ? 'ほしい機能や、変えてほしいところ' : '内容'}
 				<textarea name="body" rows="7" maxlength="2000" required></textarea>
 			</label>
-			<p class="ui-note">返信が必要なお問い合わせにはお答えできないことがあります。個人情報は書かないでください。</p>
+			<p class="ui-note">返信や、くわしいお話を聞くために、運営から連絡することがあります。そのため、登録しているメールアドレスも運営に送られます。個人情報は書かないでください。</p>
 
 			<div class="ui-list">
 				<div class="ui-row">

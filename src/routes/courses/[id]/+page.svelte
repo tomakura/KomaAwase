@@ -144,10 +144,12 @@
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
 			{/if}
-			{#if data.shared}
+			{#if data.shared && data.shareable}
 				<a class="shared-link" href="/shared/{data.shared.id}?back={encodeURIComponent(courseHref(course.id, data.termParam))}">
 					みんなの授業データ（変更の履歴・報告）
 				</a>
+			{:else if data.shared}
+				<a class="shared-link" href="/more/verify">在籍確認をすると、みんなの授業データを見られます</a>
 			{/if}
 		</div>
 

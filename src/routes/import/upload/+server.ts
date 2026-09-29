@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { importJobs } from '$lib/server/db/schema';
 import { createImportJob, enqueue } from '$lib/server/import/jobs';
 import { currentTimetable } from '$lib/server/timetable';
+import { sharedAccess } from '$lib/server/verify';
 import type { RequestHandler } from './$types';
 
 // The cropped screenshot, already a JPEG data URL made in the browser, so the Worker
@@ -18,8 +19,13 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 
 	const term = typeof body.term === 'string' && body.term.length <= 64 ? body.term : null;
 	const timetable = await currentTimetable(locals.db, locals.user);
+	if ((await sharedAccess(locals.db, locals.user.id, timetable.universityId)) !== 'ok') {
+		return json({ message: 'スクショからの読み込みは、在籍確認をすると使えます' }, { status: 403 });
+	}
 	const created = await createImportJob(locals.db, locals.user.id, timetable.id, body.image, body.tiled === true, term);
 	if ('message' in created) return json({ message: created.message }, { status: 400 });
+	// Today's total is used up: it waits for the quotas to reset and the daily cron picks it up
+	if (created.deferred) return json({ id: created.id });
 	try {
 		// No queue consumer runs under `npm run dev`, so the screenshot is read in the background here.
 		await enqueue(platform.env, platform.ctx, locals.db, created.id, dev);

@@ -43,6 +43,9 @@ export const users = sqliteTable('users', {
 	friendCode: text('friend_code').unique(),
 	role: text('role', { enum: ['admin'] }),
 	notify: text('notify', { mode: 'json' }).$type<NotifySettings>(),
+	// How far the enrollment check prompts have gone (see verify-prompt.ts): null = none shown yet.
+	// Reset to null when the person verifies.
+	verifyPromptStage: integer('verify_prompt_stage'),
 	createdAt: createdAt()
 });
 

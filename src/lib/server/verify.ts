@@ -1,10 +1,13 @@
-import { and, count, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { academicYear, tokyoTime } from '$lib/time';
-import { normalizeEmail } from './auth/email';
+import type { RequestEvent } from '@sveltejs/kit';
+import { normalizeEmail, sendRelayMail } from './auth/email';
+import { RATE_LIMITED_MESSAGE, isRateLimited } from './rate-limit';
 import { generateToken, hashToken } from './auth/token';
 import type { Db } from './db';
 import { univVerifications, universities, users, verifyTokens } from './db/schema';
 import { emailMatchesDomains } from './universities';
+import { STAGE_LAPSED, STAGE_NEED, verifyPrompt } from '$lib/verify-prompt';
 
 const TOKEN_LIFETIME = 24 * 60 * 60 * 1000;
 const LIVE_TOKENS_MAX = 3;
@@ -75,7 +78,9 @@ export async function finishVerification(db: Db, token: string) {
 			.insert(univVerifications)
 			.values(values)
 			.onConflictDoUpdate({ target: univVerifications.userId, set: values }),
-		db.delete(verifyTokens).where(eq(verifyTokens.id, id))
+		db.delete(verifyTokens).where(eq(verifyTokens.id, id)),
+		// The reminders start over for the new check
+		db.update(users).set({ verifyPromptStage: null }).where(eq(users.id, row.userId))
 	]);
 	const university = await db.select({ name: universities.name }).from(universities).where(eq(universities.id, row.universityId)).get();
 	return { university: university?.name ?? '' };
@@ -119,3 +124,78 @@ export const verifiedColumn = () =>
 	sql<boolean>`exists (select 1 from "univ_verifications" where "univ_verifications"."user_id" = "users"."id" and "univ_verifications"."university_id" = "users"."university_id" and "univ_verifications"."expires_at" > ${Date.now()})`.mapWith(
 		Boolean
 	);
+
+/**
+ * Whether this person may use what is shared at their university (searching its courses,
+ * reading the みんなの授業データ, importing from a screenshot, adding to it): they hold a
+ * current enrollment check for it, or run the app. Otherwise why not, for what to tell them.
+ */
+export type SharedAccess = 'ok' | 'need-verify' | 'unsupported' | 'no-university';
+
+export async function sharedAccess(db: Db, userId: string, universityId: string | null): Promise<SharedAccess> {
+	if (!universityId) return 'no-university';
+	const [[user], [university], [check]] = await db.batch([
+		db.select({ role: users.role }).from(users).where(eq(users.id, userId)),
+		db.select({ domains: universities.emailDomains }).from(universities).where(eq(universities.id, universityId)),
+		db
+			.select({ userId: univVerifications.userId })
+			.from(univVerifications)
+			.where(
+				and(
+					eq(univVerifications.userId, userId),
+					eq(univVerifications.universityId, universityId),
+					gt(univVerifications.expiresAt, new Date())
+				)
+			)
+	]);
+	if (user?.role === 'admin' || check) return 'ok';
+	return university?.domains.length ? 'need-verify' : 'unsupported';
+}
+
+/** The screen to suggest an enrollment check on, if one is due (see verify-prompt.ts) */
+export async function verifyPromptFor(
+	db: Db,
+	user: { id: string; universityId: string | null; setupAt: Date | null; verifyPromptStage: number | null }
+) {
+	if (!user.setupAt || !user.universityId) return null;
+	const row = await db
+		.select({ domains: universities.emailDomains, expiresAt: univVerifications.expiresAt })
+		.from(universities)
+		.leftJoin(univVerifications, and(eq(univVerifications.universityId, universities.id), eq(univVerifications.userId, user.id)))
+		.where(eq(universities.id, user.universityId))
+		.get();
+	if (!row) return null;
+	return verifyPrompt({
+		supported: row.domains.length > 0,
+		check: row.expiresAt ? { expiresAt: row.expiresAt.getTime() } : null,
+		shown: user.verifyPromptStage,
+		now: Date.now()
+	});
+}
+
+/** Remembers that the prompt for `stage` was shown; earlier stages don't come back. */
+export async function markVerifyPrompt(db: Db, userId: string, stage: number) {
+	if (![STAGE_NEED, 30, 14, 7, STAGE_LAPSED].includes(stage)) return;
+	await db
+		.update(users)
+		.set({ verifyPromptStage: stage })
+		.where(and(eq(users.id, userId), or(isNull(users.verifyPromptStage), gt(users.verifyPromptStage, stage))));
+}
+
+/** The enrollment mail for the form that was posted: `sentTo`, or the message and status to show. */
+export async function sendVerificationMail(event: RequestEvent): Promise<{ sentTo: string } | { status: number; message: string }> {
+	const { locals, request, url, platform } = event;
+	if (!locals.user || !platform) return { status: 500, message: 'もう一度やり直してください' };
+	if (await isRateLimited(event, platform.env.EMAIL_LINK_LIMITER)) return { status: 429, message: RATE_LIMITED_MESSAGE };
+
+	const started = await startVerification(locals.db, locals.user, String((await request.formData()).get('email') ?? ''));
+	if (!started.token) return { status: 400, message: started.message ?? 'もう一度やり直してください' };
+	try {
+		await sendRelayMail(platform.env, 'verify', started.email, `${url.origin}/verify/${started.token}`);
+	} catch (e) {
+		console.error('verification mail failed', e);
+		await dropToken(locals.db, started.token);
+		return { status: 502, message: 'メールを送れませんでした。時間をおいてもう一度やり直してください' };
+	}
+	return { sentTo: started.email };
+}

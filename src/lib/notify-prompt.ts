@@ -16,11 +16,20 @@ export type PromptKind =
 // Only on the tabs, so it never covers a form someone is in the middle of
 export const PROMPT_ROUTES = ['/', '/overlay', '/friends', '/more'];
 
-/** `reminders` is how many times before a class were chosen, or null when not known yet */
-export function promptKind(o: { state: PushState; asked: boolean; reminders: number | null }): PromptKind | null {
+/**
+ * `reminders` is how many times before a class were chosen, and `devices` how many of the
+ * person's devices receive notifications; each is null when not known yet. Someone who has
+ * notifications on elsewhere is not asked to turn them on again here.
+ */
+export function promptKind(o: {
+	state: PushState;
+	asked: boolean;
+	reminders: number | null;
+	devices: number | null;
+}): PromptKind | null {
 	if (o.asked) return null;
-	if (o.state === 'install') return 'install';
-	if (o.state === 'off') return 'enable';
+	if (o.state === 'install') return o.devices === 0 ? 'install' : null;
+	if (o.state === 'off') return o.devices === 0 ? 'enable' : null;
 	if (o.state === 'on' && o.reminders === 0) return 'reminder';
 	return null;
 }
