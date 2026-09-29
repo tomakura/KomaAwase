@@ -53,10 +53,11 @@
 
 <div class="page">
 	<header>
-		<a class="back" href={timetableHref(data.termParam)} aria-label="もどる">
+		<a class="back" href={timetableHref(data.termParam)}>
 			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+			<span class="visually-hidden">もどる：</span>
+			<h1>授業を追加</h1>
 		</a>
-		<h1>授業を追加</h1>
 		{#if data.slot}
 			<span class="slot">{DAY_NAMES[data.slot.weekday]}曜 {data.slot.period}限</span>
 		{/if}
@@ -170,12 +171,14 @@
 	}
 
 	.back {
-		width: 44px;
-		height: 44px;
+		min-width: 0;
+		min-height: 44px;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 4px;
+		padding: 0 12px 0 11px;
 		color: var(--ink);
+		text-decoration: none;
 	}
 
 	h1 {
