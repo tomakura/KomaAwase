@@ -119,3 +119,30 @@ export const verifiedColumn = () =>
 	sql<boolean>`exists (select 1 from "univ_verifications" where "univ_verifications"."user_id" = "users"."id" and "univ_verifications"."university_id" = "users"."university_id" and "univ_verifications"."expires_at" > ${Date.now()})`.mapWith(
 		Boolean
 	);
+
+/**
+ * Whether this person may use what is shared at their university (searching its courses,
+ * reading the みんなの授業データ, importing from a screenshot, adding to it): they hold a
+ * current enrollment check for it, or run the app. Otherwise why not, for what to tell them.
+ */
+export type SharedAccess = 'ok' | 'need-verify' | 'unsupported' | 'no-university';
+
+export async function sharedAccess(db: Db, userId: string, universityId: string | null): Promise<SharedAccess> {
+	if (!universityId) return 'no-university';
+	const [[user], [university], [check]] = await db.batch([
+		db.select({ role: users.role }).from(users).where(eq(users.id, userId)),
+		db.select({ domains: universities.emailDomains }).from(universities).where(eq(universities.id, universityId)),
+		db
+			.select({ userId: univVerifications.userId })
+			.from(univVerifications)
+			.where(
+				and(
+					eq(univVerifications.userId, userId),
+					eq(univVerifications.universityId, universityId),
+					gt(univVerifications.expiresAt, new Date())
+				)
+			)
+	]);
+	if (user?.role === 'admin' || check) return 'ok';
+	return university?.domains.length ? 'need-verify' : 'unsupported';
+}

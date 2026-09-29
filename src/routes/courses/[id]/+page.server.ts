@@ -3,6 +3,7 @@ import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
 import { tokyoTime } from '$lib/time';
+import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, url, platform }) => {
@@ -13,8 +14,11 @@ export const load: PageServerLoad = async ({ locals, params, url, platform }) =>
 		usedBytes(locals.db, locals.user.id)
 	]);
 	if (!loaded) error(404, '授業が見つかりません');
+	// The みんなの授業データ page is for people with an enrollment check
+	const shareable = loaded.shared ? (await sharedAccess(locals.db, locals.user.id, loaded.timetable.universityId)) === 'ok' : false;
 	return {
 		...loaded,
+		shareable,
 		files,
 		usedBytes: used,
 		quotaBytes: USER_QUOTA_BYTES,

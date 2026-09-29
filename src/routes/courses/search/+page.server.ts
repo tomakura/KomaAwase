@@ -4,6 +4,7 @@ import { universities } from '$lib/server/db/schema';
 import { peopleTaking, visibleUserIds } from '$lib/server/friends';
 import { searchSharedCourses } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
+import { sharedAccess } from '$lib/server/verify';
 import type { PageServerLoad } from './$types';
 
 const QUERY_MAX = 50;
@@ -13,12 +14,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
 	const universityId = timetable.universityId;
 	// Friends (and group members who show their timetable) already taking each course
-	const [shape, university, visible] = await Promise.all([
+	const [shape, university, visible, access] = await Promise.all([
 		loadShape(locals.db, timetable.id),
 		universityId
 			? locals.db.select({ name: universities.name }).from(universities).where(eq(universities.id, universityId)).get()
 			: null,
-		visibleUserIds(locals.db, locals.user.id)
+		visibleUserIds(locals.db, locals.user.id),
+		sharedAccess(locals.db, locals.user.id, universityId)
 	]);
 
 	const term = shape.terms.find((t) => t.id === url.searchParams.get('term')) ?? null;
@@ -28,7 +30,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		day >= 1 && day <= 7 && shape.periods.some((p) => p.number === period) ? { weekday: day, period } : null;
 	const q = [...(url.searchParams.get('q') ?? '').trim()].slice(0, QUERY_MAX).join('');
 
-	const results = universityId
+	// The shared courses are for people with an enrollment check
+	const results = access === 'ok' && universityId
 		? await searchSharedCourses(locals.db, {
 				universityId,
 				year: timetable.year,
@@ -46,6 +49,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	);
 
 	return {
+		access,
 		termParam: term?.id ?? null,
 		termName: term?.name ?? null,
 		slot,

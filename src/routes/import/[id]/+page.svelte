@@ -149,15 +149,17 @@
 				</div>
 			</fieldset>
 
-			<div class="ui-list">
-				<div class="ui-row">
-					<span id="sync-label">みんなと同期する</span>
-					<Switch bind:checked={sync} labelledby="sync-label" name="sync" />
+			{#if data.canShare}
+				<div class="ui-list">
+					<div class="ui-row">
+						<span id="sync-label">みんなと同期する</span>
+						<Switch bind:checked={sync} labelledby="sync-label" name="sync" />
+					</div>
 				</div>
-			</div>
-			<p class="ui-note">
-				同期すると、同じ大学の人が「授業をさがす」で選べるようになります。「みんなの登録」に合わせた授業はいつも同期します。
-			</p>
+				<p class="ui-note">
+					同期すると、同じ大学の人が「授業をさがす」で選べるようになります。「みんなの登録」に合わせた授業はいつも同期します。
+				</p>
+			{/if}
 
 			<h2 class="count">{rows.length}件の授業（{included.length}件を追加）</h2>
 			{#each rows as row, i (i)}

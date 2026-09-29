@@ -3,6 +3,7 @@
 	import Cropper from '$lib/components/Cropper.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import SharedLock from '$lib/components/SharedLock.svelte';
 	import { monthDay, tokyoTime } from '$lib/time';
 
 	let { data } = $props();
@@ -133,7 +134,11 @@
 			{/if}
 		{/if}
 
-		{#if !data.job || data.job.status === 'failed'}
+		{#if data.access !== 'ok' && !data.job}
+			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
+			<SharedLock access={data.access} what="スクショからの読み込み" from="/import" />
+			<p class="ui-note">授業は <a href="/courses/new">自分で入力</a> することもできます。</p>
+		{:else if !data.job || data.job.status === 'failed'}
 			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
 
 			<input class="file" type="file" accept="image/*" bind:this={fileInput} onchange={(e) => pick(e.currentTarget.files)} />

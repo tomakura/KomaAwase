@@ -9,6 +9,7 @@ import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
 import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, writeShared, type SharedCourse } from './shared-courses';
 import { loadShape, shapeQueries } from './timetable';
+import { sharedAccess } from './verify';
 
 const TITLE_MAX = 60;
 const TEACHER_MAX = 30;
@@ -130,12 +131,16 @@ export async function nextColor(db: Db, timetableId: string) {
 const CONFLICT =
 	'ほかの人が先にこの授業を直しました。画面を読み込み直すと最新の内容になるので、もう一度直して保存してください';
 
+const NEEDS_CHECK = 'みんなの授業データは、在籍確認をすると使えます。「その他」→「在籍確認」からできます';
+
 type SaveArgs = {
 	userId: string;
 	timetable: { id: string; year: number; universityId: string | null };
 	terms: { id: string; name: string }[];
 	courseId: string | null;
 	input: CourseInput;
+	// Whether the user may use the shared data of their university (sharedAccess); read here when not given
+	sharedAllowed?: boolean;
 };
 
 type PreparedCourse = { id: string; existing: SharedCourse | null; statements: BatchItem<'sqlite'>[] };
@@ -153,7 +158,7 @@ export async function saveCourse(db: Db, args: SaveArgs) {
 /** The statements that save one course, so several can go in one batch (commitCourses). */
 export async function prepareCourse(
 	db: Db,
-	{ userId, timetable, terms, courseId, input }: SaveArgs
+	{ userId, timetable, terms, courseId, input, sharedAllowed }: SaveArgs
 ): Promise<PreparedCourse | { message: string }> {
 	const existing = input.sharedCourseId ? await loadSharedCourse(db, input.sharedCourseId) : null;
 	if (
@@ -162,10 +167,24 @@ export async function prepareCourse(
 	) {
 		error(400, 'つながっている授業が見つかりません');
 	}
+	// The shared data is for people with a current enrollment check. A course already linked
+	// stays so (its values are still read); new links and new shared courses need the check.
+	const allowed = async () => (sharedAllowed ??= (await sharedAccess(db, userId, timetable.universityId)) === 'ok');
+	if (existing) {
+		const linked = courseId
+			? await db
+					.select({ id: courses.sharedCourseId })
+					.from(courses)
+					.where(and(eq(courses.id, courseId), eq(courses.timetableId, timetable.id)))
+					.get()
+			: null;
+		if (linked?.id !== existing.id && !(await allowed())) return { message: NEEDS_CHECK };
+	}
 
 	let sharedCourseId = existing?.id ?? null;
 	let syncMode = input.syncMode;
 	const shared: BatchItem<'sqlite'>[] = [];
+	if (syncMode === 'synced' && !existing && !(await allowed())) syncMode = 'personal';
 	if (syncMode === 'synced') {
 		if (!timetable.universityId) error(400, '大学が決まっていないので同期できません');
 		const written = writeShared(db, {

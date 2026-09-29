@@ -4,13 +4,16 @@ import { requireUser, safeNext } from '$lib/server/auth/next';
 import { timetables, universities } from '$lib/server/db/schema';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
 import { canEditShared, loadEdits, loadSharedCourse, restoreShared, syncedCount } from '$lib/server/shared-courses';
+import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
-// Shared data is for the university's students: anyone with a timetable there that year.
+// Shared data is for the university's students with an enrollment check: anyone with a
+// timetable there that year who has one.
 async function usable(db: App.Locals['db'], user: NonNullable<App.Locals['user']>, id: string) {
 	const course = await loadSharedCourse(db, id);
 	if (!course) error(404, '授業が見つかりません');
 	if (user.role === 'admin') return course;
+	if ((await sharedAccess(db, user.id, course.universityId)) !== 'ok') error(404, '授業が見つかりません');
 	const mine = await db
 		.select({ id: timetables.id })
 		.from(timetables)

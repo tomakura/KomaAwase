@@ -1,6 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { DAILY_LIMIT, latestJobs, queuePosition } from '$lib/server/import/jobs';
+import { currentTimetable } from '$lib/server/timetable';
+import { sharedAccess } from '$lib/server/verify';
 import type { PageServerLoad } from './$types';
 
 // `back` is whatever the query said, so one that cannot be read as a URL (//, http://[) gives no term
@@ -17,10 +19,13 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	const me = requireUser(locals, url);
 	if (!me.setupAt) redirect(303, '/');
 	depends('app:import');
-	const jobs = await latestJobs(locals.db, me.id);
+	const [jobs, timetable] = await Promise.all([latestJobs(locals.db, me.id), currentTimetable(locals.db, me, locals.timetable)]);
+	// Screenshot reading is for people with an enrollment check
+	const access = await sharedAccess(locals.db, me.id, timetable.universityId);
 	// The one to show: the newest that is still going, or finished and not yet looked at
 	const current = jobs.find((j) => !j.closedAt);
 	return {
+		access,
 		dailyLimit: DAILY_LIMIT,
 		back: safeNext(url.searchParams.get('back')) ?? '/',
 		// The term the person was looking at when they came here, so the review starts with it
