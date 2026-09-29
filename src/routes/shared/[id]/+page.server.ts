@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { timetables, universities } from '$lib/server/db/schema';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
-import { canEditShared, loadEdits, loadSharedCourse, restoreShared, syncedCount } from '$lib/server/shared-courses';
+import { canEditShared, loadEdits, loadSharedCourse, restoreShared, syncedCount, writeShared } from '$lib/server/shared-courses';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -49,6 +49,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		},
 		users,
 		canEdit,
+		isAdmin: me.role === 'admin',
 		edits: history.edits.map((e) => ({ id: e.id, createdAt: e.createdAt, diff: e.diff })),
 		page,
 		more: history.more,
@@ -72,6 +73,41 @@ export const actions: Actions = {
 		});
 		if ('message' in result) return fail(409, { message: result.message });
 		return { restored: true };
+	},
+	// Whoever runs the app fixes what others registered: the name, the teachers and the rooms
+	edit: async ({ locals, params, url, request }) => {
+		const me = requireUser(locals, url);
+		if (me.role !== 'admin') error(404, 'Not found');
+		const course = await usable(locals.db, me, params.id);
+		const form = await request.formData();
+		const title = String(form.get('title') ?? '').trim();
+		if (!title || [...title].length > 60) return fail(400, { message: '授業名は1〜60文字で入れてください', edit: true });
+		const teachers = [...new Set(String(form.get('teachers') ?? '').split(/[\n、,]/).map((t) => t.trim()))].filter(Boolean);
+		if (teachers.length > 10 || teachers.some((t) => [...t].length > 30)) {
+			return fail(400, { message: '先生は10人まで、名前は30文字までです', edit: true });
+		}
+		const rooms = form.getAll('room').map((r) => String(r).trim());
+		if (rooms.some((r) => [...r].length > 20)) return fail(400, { message: '教室は20文字までです', edit: true });
+		const written = writeShared(locals.db, {
+			userId: me.id,
+			universityId: course.universityId,
+			year: course.year,
+			termNames: course.terms,
+			existing: course,
+			values: {
+				...course.values,
+				title,
+				teachers,
+				slots: course.values.slots.map((slot, i) => ({ ...slot, room: rooms[i] || null }))
+			}
+		});
+		if (!written.changed) return fail(400, { message: '変わったところがありません', edit: true });
+		try {
+			await locals.db.batch(written.statements as [(typeof written.statements)[number], ...(typeof written.statements)[number][]]);
+		} catch {
+			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', edit: true });
+		}
+		return { edited: true };
 	},
 	report: async ({ locals, params, url, request }) => {
 		const me = requireUser(locals, url);
