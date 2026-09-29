@@ -6,9 +6,12 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login');
-	await currentTimetable(locals.db, locals.user);
+	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
 	const year = thisYear();
-	const [list, settings] = await Promise.all([listUniversities(locals.db), timetableSettings(locals.db, locals.user, year)]);
+	const [list, settings] = await Promise.all([
+		listUniversities(locals.db),
+		timetableSettings(locals.db, locals.user, year, timetable)
+	]);
 	return {
 		universityName: settings.universityName,
 		universities: list.map((u) => u.name),

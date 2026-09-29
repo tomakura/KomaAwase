@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql, type SQLWrapper } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Delivery, WeekPattern } from '$lib/courses';
 import { compareJa } from '$lib/sort';
@@ -52,31 +52,31 @@ export type SharedCourse = {
 // D1 takes at most 100 bound values per query, so many ids are read 90 at a time.
 const CHUNK = 90;
 
-export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<string, SharedCourse>> {
-	const unique = [...new Set(ids)];
-	if (!unique.length) return new Map();
-	const chunks = [];
-	for (let i = 0; i < unique.length; i += CHUNK) chunks.push(unique.slice(i, i + CHUNK));
-	const parts = await Promise.all(
-		chunks.map((part) =>
-			db.batch([
-				db.select().from(sharedCourses).where(inArray(sharedCourses.id, part)),
-				db
-					.select()
-					.from(sharedCourseSlots)
-					.where(inArray(sharedCourseSlots.sharedCourseId, part))
-					.orderBy(asc(sharedCourseSlots.weekday), asc(sharedCourseSlots.periodNumber)),
-				db
-					.select()
-					.from(sharedCourseTeachers)
-					.where(inArray(sharedCourseTeachers.sharedCourseId, part))
-					.orderBy(asc(sharedCourseTeachers.sortOrder))
-			])
-		)
-	);
-	const rows = parts.flatMap((p) => p[0]);
-	const slots = parts.flatMap((p) => p[1]);
-	const teachers = parts.flatMap((p) => p[2]);
+/**
+ * The queries behind loadSharedCourses, for a list of ids or a subquery that gives them,
+ * so a caller can run them in its own batch and read the rows with sharedCoursesFrom.
+ */
+export function sharedCourseQueries(db: Db, ids: string[] | SQLWrapper) {
+	return [
+		db.select().from(sharedCourses).where(inArray(sharedCourses.id, ids)),
+		db
+			.select()
+			.from(sharedCourseSlots)
+			.where(inArray(sharedCourseSlots.sharedCourseId, ids))
+			.orderBy(asc(sharedCourseSlots.weekday), asc(sharedCourseSlots.periodNumber)),
+		db
+			.select()
+			.from(sharedCourseTeachers)
+			.where(inArray(sharedCourseTeachers.sharedCourseId, ids))
+			.orderBy(asc(sharedCourseTeachers.sortOrder))
+	] as const;
+}
+
+export function sharedCoursesFrom(
+	rows: (typeof sharedCourses.$inferSelect)[],
+	slots: (typeof sharedCourseSlots.$inferSelect)[],
+	teachers: (typeof sharedCourseTeachers.$inferSelect)[]
+): Map<string, SharedCourse> {
 	return new Map(
 		rows.map((r) => [
 			r.id,
@@ -100,6 +100,19 @@ export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<stri
 				})
 			}
 		])
+	);
+}
+
+export async function loadSharedCourses(db: Db, ids: string[]): Promise<Map<string, SharedCourse>> {
+	const unique = [...new Set(ids)];
+	if (!unique.length) return new Map();
+	const chunks = [];
+	for (let i = 0; i < unique.length; i += CHUNK) chunks.push(unique.slice(i, i + CHUNK));
+	const parts = await Promise.all(chunks.map((part) => db.batch(sharedCourseQueries(db, part))));
+	return sharedCoursesFrom(
+		parts.flatMap((p) => p[0]),
+		parts.flatMap((p) => p[1]),
+		parts.flatMap((p) => p[2])
 	);
 }
 

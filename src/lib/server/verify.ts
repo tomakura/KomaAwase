@@ -1,4 +1,4 @@
-import { and, count, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { academicYear, tokyoTime } from '$lib/time';
 import { normalizeEmail } from './auth/email';
 import { generateToken, hashToken } from './auth/token';
@@ -111,11 +111,11 @@ export async function verifiedIds(db: Db, ids: string[]) {
 	return out;
 }
 
-/** Adds `verified` to each person */
-export async function withVerified<T extends { id: string }>(db: Db, people: T[]) {
-	const ids = await verifiedIds(
-		db,
-		people.map((p) => p.id)
+/**
+ * What verifiedIds tells, as a column of a query that reads `users`, so it comes without a
+ * trip to D1 of its own
+ */
+export const verifiedColumn = () =>
+	sql<boolean>`exists (select 1 from "univ_verifications" where "univ_verifications"."user_id" = "users"."id" and "univ_verifications"."university_id" = "users"."university_id" and "univ_verifications"."expires_at" > ${Date.now()})`.mapWith(
+		Boolean
 	);
-	return people.map((p) => ({ ...p, verified: ids.has(p.id) }));
-}

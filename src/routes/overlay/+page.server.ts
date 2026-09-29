@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	if (!me.setupAt) redirect(303, '/');
 	const year = thisYear();
 	const [mine, visible, groups, friendRows] = await Promise.all([
-		currentTimetable(locals.db, me),
+		currentTimetable(locals.db, me, locals.timetable),
 		visibleUserIds(locals.db, me.id),
 		groupsWithSharers(locals.db, me.id),
 		locals.db
@@ -36,15 +36,19 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const asked = (url.searchParams.get('with') ?? cookies.get(OVERLAY_COOKIE) ?? '').split(',');
 	const selected = [...new Set(asked)].filter((id) => visible.has(id)).slice(0, SELECTED_MAX);
 
-	const [people, rows] = await Promise.all([
+	const [people, loaded] = await Promise.all([
 		loadPeople(locals.db, [...visible].slice(0, 300)),
-		locals.db
-			.select({ id: timetables.id, userId: timetables.userId })
-			.from(timetables)
-			.where(and(inArray(timetables.userId, selected), eq(timetables.year, year)))
+		loadTimetables(
+			locals.db,
+			locals.db
+				.select({ id: timetables.id })
+				.from(timetables)
+				.where(
+					or(eq(timetables.id, mine.id), and(inArray(timetables.userId, selected), eq(timetables.year, year)))
+				)
+		)
 	]);
-	const loaded = await loadTimetables(locals.db, [mine.id, ...rows.map((r) => r.id)]);
-	const byUser = new Map(rows.map((r) => [r.userId, r.id]));
+	const byUser = new Map([...loaded].map(([id, t]) => [t.userId, id]));
 
 	return {
 		now: Date.now(),

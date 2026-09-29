@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import { compareJa } from '$lib/sort';
 import type { Db } from './db';
 import { blocks, courses, friendships, groupMembers, timetables, universities, users } from './db/schema';
+import { verifiedColumn } from './verify';
 
 // No 0/O or 1/I, so a code read aloud or off a screen is typed right. 256 is a multiple
 // of 32, so every character is equally likely; 10 characters are 50 bits.
@@ -163,7 +164,8 @@ export async function listFriendships(db: Db, meId: string) {
 			requesterId: friendships.requesterId,
 			status: friendships.status,
 			createdAt: friendships.createdAt,
-			...person
+			...person,
+			verified: verifiedColumn()
 		})
 		.from(friendships)
 		.innerJoin(
@@ -226,10 +228,6 @@ export async function visibleUserIds(db: Db, meId: string): Promise<Set<string>>
 	return ids;
 }
 
-export async function canSeeTimetable(db: Db, viewerId: string, ownerId: string) {
-	return viewerId === ownerId || (await visibleUserIds(db, viewerId)).has(ownerId);
-}
-
 // In chunks, since D1 takes at most 100 bound values per query
 export async function loadPeople(db: Db, ids: string[]) {
 	const out = [];
@@ -247,18 +245,19 @@ export async function loadPeople(db: Db, ids: string[]) {
 
 /** For each shared course, the people among `visible` who have it in their timetable for the year. */
 export async function peopleTaking(db: Db, sharedIds: string[], year: number, visible: Set<string>) {
-	const out = new Map<string, string[]>();
+	const out = new Map<string, { id: string; nickname: string | null; icon: typeof users.$inferSelect.icon }[]>();
 	if (!sharedIds.length || !visible.size) return out;
 	const rows = await db
-		.select({ sharedCourseId: courses.sharedCourseId, userId: timetables.userId })
+		.select({ sharedCourseId: courses.sharedCourseId, id: users.id, nickname: users.nickname, icon: users.icon })
 		.from(courses)
 		.innerJoin(timetables, eq(timetables.id, courses.timetableId))
+		.innerJoin(users, eq(users.id, timetables.userId))
 		.where(and(inArray(courses.sharedCourseId, sharedIds.slice(0, 90)), eq(timetables.year, year)));
-	for (const r of rows) {
-		if (!r.sharedCourseId || !visible.has(r.userId)) continue;
-		const list = out.get(r.sharedCourseId) ?? [];
-		if (!list.includes(r.userId)) list.push(r.userId);
-		out.set(r.sharedCourseId, list);
+	for (const { sharedCourseId, ...p } of rows) {
+		if (!sharedCourseId || !visible.has(p.id)) continue;
+		const list = out.get(sharedCourseId) ?? [];
+		if (!list.some((q) => q.id === p.id)) list.push(p);
+		out.set(sharedCourseId, list);
 	}
 	return out;
 }

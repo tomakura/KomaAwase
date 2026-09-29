@@ -32,6 +32,9 @@ declare global {
 		interface Locals {
 			db: import('$lib/server/db').Db;
 			user: import('$lib/server/auth/session').SessionUser | null;
+			// The user's timetable for this academic year: null when there is none yet,
+			// undefined when it wasn't read with the session (see hooks.server.ts)
+			timetable?: import('$lib/server/auth/session').KnownTimetable | null;
 		}
 		// interface PageData {}
 		// interface PageState {}

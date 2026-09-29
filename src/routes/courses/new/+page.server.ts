@@ -7,7 +7,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
-	const timetable = await currentTimetable(locals.db, locals.user);
+	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
 	const sharedId = url.searchParams.get('shared');
 	const [shape, color, found, others] = await Promise.all([
 		loadShape(locals.db, timetable.id),

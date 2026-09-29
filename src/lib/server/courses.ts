@@ -7,8 +7,8 @@ import type { Db } from './db';
 import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
-import { canEditShared, loadSharedCourse, writeShared, type SharedCourse } from './shared-courses';
-import { loadShape } from './timetable';
+import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, writeShared, type SharedCourse } from './shared-courses';
+import { loadShape, shapeQueries } from './timetable';
 
 const TITLE_MAX = 60;
 const TEACHER_MAX = 30;
@@ -300,14 +300,21 @@ export function findOwnedCourse(db: Db, userId: string, courseId: string) {
 }
 
 export async function loadCourse(db: Db, userId: string, courseId: string) {
-	const row = await findOwnedCourse(db, userId, courseId);
-	if (!row) return null;
-	const { course } = row;
-	const [shape, shared, notes, [termLinks, slotRows, teacherRows]] = await Promise.all([
-		loadShape(db, row.timetable.id),
-		course.sharedCourseId ? loadSharedCourse(db, course.sharedCourseId) : null,
-		loadNotes(db, courseId),
-		db.batch([
+	// All in one trip to D1: the rest is read by the course id alone and only used once the
+	// first two queries show the course is in the user's timetable. (Each reads one table:
+	// in a batch, drizzle mixes up columns of the same name from a join.)
+	const ofCourse = (column: typeof courses.timetableId | typeof courses.sharedCourseId) =>
+		db.select({ id: column }).from(courses).where(eq(courses.id, courseId));
+	const [[course], [timetable], termRows, periodRows, sharedRows, sharedSlots, sharedTeachers, notes, termLinks, slotRows, teacherRows] =
+		await db.batch([
+			db.select().from(courses).where(eq(courses.id, courseId)),
+			db
+				.select({ id: timetables.id, year: timetables.year, universityId: timetables.universityId })
+				.from(timetables)
+				.where(and(eq(timetables.id, ofCourse(courses.timetableId)), eq(timetables.userId, userId))),
+			...shapeQueries(db, ofCourse(courses.timetableId)),
+			...sharedCourseQueries(db, ofCourse(courses.sharedCourseId)),
+			loadNotes(db, courseId),
 			db.select({ termId: courseTerms.termId }).from(courseTerms).where(eq(courseTerms.courseId, courseId)),
 			db
 				.select({
@@ -325,8 +332,10 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 				.from(courseTeachers)
 				.where(eq(courseTeachers.courseId, courseId))
 				.orderBy(asc(courseTeachers.sortOrder))
-		])
-	]);
+		]);
+	if (!course || !timetable) return null;
+	const shape = { terms: termRows, periods: periodRows };
+	const shared = sharedCoursesFrom(sharedRows, sharedSlots, sharedTeachers).get(course.sharedCourseId ?? '') ?? null;
 	const local = {
 		title: course.title,
 		teachers: teacherRows.map((t) => t.name),
@@ -337,7 +346,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	};
 	const values = course.syncMode === 'synced' && shared ? shared.values : local;
 	return {
-		timetable: row.timetable,
+		timetable,
 		...shape,
 		course: {
 			id: course.id,

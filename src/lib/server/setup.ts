@@ -4,6 +4,7 @@ import { parseDays, parsePeriods, periodsProblem, type PeriodInput, type TermInp
 import { parseTerms, termsProblem } from '$lib/terms';
 import type { Theme } from '$lib/theme';
 import { academicYear, tokyoTime } from '$lib/time';
+import type { KnownTimetable } from './auth/session';
 import type { Db } from './db';
 import { courseSlots, courses, timetables, universities, users } from './db/schema';
 import { listUniversities } from './universities';
@@ -37,12 +38,15 @@ export function presetsFor(list: Awaited<ReturnType<typeof listUniversities>>, y
 }
 
 // What the timetable looks like now, or would look like if it were made today
-export async function timetableSettings(db: Db, owner: Owner, year: number) {
-	const timetable = await db
-		.select({ id: timetables.id, universityId: timetables.universityId })
-		.from(timetables)
-		.where(and(eq(timetables.userId, owner.id), eq(timetables.year, year)))
-		.get();
+export async function timetableSettings(db: Db, owner: Owner, year: number, known?: KnownTimetable) {
+	const timetable =
+		known?.year === year
+			? known
+			: await db
+					.select({ id: timetables.id, universityId: timetables.universityId })
+					.from(timetables)
+					.where(and(eq(timetables.userId, owner.id), eq(timetables.year, year)))
+					.get();
 	if (timetable) {
 		const [shape, used, university] = await Promise.all([
 			loadShape(db, timetable.id),

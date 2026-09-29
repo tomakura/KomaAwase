@@ -2,7 +2,6 @@ import { redirect } from '@sveltejs/kit';
 import { acceptRequest, listFriendships, removeFriendship } from '$lib/server/friends';
 import { notifyLater } from '$lib/server/notify';
 import { listMyGroups } from '$lib/server/groups';
-import { withVerified } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, depends }) => {
@@ -13,8 +12,8 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		listMyGroups(locals.db, locals.user.id)
 	]);
 	return {
-		friends: await withVerified(locals.db, friends),
-		incoming: await withVerified(locals.db, incoming),
+		friends,
+		incoming,
 		outgoing,
 		groups
 	};
