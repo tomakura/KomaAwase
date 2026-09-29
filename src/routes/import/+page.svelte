@@ -27,15 +27,15 @@
 		sending = true;
 		message = null;
 		try {
-			const image = await cropper.crop();
-			if (!image) {
+			const cropped = await cropper.crop();
+			if (!cropped) {
 				message = '画像を読み込めませんでした。別の画像でお試しください';
 				return;
 			}
 			const res = await fetch('/import/upload', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ image })
+				body: JSON.stringify(cropped)
 			});
 			const body = (await res.json().catch(() => null)) as { message?: string } | null;
 			if (!res.ok) {

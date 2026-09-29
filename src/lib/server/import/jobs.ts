@@ -17,7 +17,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 export const IMAGE_MAX = 1_500_000;
 
-export async function createImportJob(db: Db, userId: string, timetableId: string, image: string) {
+export async function createImportJob(db: Db, userId: string, timetableId: string, image: string, tiled = false) {
 	if (image.length > IMAGE_MAX || !IMAGE_PATTERN.test(image)) {
 		return { message: '画像を読み込めませんでした。別の画像でお試しください' };
 	}
@@ -36,7 +36,7 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 	if ((active?.n ?? 0) >= ACTIVE_LIMIT) return { message: '読み込み中のものが終わってから、次の画像を送ってください' };
 	const row = await db
 		.insert(importJobs)
-		.values({ userId, timetableId, image })
+		.values({ userId, timetableId, image, tiled })
 		.returning({ id: importJobs.id })
 		.get();
 	return { id: row.id };
@@ -134,8 +134,8 @@ async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): P
 
 	const errors: string[] = [];
 	const providers: { name: 'groq' | 'workers-ai'; read: () => Promise<unknown> }[] = [];
-	if (env.GROQ_API_KEY) providers.push({ name: 'groq', read: () => readWithGroq(env.GROQ_API_KEY!, job.image!) });
-	if (env.AI) providers.push({ name: 'workers-ai', read: () => readWithWorkersAi(env.AI, job.image!) });
+	if (env.GROQ_API_KEY) providers.push({ name: 'groq', read: () => readWithGroq(env.GROQ_API_KEY!, job.image!, job.tiled) });
+	if (env.AI) providers.push({ name: 'workers-ai', read: () => readWithWorkersAi(env.AI, job.image!, job.tiled) });
 
 	for (const provider of providers) {
 		let courses;

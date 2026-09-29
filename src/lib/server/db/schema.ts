@@ -499,6 +499,8 @@ export const importJobs = sqliteTable(
 			.default('queued'),
 		// The cropped screenshot as a JPEG data URL, cleared as soon as it has been read
 		image: text('image'),
+		// The table was cut into cells and stacked in the browser (import-grid.ts), so it is read another way
+		tiled: integer('tiled', { mode: 'boolean' }).notNull().default(false),
 		provider: text('provider', { enum: ['groq', 'workers-ai'] }),
 		result: text('result', { mode: 'json' }).$type<import('$lib/import').ImportedCourse[]>(),
 		error: text('error'),

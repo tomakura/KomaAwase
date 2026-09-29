@@ -1,6 +1,6 @@
 // The two AIs that read screenshots. Neither trains on what it is sent: Groq with zero data
 // retention turned on in its console, Workers AI by Cloudflare's terms (docs/architecture.md).
-import { IMPORT_PROMPT, IMPORT_SCHEMA } from '$lib/import';
+import { IMPORT_PROMPT, IMPORT_SCHEMA, IMPORT_TILE_PROMPT, IMPORT_TILE_SCHEMA } from '$lib/import';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 export const GROQ_MODEL = 'qwen/qwen3.8-27b';
@@ -16,24 +16,27 @@ export class Busy extends Error {
 /** Out of today's free quota: try the other AI, or tomorrow. */
 export class OutOfQuota extends Error {}
 
-const messages = (image: string) => [
+// `tiled`: the browser cut the table into cells and stacked them (import-grid.ts), and what is
+// asked for changes with it.
+const messages = (image: string, tiled: boolean) => [
 	{
 		role: 'user',
 		content: [
-			{ type: 'text', text: IMPORT_PROMPT },
+			{ type: 'text', text: tiled ? IMPORT_TILE_PROMPT : IMPORT_PROMPT },
 			{ type: 'image_url', image_url: { url: image } }
 		]
 	}
 ];
+const schemaOf = (tiled: boolean) => (tiled ? IMPORT_TILE_SCHEMA : IMPORT_SCHEMA);
 
-export async function readWithGroq(apiKey: string, image: string): Promise<unknown> {
+export async function readWithGroq(apiKey: string, image: string, tiled: boolean): Promise<unknown> {
 	const res = await fetch(GROQ_URL, {
 		method: 'POST',
 		headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
 		body: JSON.stringify({
 			model: GROQ_MODEL,
-			messages: messages(image),
-			response_format: { type: 'json_schema', json_schema: { name: 'timetable', strict: true, schema: IMPORT_SCHEMA } },
+			messages: messages(image, tiled),
+			response_format: { type: 'json_schema', json_schema: { name: 'timetable', strict: true, schema: schemaOf(tiled) } },
 			reasoning_effort: 'none',
 			temperature: 0,
 			max_completion_tokens: 4096
@@ -51,11 +54,11 @@ export async function readWithGroq(apiKey: string, image: string): Promise<unkno
 	return data.choices?.[0]?.message?.content ?? null;
 }
 
-export async function readWithWorkersAi(ai: Ai, image: string): Promise<unknown> {
+export async function readWithWorkersAi(ai: Ai, image: string, tiled: boolean): Promise<unknown> {
 	try {
 		const out = (await ai.run(WORKERS_AI_MODEL as Parameters<Ai['run']>[0], {
-			messages: messages(image),
-			response_format: { type: 'json_schema', json_schema: IMPORT_SCHEMA },
+			messages: messages(image, tiled),
+			response_format: { type: 'json_schema', json_schema: schemaOf(tiled) },
 			temperature: 0,
 			max_tokens: 4096
 		} as never)) as { response?: unknown };
