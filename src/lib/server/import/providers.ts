@@ -39,7 +39,7 @@ export async function readWithGroq(apiKey: string, image: string, tiled: boolean
 			response_format: { type: 'json_schema', json_schema: { name: 'timetable', strict: true, schema: schemaOf(tiled) } },
 			reasoning_effort: 'none',
 			temperature: 0,
-			max_completion_tokens: 4096
+			max_completion_tokens: 2048
 		}),
 		signal: AbortSignal.timeout(90_000)
 	});
