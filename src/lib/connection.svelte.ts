@@ -57,7 +57,7 @@ const STALE_AFTER_CHANGE = ['/overlay/__data.json', '/more/__data.json'];
 // The attribute on <body> that has links prepare their page when the pointer nears (src/app.html)
 const PRELOAD = 'data-sveltekit-preload-data';
 
-const CAUSE = { offline: 'オフラインのため', poor: '通信が不安定なため' } as const;
+const CAUSE = { offline: 'オフラインです', poor: '通信が不安定です' } as const;
 
 const onLine = () => typeof navigator === 'undefined' || navigator.onLine !== false;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
@@ -274,7 +274,7 @@ export class Connection {
 		if (ok) return;
 		if (this.blocked) {
 			this.#retrySoon();
-			if (opts.manual) this.tell(`${CAUSE[this.#link as Exclude<Link, 'online'>]}、まだ更新できません。電波のよいところでもう一度お試しください。`);
+			if (opts.manual) this.tell(`${CAUSE[this.#link as Exclude<Link, 'online'>]}。まだ更新できません`);
 		}
 	}
 
@@ -451,10 +451,10 @@ export class Connection {
 
 	#say(what: 'action' | 'add' | 'unsaved' | 'view') {
 		const cause = CAUSE[this.#link === 'poor' ? 'poor' : 'offline'];
-		if (what === 'add') return `${cause}、授業の追加などはできません。つながってからお試しください。`;
-		if (what === 'view') return `${cause}、この表示にはサーバーの情報が必要です。つながってからお試しください。`;
-		if (what === 'unsaved') return `${cause}、このページは開けません。まだ端末に保存されていません。`;
-		return `${cause}、この操作はできません。つながってからお試しください。`;
+		if (what === 'add') return `${cause}。追加の画面は開けません`;
+		if (what === 'view') return `${cause}。この表示は開けません`;
+		if (what === 'unsaved') return `${cause}。このページは開けません`;
+		return `${cause}。この操作はできません`;
 	}
 }
 
