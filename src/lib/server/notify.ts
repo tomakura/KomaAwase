@@ -2,10 +2,8 @@ import { eq, inArray } from 'drizzle-orm';
 import type { NotifyKind } from '$lib/notify';
 import type { Db } from './db';
 import { pushSubscriptions, users } from './db/schema';
-import { sendPush } from './push';
+import { PUSH_SUBJECT, sendPush } from './push';
 
-// Named in every request to the push services, as they ask
-const SUBJECT = 'https://koma.tomakura.com';
 // The Free plan allows 50 outside requests per invocation; the rest of the work needs a few
 const SENDS_MAX = 40;
 
@@ -41,7 +39,7 @@ export async function notify(env: Env, db: Db, userIds: string[], kind: NotifyKi
 		await Promise.all(
 			wanted.map(async (r) => {
 				try {
-					if ((await sendPush(r, message, keys, SUBJECT)) === 'gone') gone.push(r.id);
+					if ((await sendPush(r, message, keys, PUSH_SUBJECT)) === 'gone') gone.push(r.id);
 				} catch (e) {
 					console.error('push failed', e);
 				}

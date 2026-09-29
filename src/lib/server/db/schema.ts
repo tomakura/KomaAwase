@@ -73,6 +73,19 @@ export const pushSubscriptions = sqliteTable(
 	(t) => [index('push_subscriptions_user_idx').on(t.userId)]
 );
 
+// How long before a class starts a user wants a notification (src/lib/reminder.ts): up to
+// three rows each. Read every minute by the reminder cron (src/lib/server/reminders.ts).
+export const classReminders = sqliteTable(
+	'class_reminders',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		minutes: integer('minutes').notNull()
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.minutes] })]
+);
+
 export const passkeys = sqliteTable(
 	'passkeys',
 	{

@@ -2,6 +2,10 @@
 // daily sweep reuse its routes by calling them in-process, with a flag on env that a request
 // from outside can never carry (see src/lib/server/internal.ts).
 import sveltekit from '../.svelte-kit/cloudflare/_worker.js';
+import { sendDueReminders } from '../src/lib/server/reminders.ts';
+
+// The cron in wrangler.jsonc that runs every minute; the other one is the daily sweep
+const REMINDER_CRON = '* 0-13,21-23 * * *';
 
 /**
  * @param {Env} env
@@ -44,11 +48,17 @@ export default {
 	},
 
 	/**
-	 * @param {ScheduledController} _controller
+	 * The class reminders don't go through SvelteKit: they run every minute, so they must stay
+	 * light (src/lib/server/reminders.ts).
+	 * @param {ScheduledController} controller
 	 * @param {Env} env
 	 * @param {ExecutionContext} ctx
 	 */
-	async scheduled(_controller, env, ctx) {
-		ctx.waitUntil(internal(env, ctx, '/internal/daily', {}));
+	async scheduled(controller, env, ctx) {
+		if (controller.cron === REMINDER_CRON) {
+			ctx.waitUntil(sendDueReminders(env, controller.scheduledTime));
+		} else {
+			ctx.waitUntil(internal(env, ctx, '/internal/daily', {}));
+		}
 	}
 };

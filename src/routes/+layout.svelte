@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
+	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
 	import { version } from '$app/environment';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
@@ -123,3 +124,5 @@
 <ConnectionBar />
 <NavigationWait />
 {@render children()}
+
+<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} />

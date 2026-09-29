@@ -3,75 +3,34 @@
 	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Switch from '$lib/components/Switch.svelte';
+	import type { PushState } from '$lib/notify-prompt';
+	import { enablePush, pushState, subscription } from '$lib/push-client';
+	import { REMINDERS_MAX, REMINDER_MINUTES, leadLabel } from '$lib/reminder';
 
 	let { data, form } = $props();
 
 	// What this device can do, found out in the browser
-	type State = 'checking' | 'unsupported' | 'install' | 'denied' | 'off' | 'on';
-	let device = $state<State>('checking');
+	let device = $state<PushState | 'checking'>('checking');
 	let busy = $state(false);
 	let message = $state<string | null>(null);
 
-	// iPhone and iPad only deliver notifications to the app added to the home screen
-	const isIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-	const standalone = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
-
-	async function subscription() {
-		const registration = await navigator.serviceWorker.ready;
-		return registration.pushManager.getSubscription();
-	}
-
-	async function check() {
-		if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-			device = isIos() && !standalone() ? 'install' : 'unsupported';
-			return;
-		}
-		if (Notification.permission === 'denied') {
-			device = 'denied';
-			return;
-		}
-		device = (await subscription()) ? 'on' : 'off';
-	}
-
 	$effect(() => {
-		check();
+		pushState().then((state) => (device = state));
 	});
-
-	function keyBytes(key: string) {
-		const s = atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (key.length % 4)) % 4));
-		return Uint8Array.from(s, (c) => c.charCodeAt(0));
-	}
 
 	async function turnOn() {
 		if (!data.publicKey) return;
 		busy = true;
 		message = null;
-		try {
-			if ((await Notification.requestPermission()) !== 'granted') {
-				device = Notification.permission === 'denied' ? 'denied' : 'off';
-				return;
-			}
-			const registration = await navigator.serviceWorker.ready;
-			const sub =
-				(await registration.pushManager.getSubscription()) ??
-				(await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.publicKey) }));
-			const res = await fetch('/api/push/subscribe', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(sub.toJSON())
-			});
-			if (!res.ok) {
-				message = ((await res.json().catch(() => null)) as { message?: string } | null)?.message ?? 'この端末では通知を受け取れませんでした';
-				await sub.unsubscribe();
-				return;
-			}
+		const result = await enablePush(data.publicKey);
+		if (result.ok) {
 			device = 'on';
 			await invalidateAll();
-		} catch {
-			message = 'この端末では通知を受け取れませんでした';
-		} finally {
-			busy = false;
+		} else {
+			device = result.state;
+			message = result.message ?? null;
 		}
+		busy = false;
 	}
 
 	async function turnOff() {
@@ -95,6 +54,10 @@
 	}
 
 	let settingsForm = $state<HTMLFormElement>();
+
+	// svelte-ignore state_referenced_locally
+	let picked = $state<number[]>(data.reminders);
+	let remindersForm = $state<HTMLFormElement>();
 </script>
 
 <svelte:head>
@@ -160,6 +123,31 @@
 				</form>
 				<p class="ui-note">設定はすべての端末で共通です。</p>
 			</section>
+
+			<section>
+				<h2>授業の前の通知</h2>
+				<form method="POST" action="?/reminders" bind:this={remindersForm} use:enhance={() => async ({ update }) => update({ reset: false })}>
+					<div class="chips">
+						{#each REMINDER_MINUTES as m (m)}
+							<label class="chip">
+								<input
+									type="checkbox"
+									name="minutes"
+									value={m}
+									bind:group={picked}
+									disabled={!picked.includes(m) && picked.length >= REMINDERS_MAX}
+									onchange={() => queueMicrotask(() => remindersForm?.requestSubmit())}
+								/>
+								<span>{leadLabel(m)}</span>
+							</label>
+						{/each}
+					</div>
+				</form>
+				<p class="ui-note">授業が始まる前に、授業名・教室・開始時刻をお知らせします。{REMINDERS_MAX}つまで選べます。</p>
+				{#if device !== 'on' && device !== 'checking'}
+					<p class="ui-note">通知をオンにした端末に届きます。</p>
+				{/if}
+			</section>
 		{/if}
 	</div>
 </div>
@@ -203,5 +191,54 @@
 
 	.row form .btn {
 		width: 100%;
+	}
+
+	.chips {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 8px;
+	}
+
+	.chip {
+		position: relative;
+	}
+
+	.chip input {
+		position: absolute;
+		inset: 0;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+
+	.chip span {
+		display: block;
+		padding: 11px 2px;
+		border: 1px solid var(--line-bold);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-size: 13px;
+		font-weight: 700;
+		text-align: center;
+	}
+
+	.chip:has(input:checked) span {
+		border-color: var(--ink);
+		background: var(--ink);
+		color: var(--surface);
+	}
+
+	.chip:has(input:disabled) {
+		opacity: 0.4;
+	}
+
+	.chip:has(input:disabled) input {
+		cursor: default;
+	}
+
+	.chip:has(input:focus-visible) span {
+		outline: 2px solid var(--accent-text);
+		outline-offset: 2px;
 	}
 </style>
