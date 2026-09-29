@@ -56,7 +56,7 @@ export const actions: Actions = {
 			await deleteFile(event.platform.env, event.locals.db, courseId, String(form.get('id')));
 		} catch (e) {
 			console.error('file delete failed', e);
-			return fail(502, { message: '資料を消せませんでした。時間をおいてもう一度お試しください' });
+			return fail(502, { message: '資料を消せませんでした。時間をおいてもう一度やり直してください' });
 		}
 	}
 };

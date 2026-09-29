@@ -60,7 +60,7 @@
 			if (url) formData.set('photo', url);
 			else {
 				// Not loaded (HEIC outside Safari, say) or too big even at low quality
-				photoError = 'この写真は使えませんでした。別の写真でお試しください';
+				photoError = 'この写真は使えませんでした。別の写真でやり直してください';
 				cancel();
 			}
 		}}

@@ -365,7 +365,7 @@ describe('when the connection is down', () => {
 		expect(pings(s.asked)).toBe(before + 1);
 		await vi.advanceTimersByTimeAsync(700);
 		expect(s.connection.phase).toBe('idle');
-		expect(s.connection.notice?.text).toContain('まだ更新できません');
+		expect(s.connection.notice?.text).toBe('更新に失敗しました');
 	});
 });
 
@@ -400,7 +400,7 @@ describe('while the connection is down, what needs the server is off', () => {
 
 		await expect(fetch('/courses/abc/files', { method: 'POST', body: 'x' })).rejects.toThrow(TypeError);
 		expect(original).not.toHaveBeenCalled();
-		expect(s.connection.notice?.text).toBe('オフラインのため、この操作はできません。つながってからお試しください。');
+		expect(s.connection.notice?.text).toBe('オフラインのため、その操作はできません');
 
 		// Reading is still up to the service worker
 		await fetch('/friends/__data.json');
@@ -413,7 +413,7 @@ describe('while the connection is down, what needs the server is off', () => {
 		await vi.advanceTimersByTimeAsync(6_000);
 		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
 		await fetch('/x', { method: 'POST' }).catch(() => {});
-		expect(s.connection.notice?.text).toContain('通信が不安定なため');
+		expect(s.connection.notice?.text).toBe('通信が不安定のため、更新できません');
 	});
 
 	it('lets its own refresh requests and requests to other sites through', async () => {
@@ -461,9 +461,9 @@ describe('while the connection is down, what needs the server is off', () => {
 		expect(go('/friends')).toBe(true);
 		expect(go('/')).toBe(true);
 		expect(go('/courses/search?term=a&day=1&period=2')).toBe(false);
-		expect(s.connection.notice?.text).toContain('授業の追加');
+		expect(s.connection.notice?.text).toBe('オフラインのため、その操作はできません');
 		expect(go('/overlay')).toBe(false);
-		expect(s.connection.notice?.text).toContain('端末に保存されていません');
+		expect(s.connection.notice?.text).toBe('オフラインのため、その操作はできません');
 		expect(go('https://elsewhere.test/')).toBe(true);
 	});
 
@@ -507,7 +507,7 @@ describe('while the connection is down, what needs the server is off', () => {
 		expect(go('/overlay?with=u2&term=T', '/overlay')).toBe(true);
 		expect(s.connection.notice).toBeNull();
 		expect(go('/overlay?with=u3&term=T', '/overlay')).toBe(false);
-		expect(s.connection.notice?.text).toBe('オフラインのため、この表示にはサーバーの情報が必要です。つながってからお試しください。');
+		expect(s.connection.notice?.text).toBe('オフラインのため、その操作はできません');
 		expect(go('/overlay?term=T', '/overlay')).toBe(false);
 	});
 
@@ -522,7 +522,7 @@ describe('while the connection is down, what needs the server is off', () => {
 		expect(go('/overlay?with=u9&term=T', '/')).toBe(true);
 		// No copy of the page at all
 		expect(go('/more?x=1', '/')).toBe(false);
-		expect(s.connection.notice?.text).toContain('端末に保存されていません');
+		expect(s.connection.notice?.text).toBe('オフラインのため、その操作はできません');
 	});
 
 	it('counts a view opened while online as kept, so it opens again offline', async () => {

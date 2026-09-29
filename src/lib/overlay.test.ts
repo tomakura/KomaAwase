@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellKey, lookingAt, normalizeTitle, overlay, termOn, type OverlayPerson } from './overlay';
+import { cellKey, classFill, lookingAt, normalizeTitle, overlay, termOn, type OverlayPerson } from './overlay';
 
 const dhw = [
 	{ number: 1, start: '08:40', end: '10:10' },
@@ -87,4 +87,18 @@ describe('termOn', () => {
 
 it('normalizes titles', () => {
 	expect(normalizeTitle('ＡＢ 演習')).toBe(normalizeTitle('AB演習'));
+});
+
+describe('classFill', () => {
+	it('is one color for one person', () => {
+		const fill = classFill(['#2F5F99']);
+		expect(fill).toContain('linear-gradient(to bottom, #2F5F99 0% 100%) left / 4px 100% no-repeat');
+		expect(fill).toContain('color-mix(in srgb, #2F5F99 28%, var(--raised)) 0% 100%');
+	});
+
+	it('is a band of each color for a class taken by several people', () => {
+		const fill = classFill(['#2F5F99', '#3E7A4E']);
+		expect(fill).toContain('linear-gradient(to bottom, #2F5F99 0% 50%, #3E7A4E 50% 100%)');
+		expect(fill).toContain('color-mix(in srgb, #3E7A4E 28%, var(--raised)) 50% 100%');
+	});
 });

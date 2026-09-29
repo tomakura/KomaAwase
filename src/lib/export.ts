@@ -146,7 +146,11 @@ const NO_LINE_START = /^[ーぁぃぅぇぉっゃゅょゎァィゥェォッャ�
  * Lines for a title: words (from titleParts) are kept whole where they fit, a word
  * longer than a line is broken anywhere, and what doesn't fit ends in "…".
  */
-export function wrap(measure: (s: string) => number, parts: string[], maxWidth: number, maxLines: number) {
+export function wrap(measureText: (s: string) => number, parts: string[], maxWidth: number, maxLines: number) {
+	// A space at the end of a line takes no room on screen, so it takes none here either (English
+	// words come with theirs); counting it would break lines a little too early, then narrower
+	// again if the box takes its width from the lines
+	const measure = (s: string) => measureText(s.trimEnd());
 	const lines: string[] = [];
 	let line = '';
 	const push = (piece: string) => {
@@ -179,6 +183,7 @@ export function wrap(measure: (s: string) => number, parts: string[], maxWidth: 
 		for (const ch of part) push(ch);
 	}
 	if (line) lines.push(line);
+	lines.forEach((l, i) => (lines[i] = l.trimEnd()));
 	if (lines.length <= maxLines) return lines;
 	const kept = lines.slice(0, maxLines);
 	let last = kept[maxLines - 1];

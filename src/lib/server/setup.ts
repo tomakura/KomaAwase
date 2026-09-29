@@ -88,7 +88,7 @@ export type ShapeForm = { terms: TermInput[]; periods: PeriodInput[] };
 export function readShape(form: FormData): ShapeForm | { message: string } {
 	const terms = parseTerms(String(form.get('terms') ?? ''));
 	const periods = parsePeriods(String(form.get('periods') ?? ''));
-	if (!terms || !periods) return { message: '入力を読み取れませんでした。もう一度お試しください' };
+	if (!terms || !periods) return { message: '入力を読み取れませんでした。もう一度やり直してください' };
 	const problem = termsProblem(terms) ?? periodsProblem(periods);
 	return problem ? { message: problem } : { terms, periods };
 }

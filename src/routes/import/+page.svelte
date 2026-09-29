@@ -29,7 +29,7 @@
 		try {
 			const cropped = await cropper.crop();
 			if (!cropped) {
-				message = '画像を読み込めませんでした。別の画像でお試しください';
+				message = '画像を読み込めませんでした。別の画像でやり直してください';
 				return;
 			}
 			const res = await fetch('/import/upload', {
@@ -39,7 +39,7 @@
 			});
 			const body = (await res.json().catch(() => null)) as { message?: string } | null;
 			if (!res.ok) {
-				message = body?.message ?? '送れませんでした。時間をおいてもう一度お試しください';
+				message = body?.message ?? '送れませんでした。時間をおいてもう一度やり直してください';
 				return;
 			}
 			if (src) URL.revokeObjectURL(src);
@@ -49,7 +49,7 @@
 			if (fileInput) fileInput.value = '';
 			await invalidate('app:import');
 		} catch {
-			message = '送れませんでした。電波のよいところでもう一度お試しください';
+			message = '送れませんでした。電波のよいところで、もう一度やり直してください';
 		} finally {
 			sending = false;
 		}

@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { fade, fly, slide } from 'svelte/transition';
 	import Icon from './Icon.svelte';
 	import { connection } from '$lib/connection.svelte';
+	import { motion } from '$lib/motion';
 	import { savedAtLabel } from '$lib/sync';
 
 	// The strip at the top while the app is offline or the connection is poor (and while the
@@ -14,7 +16,7 @@
 
 	const mode = $derived(link !== 'online' ? link : connection.recovered ? 'recovered' : 'syncing');
 	const title = $derived(
-		{ offline: 'オフライン', poor: '通信が不安定です', recovered: 'つながりました', syncing: '時間割を同期中' }[mode]
+		{ offline: 'オフライン', poor: '通信が不安定です', recovered: 'オンラインに復帰しました', syncing: '時間割を同期中' }[mode]
 	);
 	const detail = $derived(
 		mode === 'recovered'
@@ -22,7 +24,7 @@
 			: mode === 'syncing'
 				? null
 				: fetched
-					? `${fetched} に取得した情報を表示しています`
+					? `${fetched} の情報を表示しています`
 					: null
 	);
 	const step = $derived(
@@ -36,17 +38,23 @@
 	);
 
 	// The page's minimum height gives up the strip's height (--bar-h, see src/app.css), so that
-	// showing it doesn't make the page scroll
+	// showing it doesn't make the page scroll. It follows the strip while it slides.
 	let height = $state(0);
 	$effect(() => {
 		const root = document.documentElement;
-		root.style.setProperty('--bar-h', connection.visible ? `${height}px` : '0px');
+		root.style.setProperty('--bar-h', `${height}px`);
 		return () => root.style.removeProperty('--bar-h');
 	});
 </script>
 
 {#if connection.visible}
-	<div class="bar {mode}" bind:offsetHeight={height} aria-live="polite">
+	<div
+		class="bar {mode}"
+		bind:offsetHeight={height}
+		aria-live="polite"
+		transition:slide={motion(260)}
+		onoutroend={() => (height = 0)}
+	>
 		<div class="inner">
 			<div class="row">
 				<Icon name={mode === 'recovered' ? 'check' : mode === 'syncing' ? 'sync' : 'offline'} size={20} />
@@ -61,7 +69,7 @@
 				{/if}
 			</div>
 			{#if busy && step}
-				<div class="step">
+				<div class="step" transition:slide={motion(260)}>
 					<span>{step}</span>
 					{#if progress}
 						<div class="track" role="progressbar" aria-label="同期の進み具合" aria-valuemin="0" aria-valuemax={progress.total} aria-valuenow={progress.done}>
@@ -78,7 +86,10 @@
 
 {#if connection.notice}
 	{#key connection.notice.id}
-		<p class="toast" role="status">{connection.notice.text}</p>
+		<!-- Global: the whole block goes when the notice does -->
+		<p class="toast" role="status" in:fly|global={{ ...motion(200), y: 8 }} out:fade|global={motion(150)}>
+			{connection.notice.text}
+		</p>
 	{/key}
 {/if}
 
@@ -90,6 +101,15 @@
 		background: var(--course-blue);
 		color: var(--ink);
 		border-bottom: 1px solid var(--line-strong);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.bar {
+			transition:
+				background-color 0.3s,
+				color 0.3s,
+				border-color 0.3s;
+		}
 	}
 
 	.bar.offline {
@@ -220,10 +240,6 @@
 			animation: wait 1.4s ease-in-out infinite;
 		}
 
-		.toast {
-			animation: rise 0.2s ease-out;
-		}
-
 		@keyframes spin {
 			to {
 				transform: rotate(360deg);
@@ -236,13 +252,6 @@
 			}
 			to {
 				transform: translateX(300%);
-			}
-		}
-
-		@keyframes rise {
-			from {
-				opacity: 0;
-				transform: translate(-50%, 8px);
 			}
 		}
 	}

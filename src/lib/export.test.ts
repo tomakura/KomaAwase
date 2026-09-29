@@ -20,6 +20,14 @@ describe('wrap', () => {
 		expect(wrap(measure, ['データ', 'ベース'], 4, 3)).toEqual(['データ', 'ベース']);
 	});
 
+	it('does not count the space that ends a line', () => {
+		// 'Core Eng IV Com-A' in words, each with its space. A line fits when its letters do
+		const words = ['Core ', 'Eng ', 'IV ', 'Com-A'];
+		expect(wrap(measure, words, 11, 5)).toEqual(['Core Eng IV', 'Com-A']);
+		expect(wrap(measure, words, 8, 5)).toEqual(['Core Eng', 'IV Com-A']);
+		expect(wrap(measure, words, 4, 5)).toEqual(['Core', 'Eng', 'IV', 'Com-', 'A']);
+	});
+
 	it('ends what does not fit with an ellipsis', () => {
 		expect(wrap(measure, ['一二三', '四五六', '七八九'], 3, 2)).toEqual(['一二三', '四五…']);
 	});

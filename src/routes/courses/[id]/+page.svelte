@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
@@ -215,7 +217,7 @@
 					<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required></textarea></label>
 				{:else if adding === 'task'}
 					<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
-					<label class="field">締切（なくてもOK）<input type="date" name="due" /></label>
+					<label class="field">締切（任意）<input type="date" name="due" /></label>
 				{:else}
 					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
 					<label class="field">
@@ -236,7 +238,7 @@
 				<section>
 					<h2>課題</h2>
 					{#each tasks as task (task.id)}
-						<div class="item" class:done={task.done}>
+						<div transition:slide={motion()} class="item" class:done={task.done}>
 							<form method="POST" action={actionHref('done', data.termParam)} use:enhance>
 								<input type="hidden" name="id" value={task.id} />
 								<input
@@ -266,7 +268,7 @@
 				<section>
 					<h2>休講</h2>
 					{#each cancels as c (c.id)}
-						<div class="item" class:done={(c.date ?? '') < data.today}>
+						<div transition:slide={motion()} class="item" class:done={(c.date ?? '') < data.today}>
 							<span class="text">
 								<span class="main">{withDay(c.date ?? '')} 休講</span>
 								{#if c.body}<span class="sub">{c.body}</span>{/if}
@@ -283,7 +285,7 @@
 					<div class="files">
 						{#each data.files as file (file.id)}
 							{@const badge = fileBadge(file.mime)}
-							<div class="file">
+							<div transition:slide={motion()} class="file">
 								<a href="/courses/{course.id}/files/{file.id}" target="_blank" rel="noopener">
 									<span class="file-icon">
 										{#if badge}
@@ -315,7 +317,7 @@
 				<section>
 					<h2>メモ</h2>
 					{#each memos as memo (memo.id)}
-						<div class="item memo">
+						<div transition:slide={motion()} class="item memo">
 							<span class="text">
 								{#if memo.date}<span class="sub">{withDay(memo.date)}</span>{/if}
 								<span class="body">{memo.body}</span>
@@ -386,11 +388,13 @@
 		gap: 12px;
 	}
 
+	/* Takes the room there is, so the title is wrapped to that and not to its own width */
 	.name {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		min-width: 0;
+		flex: 1;
 	}
 
 	.bar {
@@ -408,6 +412,8 @@
 		font-family: var(--font-display);
 		font-weight: 700;
 		font-size: 24px;
+		min-width: 0;
+		flex: 1;
 		word-break: keep-all;
 		overflow-wrap: anywhere;
 	}

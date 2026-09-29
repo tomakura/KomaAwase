@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { still } from '$lib/motion';
 	import { swipeDown } from '$lib/swipe';
 
 	// A sheet that slides up from the bottom, on the native <dialog> so focus and Escape work.
@@ -11,25 +12,43 @@
 	}: { open?: boolean; title: string; onclose?: () => void; children: Snippet } = $props();
 
 	let dialog = $state<HTMLDialogElement>();
+	let closing = $state(false);
+
+	// Slides down first, as it slid up (a pull down has already moved it away: see swipeDown)
+	function dismiss() {
+		if (!dialog?.open || closing) return;
+		if (still()) return dialog.close();
+		closing = true;
+		setTimeout(() => {
+			closing = false;
+			dialog?.close();
+		}, 200);
+	}
 
 	$effect(() => {
 		if (!dialog) return;
 		if (open && !dialog.open) dialog.showModal();
-		if (!open && dialog.open) dialog.close();
+		if (!open && dialog.open) dismiss();
 	});
 </script>
 
 <dialog
 	bind:this={dialog}
+	class:closing
 	use:swipeDown={() => dialog?.close()}
 	aria-label={title}
+	oncancel={(e) => {
+		// Escape
+		e.preventDefault();
+		dismiss();
+	}}
 	onclose={() => {
 		open = false;
 		onclose?.();
 	}}
 	onclick={(e) => {
 		// A tap on the backdrop closes it.
-		if (e.target === dialog) dialog.close();
+		if (e.target === dialog) dismiss();
 	}}
 >
 	<div class="sheet">
@@ -90,6 +109,26 @@
 
 		dialog[open]::backdrop {
 			animation: fade 0.24s ease-out;
+		}
+
+		dialog.closing {
+			animation: down 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+		}
+
+		dialog.closing::backdrop {
+			animation: fade-out 0.2s ease-in forwards;
+		}
+
+		@keyframes fade-out {
+			to {
+				opacity: 0;
+			}
+		}
+
+		@keyframes down {
+			to {
+				transform: translateY(100%);
+			}
 		}
 
 		@keyframes fade {

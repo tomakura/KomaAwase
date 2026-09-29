@@ -38,6 +38,20 @@ function groupKey(course: OverlayCourse, universityId: string | null) {
 
 const time = (t: string) => t.replace(/^0/, '');
 
+// Equal bands of the colors, side by side (to right) or stacked (to bottom)
+const bands = (direction: 'right' | 'bottom', colors: string[]) =>
+	`linear-gradient(to ${direction}, ${colors.map((c, i) => `${c} ${(i / colors.length) * 100}% ${((i + 1) / colors.length) * 100}%`).join(', ')})`;
+
+/**
+ * The look of a class taken by these people: a band of each person's tint, and a stripe down
+ * the left in their colors. A class that is one person's is in just that person's color.
+ * `raised` is what the tint is mixed into.
+ */
+export function classFill(colors: string[], raised = 'var(--raised)') {
+	const tints = colors.map((c) => `color-mix(in srgb, ${c} 28%, ${raised})`);
+	return `${bands('bottom', colors)} left / 4px 100% no-repeat, ${bands('right', tints)}`;
+}
+
 /**
  * Which of the viewer's periods each person is in class during, by the minute. A period
  * counts as taken when any part of it overlaps a class.

@@ -65,7 +65,7 @@
 				</svg>
 				Googleで続ける
 			</a>
-			{#if data.googleFailed}<p class="error" role="alert">Googleでログインできませんでした。もう一度お試しください</p>{/if}
+			{#if data.googleFailed}<p class="error" role="alert">Googleでログインできませんでした。もう一度やり直してください</p>{/if}
 			{#if data.googleUseMail}
 				<p class="error" role="alert">このGoogleアカウントのメールアドレスでは続けられません。下からメールアドレスでログインしてください</p>
 			{/if}
@@ -96,7 +96,7 @@
 					<input name="email" type="email" autocomplete="email" required />
 				</label>
 				{#if blocked}
-					<p class="error" role="alert">送れませんでした。しばらく待ってから、もう一度お試しください</p>
+					<p class="error" role="alert">送れませんでした。しばらく待ってから、もう一度やり直してください</p>
 				{:else if form?.message}
 					<p class="error" role="alert">{form.message}</p>
 				{/if}

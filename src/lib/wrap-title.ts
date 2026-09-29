@@ -10,8 +10,11 @@ const canvas = typeof document === 'undefined' ? null : document.createElement('
 export function wrapTitle(node: HTMLElement, title: string) {
 	let current = titleParts(title);
 	function render() {
-		const width = node.clientWidth;
-		if (!canvas || !width) return;
+		// Not clientWidth, which rounds down: a box that takes its width from its longest line would
+		// then break that line, and get narrower again on every pass. The extra half pixel is for
+		// the canvas and the page measuring the same text a hair apart.
+		const width = node.getBoundingClientRect().width + 0.5;
+		if (!canvas || width < 1) return;
 		const style = getComputedStyle(node);
 		canvas.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
 		node.textContent = wrap((s) => canvas.measureText(s).width, current, width, 20).join('\n');

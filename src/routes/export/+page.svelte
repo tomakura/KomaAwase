@@ -132,7 +132,7 @@
 		try {
 			await navigator.share({ files: [new File([b], fileName, { type: 'image/png' })], title: exportData.title });
 		} catch (e) {
-			if (!(e instanceof DOMException && e.name === 'AbortError')) message = '共有できませんでした。「画像を保存」をお試しください';
+			if (!(e instanceof DOMException && e.name === 'AbortError')) message = '共有できませんでした。「画像を保存」を使ってください';
 		}
 	}
 

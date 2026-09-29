@@ -45,7 +45,7 @@ const MESSAGES = {
 	friends: null,
 	pending: null,
 	unavailable: '申請できませんでした',
-	limit: '返事を待っている申請が多すぎます。承認されるか、取り消してからもう一度お試しください'
+	limit: '返事を待っている申請が多すぎます。承認されるか、取り消してからもう一度やり直してください'
 };
 
 export const actions: Actions = {

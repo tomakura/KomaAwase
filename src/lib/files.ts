@@ -66,7 +66,7 @@ export async function uploadFile(courseId: string, file: File): Promise<string |
 	}).catch(() => null);
 	if (res?.ok) return null;
 	const data = (await res?.json().catch(() => null)) as { message?: string } | null;
-	return `${name}：${data?.message ?? '送れませんでした。時間をおいてもう一度お試しください'}`;
+	return `${name}：${data?.message ?? '送れませんでした。時間をおいてもう一度やり直してください'}`;
 }
 
 // 820KB, 2.1MB, 100MB

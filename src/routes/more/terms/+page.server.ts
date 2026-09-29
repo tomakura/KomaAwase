@@ -21,7 +21,7 @@ export const actions: Actions = {
 	default: async ({ request, locals }) => {
 		if (!locals.user) redirect(303, '/login');
 		const terms = parseTerms(String((await request.formData()).get('terms') ?? ''));
-		if (!terms) return fail(400, { message: '入力を読み取れませんでした。もう一度お試しください' });
+		if (!terms) return fail(400, { message: '入力を読み取れませんでした。もう一度やり直してください' });
 		const problem = termsProblem(terms);
 		if (problem) return fail(400, { message: problem });
 		const timetable = await currentTimetable(locals.db, locals.user);

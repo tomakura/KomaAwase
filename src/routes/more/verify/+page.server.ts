@@ -41,7 +41,7 @@ export const actions: Actions = {
 		} catch (e) {
 			console.error('verification mail failed', e);
 			await dropToken(locals.db, started.token);
-			return fail(502, { message: 'メールを送れませんでした。時間をおいてもう一度お試しください' });
+			return fail(502, { message: 'メールを送れませんでした。時間をおいてもう一度やり直してください' });
 		}
 		return { sentTo: started.email };
 	}

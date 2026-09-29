@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { replaceState } from '$app/navigation';
+	import { fade } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
@@ -7,6 +8,7 @@
 	import UnscheduledCards from '$lib/components/UnscheduledCards.svelte';
 	import { liveClock } from '$lib/clock.svelte';
 	import { courseHref, timetableHref } from '$lib/courses';
+	import { motion } from '$lib/motion';
 	import { currentTerm, termIsOn } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
 
@@ -79,18 +81,23 @@
 			</section>
 		{/if}
 
-		<TimetableGrid
-			periods={data.periods}
-			{days}
-			courses={termCourses}
-			{clock}
-			termIsOn={on}
-			termStart={term?.startDate}
-			slotHref={(day, period) => `/courses/search?term=${termId}&day=${day}&period=${period}`}
-			courseHref={(id) => courseHref(id, termId ?? null)}
-		/>
+		<!-- The other term's classes fade in -->
+		{#key termId}
+			<div in:fade={motion(200)}>
+				<TimetableGrid
+					periods={data.periods}
+					{days}
+					courses={termCourses}
+					{clock}
+					termIsOn={on}
+					termStart={term?.startDate}
+					slotHref={(day, period) => `/courses/search?term=${termId}&day=${day}&period=${period}`}
+					courseHref={(id) => courseHref(id, termId ?? null)}
+				/>
 
-		<UnscheduledCards courses={unscheduled} href={(id) => courseHref(id, termId ?? null)} />
+				<UnscheduledCards courses={unscheduled} href={(id) => courseHref(id, termId ?? null)} />
+			</div>
+		{/key}
 	</main>
 
 	<BottomNav current="timetable" />
