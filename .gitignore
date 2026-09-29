@@ -30,3 +30,6 @@ relay/koma-files-secret.php
 .dev.local.vars
 .dev.vars
 .bench/
+
+# Claude
+.claude
