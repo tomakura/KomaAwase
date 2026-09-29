@@ -90,6 +90,7 @@
 		<section class="ui-section">
 			<h2 class="ui-section-title">運営が直す</h2>
 			<form class="admin-edit" method="POST" action="?/edit" use:enhance={() => async ({ update }) => update({ reset: false })}>
+				<input type="hidden" name="version" value={data.course.version} />
 				<label class="field">
 					授業名
 					<input name="title" value={data.course.values.title} maxlength="60" required />

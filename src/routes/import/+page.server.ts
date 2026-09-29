@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	return {
 		access,
 		// Everyone's screenshots for today are taken: when one sent now would be read (null when it is read at once)
-		readAt: used >= TOTAL_DAILY_LIMIT ? (await readSlot(locals.db)).getTime() : null,
+		readAt: used >= TOTAL_DAILY_LIMIT ? ((await readSlot(locals.db))?.getTime() ?? null) : null,
 		dailyLimit: DAILY_LIMIT,
 		back: safeNext(url.searchParams.get('back')) ?? '/',
 		// The term the person was looking at when they came here, so the review starts with it

@@ -8,7 +8,13 @@
 	// Suggests confirming enrollment: for someone who never has, and as the check runs out
 	// (30, 14 and 7 days before, and once after). What was shown is kept on the account, so
 	// each comes once, on a tab, a moment after opening.
-	let { prompt, setupDone }: { prompt: VerifyPrompt | null; setupDone: boolean } = $props();
+	// `dismissed` is the stage the person has closed, so the layout can stop holding back the
+	// screen that follows (NotifyPrompt) while the page's data still carries this one.
+	let {
+		prompt,
+		setupDone,
+		dismissed = $bindable(-1)
+	}: { prompt: VerifyPrompt | null; setupDone: boolean; dismissed?: number } = $props();
 
 	let open = $state(false);
 	// The prompt on screen; kept because the page's data still holds it until it next loads
@@ -32,6 +38,10 @@
 			}).catch(() => {});
 		}, 1500);
 		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		if (!open && shown) dismissed = shown.stage;
 	});
 
 	const title = $derived(

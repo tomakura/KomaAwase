@@ -66,12 +66,12 @@
 	});
 
 	// 「明日の朝」: when a screenshot that could not be read today is read (a few days on if those mornings are taken too)
+	const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000));
+	const deferredDays = (at: number | null) => daysBetween(tokyoTime(Date.now()).date, tokyoTime(at ?? nextRetryTime().getTime()).date);
 	function whenLabel(at: number | null) {
 		const days = deferredDays(at);
 		return `${days <= 0 ? '今日' : days === 1 ? '明日' : `${days}日後`}の朝`;
 	}
-	const deferredDays = (at: number | null) => daysBetween(tokyoTime(Date.now()).date, tokyoTime(at ?? nextRetryTime().getTime()).date);
-	const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000));
 
 	const minutes = $derived(Math.max(1, Math.ceil(((data.job?.ahead ?? 0) + 1) * 0.5)));
 

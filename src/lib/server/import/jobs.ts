@@ -19,9 +19,9 @@ const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 export const IMAGE_MAX = 1_500_000;
 
 /**
- * How much of today's free quota is spoken for: screenshots waiting or being read (those put
- * off from an earlier day come back to the queue after the quotas reset, so they count) and
- * those read since the quotas last reset.
+ * How much of today's free quota is spoken for: screenshots waiting or being read, those put
+ * off to a time before the next reset (they come back to the queue then), and those read
+ * since the quotas last reset.
  */
 export async function quotaUsed(db: Db) {
 	const [row] = await db
@@ -30,6 +30,7 @@ export async function quotaUsed(db: Db) {
 		.where(
 			or(
 				inArray(importJobs.status, ['queued', 'processing']),
+				and(eq(importJobs.status, 'retry'), lt(importJobs.retryAt, new Date(lastQuotaReset().getTime() + DAY))),
 				and(
 					or(eq(importJobs.status, 'done'), and(eq(importJobs.status, 'failed'), gt(importJobs.attempts, 0))),
 					gte(importJobs.finishedAt, lastQuotaReset())
@@ -41,20 +42,21 @@ export async function quotaUsed(db: Db) {
 
 /**
  * When a screenshot that can't be read today would be read: the next morning, or the one
- * after when the queue for that morning already holds a day's worth, and so on.
+ * after when the queue for that morning already holds a day's worth. Never later than that:
+ * a job is given up after three days (dailySweep). Null when both mornings are full.
  */
 export async function readSlot(db: Db) {
 	let at = nextRetryTime();
-	for (let day = 0; day < 14; day++) {
+	for (let day = 0; day < 2; day++) {
 		const from = new Date(at.getTime() - RETRY_AFTER_RESET);
 		const [row] = await db
 			.select({ n: count() })
 			.from(importJobs)
 			.where(and(eq(importJobs.status, 'retry'), gte(importJobs.retryAt, from), lt(importJobs.retryAt, new Date(from.getTime() + DAY))));
-		if ((row?.n ?? 0) < TOTAL_DAILY_LIMIT) break;
+		if ((row?.n ?? 0) < TOTAL_DAILY_LIMIT) return at;
 		at = new Date(at.getTime() + DAY);
 	}
-	return at;
+	return null;
 }
 
 /**
@@ -79,6 +81,8 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 	if ((today?.n ?? 0) >= DAILY_LIMIT) return { message: `読み込みは1日${DAILY_LIMIT}回までです。明日またやり直してください` };
 	if ((active?.n ?? 0) >= ACTIVE_LIMIT) return { message: '読み込み中のものが終わってから、次の画像を送ってください' };
 	const deferred = (await quotaUsed(db)) >= TOTAL_DAILY_LIMIT;
+	const retryAt = deferred ? await readSlot(db) : null;
+	if (deferred && !retryAt) return { message: '読み込みが混み合っています。しばらくたってから、もう一度やり直してください' };
 	const row = await db
 		.insert(importJobs)
 		.values({
@@ -87,7 +91,7 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 			image,
 			tiled,
 			termId,
-			...(deferred ? { status: 'retry' as const, retryAt: await readSlot(db) } : {})
+			...(deferred ? { status: 'retry' as const, retryAt } : {})
 		})
 		.returning({ id: importJobs.id })
 		.get();

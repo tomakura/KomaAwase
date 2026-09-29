@@ -11,6 +11,8 @@
 	import { pageData } from '$lib/page-data';
 
 	let { data, children } = $props();
+	// The enrollment prompt's stage once closed; until then it holds back the notification prompt
+	let verifyDismissed = $state(-1);
 
 	// Back in the app after a while (it stays open in the background on a phone): show what
 	// changed meanwhile, such as a friend's timetable or a finished screenshot.
@@ -126,6 +128,6 @@
 <NavigationWait />
 {@render children()}
 
-<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} />
+<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
 <!-- One screen at a time: the notification one waits while the enrollment one is due -->
-<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt} />
+<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />

@@ -80,6 +80,10 @@ export const actions: Actions = {
 		if (me.role !== 'admin') error(404, 'Not found');
 		const course = await usable(locals.db, me, params.id);
 		const form = await request.formData();
+		// The version the form was opened at: someone may have changed the course since
+		if (Number(form.get('version')) !== course.version) {
+			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', edit: true });
+		}
 		const title = String(form.get('title') ?? '').trim();
 		if (!title || [...title].length > 60) return fail(400, { message: '授業名は1〜60文字で入れてください', edit: true });
 		const teachers = [...new Set(String(form.get('teachers') ?? '').split(/[\n、,]/).map((t) => t.trim()))].filter(Boolean);

@@ -25,8 +25,10 @@ export const actions: Actions = {
 		}
 		const icon = readIcon(form);
 		if ('message' in icon) return fail(400, { message: icon.message });
-		await locals.db.update(users).set({ nickname }).where(eq(users.id, locals.user.id));
+		// The icon first: the nickname is what ends this screen, so if the icon can't be saved the
+		// form is still there to send again.
 		await saveIcon(locals.db, { ...locals.user, nickname }, icon);
+		await locals.db.update(users).set({ nickname }).where(eq(users.id, locals.user.id));
 		// locals.user is from before the update; a fresh request reads the saved nickname.
 		redirect(303, '/welcome');
 	}

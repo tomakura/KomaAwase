@@ -43,6 +43,8 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	const term = currentTerm(shape.terms, today);
 	const system = termSystemOf(shape.terms);
 
+	const valid = !!verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now();
+
 	return {
 		user: { id: user.id, nickname: user.nickname, icon: user.icon, theme: user.theme, days: user.daysShown },
 		timetableLabel: `${timetable.year}年度${term ? ` ${term.groupName ?? term.name}` : ''}`,
@@ -54,13 +56,9 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		supportUrl: platform?.env.SUPPORT_URL || null,
 		isAdmin: user.role === 'admin',
 		openReports,
-		verified:
-			!!verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now(),
+		verified: valid,
 		// Days until the check lapses, when there is one to lapse
-		verifyDays:
-			verification && verification.universityId === user.universityId && verification.expiresAt.getTime() > Date.now()
-				? daysLeft(verification.expiresAt.getTime(), Date.now())
-				: null
+		verifyDays: valid && verification ? daysLeft(verification.expiresAt.getTime(), Date.now()) : null
 	};
 };
 

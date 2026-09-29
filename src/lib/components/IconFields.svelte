@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { ICON_COLORS, ICON_TEXT_MAX } from '$lib/icons';
 	import PhotoPicker from './PhotoPicker.svelte';
 
@@ -28,6 +29,9 @@
 		if (photoSrc) URL.revokeObjectURL(photoSrc);
 		photoSrc = URL.createObjectURL(file);
 	}
+	onDestroy(() => {
+		if (photoSrc) URL.revokeObjectURL(photoSrc);
+	});
 	function cancelPhoto() {
 		if (photoSrc) URL.revokeObjectURL(photoSrc);
 		photoSrc = null;
