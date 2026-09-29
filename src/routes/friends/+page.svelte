@@ -70,8 +70,7 @@
 				</div>
 			{:else}
 				<div class="empty">
-					<p>まだ友だちがいません。友だちリンクを送ると、相手が申請できます。</p>
-					<a class="btn" href="/friends/add">友だちを追加する</a>
+					<p>まだ友だちがいません。右上の「追加」から、友だちリンクを送れます。</p>
 				</div>
 			{/if}
 		</section>
