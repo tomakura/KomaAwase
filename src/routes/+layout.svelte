@@ -79,7 +79,7 @@
 	// A page that can't be opened now stays where it is, with the reason (not a reload into the offline page)
 	beforeNavigate((navigation) => {
 		if (navigation.willUnload || !navigation.to) return;
-		if (!connection.guardNavigation(navigation.to.url)) navigation.cancel();
+		if (!connection.guardNavigation(navigation.to.url, navigation.from?.url.pathname)) navigation.cancel();
 	});
 
 	// How a navigation moves: between the tabs it fades, deeper pages come in from the right

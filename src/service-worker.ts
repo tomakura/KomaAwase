@@ -45,7 +45,7 @@ sw.addEventListener('activate', (event) => {
 	);
 });
 
-const OFFLINE = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>オフライン · コマあわせ</title><body style="margin:0;min-height:100svh;display:flex;align-items:center;justify-content:center;background:#f6f2ea;color:#2b2824;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box"><p style="line-height:1.8">インターネットにつながっていません。<br>電波のよいところで、もう一度開いてください。</p></body></html>`;
+const OFFLINE = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>オフライン · コマあわせ</title><style>body{margin:0;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#f6f2ea;color:#2b2824;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box}p{margin:0;font-size:15px;line-height:1.8;text-wrap:balance}div{display:flex;gap:12px}button,a{min-height:48px;box-sizing:border-box;display:flex;align-items:center;padding:0 20px;border:1px solid currentColor;border-radius:14px;background:none;color:inherit;font:inherit;font-weight:700;text-decoration:none;cursor:pointer}@media (prefers-color-scheme:dark){body{background:#1c1a18;color:#eee7da}}</style><body><p>インターネットにつながっていません。<br>電波のよいところで、もう一度開いてください。</p><div><button onclick="location.reload()">もう一度開く</button><a href="/">時間割へ</a></div>`;
 
 // SvelteKit's data requests say which parts to reload in x-sveltekit-invalidated; the page is
 // the same whatever it says, so it's kept under one key. Any other query must match exactly.
@@ -79,6 +79,17 @@ async function stamp(request: Request, copy: Response) {
 	return new Response(stampHtml(await copy.text(), savedAt), { status: copy.status, statusText: copy.statusText, headers });
 }
 
+// A page that can't be fetched is shown from the copy of the same page under another query, if
+// there is one (…/overlay?with=… from …/overlay; the timetable of a term from the timetable): the
+// address without the query, but for the parameter SvelteKit asks a data request with
+function nearKey(request: Request) {
+	const url = new URL(request.url);
+	const slash = url.searchParams.get('x-sveltekit-trailing-slash');
+	url.search = '';
+	if (slash) url.searchParams.set('x-sveltekit-trailing-slash', slash);
+	return url.href;
+}
+
 function unavailable(request: Request) {
 	if (request.mode === 'navigate') {
 		return new Response(OFFLINE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8' } });
@@ -100,36 +111,47 @@ async function networkFirst(event: FetchEvent) {
 	});
 	event.waitUntil(network.then(() => saved, () => {}));
 	const copy = await cache.match(key);
+	// Only for when the network fails: a slow answer is waited for, not swapped for another view
+	const near = copy ? undefined : await cache.match(nearKey(request));
 	try {
 		if (request.mode === 'navigate') {
 			// A quick answer goes straight through; for a slow one the screen gets a spinner
 			const quick = await Promise.race([network, sleep(GRACE_MS)]);
-			return quick ?? waiting(event, network, copy);
+			return quick ?? waiting(event, network, copy, near);
 		}
 		if (!copy) return await network;
 		// With a copy to show, the network gets SLOW_MS to answer
 		return (await Promise.race([network, sleep(SLOW_MS)])) ?? (await stamp(request, copy));
 	} catch {
-		return copy ? await stamp(request, copy) : unavailable(request);
+		const shown = copy ?? near;
+		return shown ? await stamp(request, shown) : unavailable(request);
 	}
 }
 
 // A page still awaited after GRACE_MS: the answer starts with a spinner (src/lib/wait.ts), which
 // is the first thing on screen, and the page follows on the same document. Without this a slow
 // connection leaves the screen blank. With a copy to show, the network gets SLOW_MS in all.
-function waiting(event: FetchEvent, network: Promise<Response>, copy: Response | undefined) {
+function waiting(event: FetchEvent, network: Promise<Response>, copy: Response | undefined, near: Response | undefined) {
 	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-	event.waitUntil(follow(event.request, writable, network, copy));
+	event.waitUntil(follow(event.request, writable, network, copy, near));
 	return new Response(readable, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 }
 
-async function follow(request: Request, writable: WritableStream<Uint8Array>, network: Promise<Response>, copy: Response | undefined) {
+async function follow(
+	request: Request,
+	writable: WritableStream<Uint8Array>,
+	network: Promise<Response>,
+	copy: Response | undefined,
+	near: Response | undefined
+) {
 	const out = writable.getWriter();
 	const encoder = new TextEncoder();
 	const write = (html: string) => out.write(encoder.encode(html));
 	try {
-		const savedAt = copy?.headers.get(SAVED_AT_HEADER) ?? '';
-		const html = copy ? await copy.text() : '';
+		// What is shown if the network gives nothing: the copy of the page, else of its near kin
+		const shown = copy ?? near;
+		const savedAt = shown?.headers.get(SAVED_AT_HEADER) ?? '';
+		const html = shown ? await shown.text() : '';
 		await write(waitShell(themeOf(html)));
 
 		const answer = await (copy ? Promise.race([network, sleep(SLOW_MS - GRACE_MS)]) : network).catch(() => null);
@@ -147,7 +169,7 @@ async function follow(request: Request, writable: WritableStream<Uint8Array>, ne
 			const reader = answer.body.getReader();
 			for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) await out.write(chunk.value);
 		} else {
-			await write(copy ? stampHtml(html, savedAt) : OFFLINE);
+			await write(shown ? stampHtml(html, savedAt) : OFFLINE);
 		}
 		await write(WAIT_DONE);
 	} catch {

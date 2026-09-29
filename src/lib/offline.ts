@@ -26,19 +26,37 @@ export async function clearPageCaches() {
 }
 
 const DATA_SUFFIX = '/__data.json';
+// SvelteKit's own query parameters: they say how the page is asked for, not which page it is
+const SVELTEKIT_PARAMS = ['x-sveltekit-invalidated', 'x-sveltekit-trailing-slash'];
 
-/** The pages whose data is kept on this device, as paths ("/friends"), or null when that can't be read */
-export async function cachedPaths(): Promise<Set<string> | null> {
+/**
+ * Which copy a page is: its path, and the query that changes what it shows ("/overlay?with=u2").
+ * The overlay lays other people over the timetable by its ?with=, so each choice is a page of its own.
+ */
+export function copyKey(pathname: string, search = '') {
+	const params = new URLSearchParams(search);
+	for (const name of SVELTEKIT_PARAMS) params.delete(name);
+	const query = params.toString();
+	return (pathname.replace(/\/+$/, '') || '/') + (query ? `?${query}` : '');
+}
+
+/** The copy a data request (…/__data.json?…) is for */
+export function dataCopyKey(url: URL) {
+	return copyKey(url.pathname.endsWith(DATA_SUFFIX) ? url.pathname.slice(0, -DATA_SUFFIX.length) : url.pathname, url.search);
+}
+
+/** The pages whose data is kept on this device, by `copyKey`, or null when that can't be read */
+export async function cachedKeys(): Promise<Set<string> | null> {
 	if (typeof caches === 'undefined') return null;
 	try {
-		const paths = new Set<string>();
+		const keys = new Set<string>();
 		for (const name of (await caches.keys()).filter((k) => k.startsWith(PAGE_CACHE_PREFIX))) {
 			for (const request of await (await caches.open(name)).keys()) {
-				const { pathname } = new URL(request.url);
-				if (pathname.endsWith(DATA_SUFFIX)) paths.add(pathname.slice(0, -DATA_SUFFIX.length) || '/');
+				const url = new URL(request.url);
+				if (url.pathname.endsWith(DATA_SUFFIX)) keys.add(dataCopyKey(url));
 			}
 		}
-		return paths;
+		return keys;
 	} catch {
 		return null;
 	}
