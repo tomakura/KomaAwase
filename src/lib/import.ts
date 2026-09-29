@@ -124,19 +124,36 @@ const clip = (s: string, max: number) => [...s.trim()].slice(0, max).join('');
 
 // A Roman numeral symbol (Ⅱ, Ⅳ) becomes the letters it is drawn with (II, IV): the symbol can't
 // be typed on most keyboards, so a title with one would never match a search or a friend's.
-const ROMAN = /[Ⅰ-ⅿ]/g;
+const ROMAN = /[\u2160-\u217F]/g;
 
-// What the student portal adds after a name: the class group "(G1)" and 【ｾｯﾄ履修】. The second
-// is often misread (ｾｯﾄ comes out as セツト and the like), so any trailing bracket with 履 in it
-// goes, closed or not. A bracket without 履 is part of the name.
-const TAG = /\s*(?:[(（]\s*[GgＧｇ]\s*[0-9０-９]+\s*[)）]|[【[［][^】\]］]*履[^】\]］]*(?:[】\]］]|$))\s*$/;
+// What the student portal adds after a name. 【ｾｯﾄ履修】 is often misread (ｾｯﾄ comes out as セツト,
+// "ﾉ ﾉ" and the like), so any trailing bracket with 履 in it goes, closed or not; a bracket
+// without 履 is part of the name.
+const SET_TAG = /\s*[【[［][^】\]］]*履[^】\]］]*(?:[】\]］]|$)\s*$/;
+// The other tags are parentheses holding a class group or a code: (G1), (G2-SA), (SA-01). They
+// are told from a name in parentheses by a segment that is G and a number, or SA.
+const PAREN_TAIL = /\s*[(（]([^()（）]*)(?:[)）]|$)\s*$/;
+const PORTAL_CODE = /^(?:[A-Z0-9○〇◯]+-)*(?:G\d+|SA)(?:-[A-Z0-9○〇◯]+)*$/i;
+
+function withoutTag(title: string) {
+	const set = title.replace(SET_TAG, '');
+	if (set !== title) return set;
+	const paren = PAREN_TAIL.exec(title);
+	if (!paren) return title;
+	// Full-width letters fold with NFKC; the dashes OCR may give (‐―, −, ー) become -
+	const code = paren[1]
+		.normalize('NFKC')
+		.replace(/\s+/g, '')
+		.replace(/[\u2010-\u2015\u2212\u30FC]/g, '-');
+	return PORTAL_CODE.test(code) ? title.slice(0, paren.index) : title;
+}
 
 /** A title as it is kept: Roman numerals as letters, the portal's tags left off */
 export function cleanTitle(title: string) {
 	let t = title.replace(ROMAN, (c) => c.normalize('NFKC'));
 	for (let before = ''; before !== t; ) {
 		before = t;
-		t = t.replace(TAG, '');
+		t = withoutTag(t);
 	}
 	return t.trim();
 }

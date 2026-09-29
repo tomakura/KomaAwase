@@ -112,12 +112,20 @@ describe('cleanTitle', () => {
 	});
 
 	it('leaves out 【ｾｯﾄ履修】 however it was misread', () => {
-		for (const tag of ['【ｾｯﾄ履修】', '【セット履修】', '【セツト履 修】', '[セット履修]', '［セット履修］', '【ｾｯﾄ履']) {
+		for (const tag of ['【ｾｯﾄ履修】', '【セット履修】', '【セツト履 修】', '[セット履修]', '［セット履修］', '【ｾｯﾄ履', '【ﾉ ﾉ履修】', '【ﾉ ﾉ履 修】', '【ﾉ ﾉ履修']) {
 			expect(cleanTitle(`サンプル演習 II ${tag}`)).toBe('サンプル演習 II');
 		}
 	});
 
+	it('leaves out the other codes the portal puts in parentheses: G2-SA, SA-01', () => {
+		for (const tag of ['(G2-SA)', '（Ｇ２－ＳＡ）', '(SA-01)', '(SA-○○)', '( G2 - SA )', '(SA)', '(sa-a)', '(G2-SA', '(G2ーSA)', '(G2−SA)', '(G2‐SA)']) {
+			expect(cleanTitle(`Sample Eng IV Com-A ${tag}`)).toBe('Sample Eng IV Com-A');
+		}
+	});
+
 	it('leaves out several tags, in either order', () => {
+		expect(cleanTitle('Sample Eng IV (G2-SA) 【ﾉ ﾉ履修】')).toBe('Sample Eng IV');
+		expect(cleanTitle('Sample Eng IV 【ﾉ ﾉ履修】(SA-01)')).toBe('Sample Eng IV');
 		expect(cleanTitle('Sample Eng IV (G1) 【ｾｯﾄ履修】')).toBe('Sample Eng IV');
 		expect(cleanTitle('Sample Eng IV 【ｾｯﾄ履修】(G1)')).toBe('Sample Eng IV');
 	});
@@ -127,6 +135,9 @@ describe('cleanTitle', () => {
 		expect(cleanTitle('サンプル演習【A】')).toBe('サンプル演習【A】');
 		expect(cleanTitle('サンプル(G1)入門')).toBe('サンプル(G1)入門');
 		expect(cleanTitle('Group (Gallery) Design')).toBe('Group (Gallery) Design');
+		expect(cleanTitle('Sample Prep (SAT prep)')).toBe('Sample Prep (SAT prep)');
+		expect(cleanTitle('Sample Eng (Sample-A)')).toBe('Sample Eng (Sample-A)');
+		expect(cleanTitle('Sample (G)')).toBe('Sample (G)');
 	});
 });
 
