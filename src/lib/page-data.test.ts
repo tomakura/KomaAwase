@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { pageData } from './page-data';
 
 const ORIGIN = 'https://koma.test';
+// The time on the device when a copy is shown
+const NOW = 5_000;
+// What SvelteKit sends for a page whose data has the server's clock as `now`: JSON whose
+// first item lists where each value is. Index 1 holds the time.
+const timed = (now: number, name: string) =>
+	JSON.stringify({ type: 'data', nodes: [{ type: 'skip' }, { type: 'data', data: [{ now: 1, name: 2 }, now, name] }] });
+const nowIn = (body: string) => JSON.parse(body).nodes[1].data[1];
 const data = (path: string, mask = '01') => `${ORIGIN}${path.replace(/\/$/, '')}/__data.json?x-sveltekit-invalidated=${mask}`;
 
 // A server that answers with whatever `pages` holds (by page path) and keeps a log of what it was asked.
@@ -17,7 +24,7 @@ function setup(pages: Record<string, string | undefined>) {
 	}) as typeof fetch;
 	let here = '/';
 	let refreshed = 0;
-	const kept = pageData(original, { origin: ORIGIN, path: () => here, refresh: () => refreshed++ });
+	const kept = pageData(original, { origin: ORIGIN, path: () => here, now: () => NOW, refresh: () => refreshed++ });
 	return {
 		kept,
 		asked,
@@ -137,6 +144,52 @@ describe('pageData', () => {
 		expect(await s.back('/friends')).toBe('B');
 	});
 
+	it('does not refresh when only the clock in the data differs', async () => {
+		const pages: Record<string, string> = { '/': timed(1_000, 'home') };
+		const s = setup(pages);
+		await s.get('/');
+		await settle();
+
+		pages['/'] = timed(2_000, 'home');
+		s.go('/');
+		await s.back('/');
+		await settle();
+		expect(s.refreshed()).toBe(0);
+	});
+
+	it('refreshes when something besides the clock differs', async () => {
+		const pages: Record<string, string> = { '/': timed(1_000, 'home') };
+		const s = setup(pages);
+		await s.get('/');
+		await settle();
+
+		pages['/'] = timed(2_000, 'changed');
+		s.go('/');
+		await s.back('/');
+		await settle();
+		expect(s.refreshed()).toBe(1);
+	});
+
+	it('shows a copy with the time on the device in place of the old clock', async () => {
+		const pages: Record<string, string> = { '/': timed(1_000, 'home') };
+		const s = setup(pages);
+		await s.get('/');
+		await settle();
+
+		const body = await s.back('/');
+		expect(nowIn(body)).toBe(NOW);
+		expect(JSON.parse(body).nodes[1].data[2]).toBe('home');
+	});
+
+	it('leaves a `now` that is not a time as it is', async () => {
+		const other = JSON.stringify({ type: 'data', nodes: [{ type: 'data', data: [{ now: 1 }, 'tomorrow'] }] });
+		const s = setup({ '/': other });
+		await s.get('/');
+		await settle();
+
+		expect(await s.back('/')).toBe(other);
+	});
+
 	it('does not keep redirects or failed answers', async () => {
 		const pages: Record<string, string | undefined> = { '/login': '{"type":"redirect","location":"/"}', '/missing': undefined };
 		const s = setup(pages);
@@ -176,6 +229,8 @@ describe('pageData', () => {
 
 		pages['/'] = 'NEW';
 		s.kept.returningTo('/');
-		expect(await (await s.kept.fetch(`${ORIGIN}/__data.json?x-sveltekit-invalidated=01`, {})).text()).toBe('HOME');
+		// The address SvelteKit asks for when going back to the top page
+		const ask = `${ORIGIN}/__data.json?x-sveltekit-trailing-slash=1&x-sveltekit-invalidated=01`;
+		expect(await (await s.kept.fetch(ask, {})).text()).toBe('HOME');
 	});
 });

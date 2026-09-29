@@ -32,7 +32,12 @@
 	let pages: ReturnType<typeof pageData> | undefined;
 	$effect(() => {
 		const original = window.fetch;
-		const kept = pageData(original, { origin: location.origin, path: () => location.pathname, refresh: () => void invalidateAll() });
+		const kept = pageData(original, {
+			origin: location.origin,
+			path: () => location.pathname,
+			now: Date.now,
+			refresh: () => void invalidateAll()
+		});
 		window.fetch = kept.fetch;
 		pages = kept;
 		const opened = location.href;

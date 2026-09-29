@@ -15,9 +15,28 @@ type Copy = { body: string; type: string };
 
 const trimmed = (pathname: string) => pathname.replace(/\/+$/, '') || '/';
 
+// Some pages get the server's clock as `now` (the timetable, the overlay). It differs on every
+// request and pages read the day and the hour from it, so a copy is shown with the device's
+// time instead, and two answers that differ only there are the same. The data is JSON whose
+// first item lists where each value sits; `now` points at the slot holding the time. Anything
+// that isn't in this shape is left as it came.
+function withNow(body: string, now: number) {
+	try {
+		const message = JSON.parse(body);
+		for (const node of message.nodes) {
+			const data = node?.type === 'data' ? node.data : null;
+			const slot = Array.isArray(data) ? data[0]?.now : undefined;
+			if (typeof slot === 'number' && typeof data[slot] === 'number') data[slot] = now;
+		}
+		return JSON.stringify(message);
+	} catch {
+		return body;
+	}
+}
+
 export function pageData(
 	original: typeof fetch,
-	env: { origin: string; path: () => string; refresh: () => void }
+	env: { origin: string; path: () => string; now: () => number; refresh: () => void }
 ) {
 	const copies = new Map<string, Copy>();
 	// Bumped when a request changes something: what was read before it is out of date
@@ -39,7 +58,7 @@ export function pageData(
 			const res = await ask();
 			if (!res.ok) return;
 			const body = await res.text();
-			if (body === shown.body) return;
+			if (withNow(body, 0) === withNow(shown.body, 0)) return;
 			keep(key, { body, type: shown.type }, since);
 			if (trimmed(env.path()) === path) env.refresh();
 		} catch {
@@ -65,7 +84,7 @@ export function pageData(
 		const shown = back ? copies.get(key) : undefined;
 		if (shown) {
 			void check(key, path, shown, () => original(input, init));
-			return Promise.resolve(new Response(shown.body, { headers: { 'content-type': shown.type } }));
+			return Promise.resolve(new Response(withNow(shown.body, env.now()), { headers: { 'content-type': shown.type } }));
 		}
 
 		const since = generation;
@@ -88,8 +107,11 @@ export function pageData(
 		read(href: string) {
 			const url = new URL(href, env.origin);
 			url.hash = '';
+			const slash = url.pathname.endsWith('/');
 			url.pathname = url.pathname.replace(/\/$/, '') + SUFFIX;
-			// What SvelteKit asks for when the layout is kept and the page is loaded
+			// What SvelteKit asks for when the layout is kept and the page is loaded; it says
+			// so when the page's address ends in a slash (the top page's does)
+			if (slash) url.searchParams.append('x-sveltekit-trailing-slash', '1');
 			url.searchParams.append('x-sveltekit-invalidated', '01');
 			return standIn(url.href, {}).then(
 				() => {},
