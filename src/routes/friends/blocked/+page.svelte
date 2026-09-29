@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
@@ -16,7 +18,7 @@
 		{#if data.blocked.length}
 			<div class="ui-list">
 				{#each data.blocked as p (p.id)}
-					<div class="person">
+					<div transition:slide={motion()} class="person">
 						<UserIcon user={p} size={36} />
 						<span class="text">
 							<span class="name">{p.nickname}</span>

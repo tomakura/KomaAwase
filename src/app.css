@@ -354,6 +354,14 @@ button.ui-row {
 	button.ui-row:active {
 		background: var(--slot);
 	}
+
+	/* The small buttons and chips give a little too (:where keeps this below their own rules) */
+	:where(button, a):where(.small, .chip, .icon-button, .icon-only, .pick, .add-slot, .remove) {
+		transition: transform 0.12s ease;
+	}
+	:where(button, a):where(.small, .chip, .icon-button, .icon-only, .pick, .add-slot, .remove):active:not(:disabled) {
+		transform: scale(0.95);
+	}
 }
 
 @keyframes nav-in-right {

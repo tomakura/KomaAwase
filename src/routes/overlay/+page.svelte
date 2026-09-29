@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto, replaceState } from '$app/navigation';
-	import { fade } from 'svelte/transition';
+	import { fade, slide } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
@@ -10,6 +10,7 @@
 	import { DAY_NAMES } from '$lib/courses';
 	import { glide } from '$lib/glide';
 	import { iconOf } from '$lib/icons';
+	import { motion } from '$lib/motion';
 	import { OVERLAY_COOKIE, cellKey, classFill, lookingAt, overlay, termOn, type OverlayGroup, type OverlayPerson } from '$lib/overlay';
 	import { currentTerm } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
@@ -189,7 +190,7 @@
 					onclick={() => (open = { weekday: day, period: p.number })}
 				>
 					{#each groups as g (g.key)}
-						<span class="course" style:background={fillOf(g)} transition:fade={{ duration: 200 }}>
+						<span class="course" style:background={fillOf(g)} transition:fade={motion(200)}>
 							<span class="title">{g.title}</span>
 							<span class="people">
 								{#each g.people as x (x.id)}<UserIcon user={personOf(x.id)} size={16} short />{/each}
@@ -207,10 +208,10 @@
 			<!-- By day, which reads faster than one chip per slot -->
 			<div class="free-days">
 				{#each freeByDay as [day, periods] (day)}
-					<div class="free-day">
+					<div class="free-day" transition:slide={motion(200)}>
 						<span class="free-label">{DAY_NAMES[day]}</span>
 						<span class="free-list">
-							{#each periods as period (period)}<span class="free-chip">{period}限</span>{/each}
+							{#each periods as period (period)}<span class="free-chip" transition:fade={motion(180)}>{period}限</span>{/each}
 						</span>
 					</div>
 				{/each}

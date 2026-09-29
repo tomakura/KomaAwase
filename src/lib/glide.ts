@@ -1,3 +1,5 @@
+import { still } from './motion';
+
 // Makes a grid grow and shrink smoothly when what is in it changes, instead of jumping: taller
 // rows for more classes in a slot, a column for a day that wasn't there. Rows are 1fr of the
 // grid's height, so animating the height moves them all; columns are animated as pixel lists,
@@ -18,7 +20,6 @@ const tracks = (node: HTMLElement) =>
 const template = (list: number[], length: number) => Array.from({ length }, (_, i) => `${list[i] ?? 0}px`).join(' ');
 
 export function glide(node: HTMLElement, _columns?: number) {
-	const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 	let running: Animation[] = [];
 	let height = node.offsetHeight;
 	let width = node.offsetWidth;

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -32,7 +34,7 @@
 				<h2 class="ui-section-title">申請が届いています（{data.incoming.length}）</h2>
 				<div class="ui-list">
 					{#each data.incoming as p (p.id)}
-						<div class="person">
+						<div transition:slide={motion()} class="person">
 							{@render who(p)}
 							<form method="POST" action="?/accept" use:enhance>
 								<input type="hidden" name="id" value={p.id} />
@@ -62,7 +64,7 @@
 			{#if data.friends.length}
 				<div class="ui-list">
 					{#each data.friends as p (p.id)}
-						<a class="person" href="/friends/{p.id}">
+						<a transition:slide={motion()} class="person" href="/friends/{p.id}">
 							{@render who(p)}
 							<Icon name="chevron" size={16} />
 						</a>
@@ -80,7 +82,7 @@
 			{#if data.groups.length}
 				<div class="ui-list">
 					{#each data.groups as g (g.id)}
-						<a class="person" href="/groups/{g.id}">
+						<a transition:slide={motion()} class="person" href="/groups/{g.id}">
 							<span class="group-icon"><Icon name="users" size={20} /></span>
 							<span class="text">
 								<span class="name">{g.name}</span>
@@ -100,7 +102,7 @@
 				<h2 class="ui-section-title">申請中</h2>
 				<div class="ui-list">
 					{#each data.outgoing as p (p.id)}
-						<div class="person">
+						<div transition:slide={motion()} class="person">
 							{@render who(p)}
 							<form method="POST" action="?/remove" use:enhance>
 								<input type="hidden" name="id" value={p.id} />

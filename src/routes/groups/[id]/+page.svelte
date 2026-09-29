@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -74,7 +76,7 @@
 		<h2 class="ui-section-title">メンバー（{data.members.length}人）</h2>
 		<div class="ui-list">
 			{#each data.members as m (m.id)}
-				<div class="member">
+				<div transition:slide={motion()} class="member">
 					<svelte:element this={m.visible ? 'a' : 'div'} class="who" href={m.visible ? `/friends/${m.id}` : undefined}>
 						<UserIcon user={m} size={36} />
 						<span class="text">

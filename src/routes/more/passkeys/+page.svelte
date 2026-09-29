@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
@@ -39,7 +41,7 @@
 		{#if data.passkeys.length}
 			<div class="ui-list">
 				{#each data.passkeys as key (key.id)}
-					<div class="key">
+					<div transition:slide={motion()} class="key">
 						{#if renaming === key.id}
 							<form
 								class="rename"
