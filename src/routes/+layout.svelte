@@ -1,7 +1,8 @@
 <script lang="ts">
 	import '../app.css';
-	import { invalidateAll, onNavigate } from '$app/navigation';
+	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
+	import { pageData } from '$lib/page-data';
 
 	let { data, children } = $props();
 
@@ -25,6 +26,24 @@
 		if (!('setAppBadge' in navigator)) return;
 		(n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
 	});
+
+	// Going back shows the page as it was left and updates it after (see src/lib/page-data.ts).
+	// A tab the app opened on has no copy yet, so one is read a moment after it opens.
+	let pages: ReturnType<typeof pageData> | undefined;
+	$effect(() => {
+		const original = window.fetch;
+		const kept = pageData(original, { origin: location.origin, path: () => location.pathname, refresh: () => void invalidateAll() });
+		window.fetch = kept.fetch;
+		pages = kept;
+		const opened = location.href;
+		const seed = TABS.includes(location.pathname) ? setTimeout(() => kept.read(opened), 2000) : undefined;
+		return () => {
+			clearTimeout(seed);
+			window.fetch = original;
+			pages = undefined;
+		};
+	});
+	beforeNavigate(({ type, to }) => pages?.returningTo(type === 'popstate' && to ? to.url.pathname : null));
 
 	// How a navigation moves: between the tabs it fades, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
