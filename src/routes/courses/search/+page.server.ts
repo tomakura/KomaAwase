@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { universities } from '$lib/server/db/schema';
-import { loadPeople, peopleTaking, visibleUserIds } from '$lib/server/friends';
+import { peopleTaking, visibleUserIds } from '$lib/server/friends';
 import { searchSharedCourses } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import type { PageServerLoad } from './$types';
@@ -11,7 +11,15 @@ const QUERY_MAX = 50;
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
 	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
-	const shape = await loadShape(locals.db, timetable.id);
+	const universityId = timetable.universityId;
+	// Friends (and group members who show their timetable) already taking each course
+	const [shape, university, visible] = await Promise.all([
+		loadShape(locals.db, timetable.id),
+		universityId
+			? locals.db.select({ name: universities.name }).from(universities).where(eq(universities.id, universityId)).get()
+			: null,
+		visibleUserIds(locals.db, locals.user.id)
+	]);
 
 	const term = shape.terms.find((t) => t.id === url.searchParams.get('term')) ?? null;
 	const day = Number(url.searchParams.get('day'));
@@ -20,38 +28,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		day >= 1 && day <= 7 && shape.periods.some((p) => p.number === period) ? { weekday: day, period } : null;
 	const q = [...(url.searchParams.get('q') ?? '').trim()].slice(0, QUERY_MAX).join('');
 
-	const universityId = timetable.universityId;
-	const [university, results] = universityId
-		? await Promise.all([
-				locals.db
-					.select({ name: universities.name })
-					.from(universities)
-					.where(eq(universities.id, universityId))
-					.get(),
-				searchSharedCourses(locals.db, {
-					universityId,
-					year: timetable.year,
-					timetableId: timetable.id,
-					q,
-					slot,
-					termName: term?.name ?? null
-				})
-			])
-		: [null, []];
-
-	// Friends (and group members who show their timetable) already taking each course
-	const visible = results.length ? await visibleUserIds(locals.db, locals.user.id) : new Set<string>();
+	const results = universityId
+		? await searchSharedCourses(locals.db, {
+				universityId,
+				year: timetable.year,
+				timetableId: timetable.id,
+				q,
+				slot,
+				termName: term?.name ?? null
+			})
+		: [];
 	const taking = await peopleTaking(
 		locals.db,
 		results.map((r) => r.id),
 		timetable.year,
 		visible
-	);
-	const people = new Map(
-		(await loadPeople(locals.db, [...new Set([...taking.values()].flat())].slice(0, 90))).map((p) => [
-			p.id,
-			{ id: p.id, nickname: p.nickname, icon: p.icon }
-		])
 	);
 
 	return {
@@ -69,7 +60,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			slots: r.values.slots,
 			source: r.source,
 			users: r.users,
-			friends: (taking.get(r.id) ?? []).flatMap((id) => people.get(id) ?? [])
+			friends: taking.get(r.id) ?? []
 		}))
 	};
 };

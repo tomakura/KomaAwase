@@ -245,18 +245,19 @@ export async function loadPeople(db: Db, ids: string[]) {
 
 /** For each shared course, the people among `visible` who have it in their timetable for the year. */
 export async function peopleTaking(db: Db, sharedIds: string[], year: number, visible: Set<string>) {
-	const out = new Map<string, string[]>();
+	const out = new Map<string, { id: string; nickname: string | null; icon: typeof users.$inferSelect.icon }[]>();
 	if (!sharedIds.length || !visible.size) return out;
 	const rows = await db
-		.select({ sharedCourseId: courses.sharedCourseId, userId: timetables.userId })
+		.select({ sharedCourseId: courses.sharedCourseId, id: users.id, nickname: users.nickname, icon: users.icon })
 		.from(courses)
 		.innerJoin(timetables, eq(timetables.id, courses.timetableId))
+		.innerJoin(users, eq(users.id, timetables.userId))
 		.where(and(inArray(courses.sharedCourseId, sharedIds.slice(0, 90)), eq(timetables.year, year)));
-	for (const r of rows) {
-		if (!r.sharedCourseId || !visible.has(r.userId)) continue;
-		const list = out.get(r.sharedCourseId) ?? [];
-		if (!list.includes(r.userId)) list.push(r.userId);
-		out.set(r.sharedCourseId, list);
+	for (const { sharedCourseId, ...p } of rows) {
+		if (!sharedCourseId || !visible.has(p.id)) continue;
+		const list = out.get(sharedCourseId) ?? [];
+		if (!list.some((q) => q.id === p.id)) list.push(p);
+		out.set(sharedCourseId, list);
 	}
 	return out;
 }
