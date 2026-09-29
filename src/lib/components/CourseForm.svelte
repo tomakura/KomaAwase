@@ -166,12 +166,11 @@
 	}}
 >
 	<header>
-		<div class="title-row">
-			<a class="back" href={backHref} aria-label="もどる">
-				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-			</a>
+		<a class="back" href={backHref}>
+			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+			<span class="visually-hidden">もどる：</span>
 			<h1>{heading}</h1>
-		</div>
+		</a>
 		<button class="save" type="submit" disabled={saving}>{saving ? '保存中…' : '保存'}</button>
 	</header>
 
@@ -378,19 +377,19 @@
 		background: var(--bg);
 	}
 
-	.title-row {
+	.back {
+		min-width: 0;
+		min-height: 44px;
 		display: flex;
 		align-items: center;
 		gap: 4px;
+		padding: 0 12px 0 11px;
+		color: var(--ink);
+		text-decoration: none;
 	}
 
-	.back {
-		width: 44px;
-		height: 44px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--ink);
+	.back svg {
+		flex-shrink: 0;
 	}
 
 	h1 {

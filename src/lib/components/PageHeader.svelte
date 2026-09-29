@@ -6,8 +6,11 @@
 </script>
 
 <header>
-	<a class="back" href={back} aria-label="もどる"><Icon name="back" size={22} /></a>
-	<h1>{title}</h1>
+	<a class="back" href={back}>
+		<Icon name="back" size={22} />
+		<span class="visually-hidden">もどる：</span>
+		<h1>{title}</h1>
+	</a>
 	{#if trailing}<div class="trailing">{@render trailing()}</div>{/if}
 </header>
 
@@ -20,13 +23,14 @@
 	}
 
 	.back {
-		width: 44px;
-		height: 44px;
-		flex-shrink: 0;
+		min-width: 0;
+		min-height: 44px;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 4px;
+		padding: 0 12px 0 11px;
 		color: var(--ink);
+		text-decoration: none;
 	}
 
 	h1 {

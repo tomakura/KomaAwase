@@ -29,7 +29,7 @@ function lettersOf(user: Owner) {
 	return { color, text };
 }
 
-export async function setPhoto(db: Db, user: Owner, base64: string) {
+export async function setPhoto(db: Db, user: Owner, base64: string, letters = lettersOf(user)) {
 	const now = new Date();
 	await db.batch([
 		db
@@ -38,7 +38,7 @@ export async function setPhoto(db: Db, user: Owner, base64: string) {
 			.onConflictDoUpdate({ target: userPhotos.userId, set: { jpeg: base64, updatedAt: now } }),
 		db
 			.update(users)
-			.set({ icon: { ...lettersOf(user), photo: now.getTime() } })
+			.set({ icon: { ...letters, photo: now.getTime() } })
 			.where(eq(users.id, user.id))
 	]);
 }

@@ -41,7 +41,6 @@
 			<div class="ui-list">
 				{@render link('/more/timetable', '時間割の管理', data.timetableLabel)}
 				{@render link('/more/past', '過去の時間割', data.pastCount ? `${data.pastCount}件` : 'なし')}
-				{@render link('/import?back=/more', 'スクショから読み込む')}
 			</div>
 		</section>
 
