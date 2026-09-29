@@ -94,7 +94,8 @@ async function networkFirst(event: FetchEvent) {
 	// copy has been shown, to save the answer for next time.
 	let saved: Promise<void> = Promise.resolve();
 	const network = fetch(request).then((response) => {
-		saved = save(cache, key, response.clone());
+		// A copy that couldn't be kept (no room, say) must not fail the event that shows the page
+		saved = save(cache, key, response.clone()).catch(() => {});
 		return response;
 	});
 	event.waitUntil(network.then(() => saved, () => {}));
@@ -162,7 +163,7 @@ async function refresh(event: FetchEvent) {
 	const { request } = event;
 	const cache = await caches.open(PAGES);
 	const response = await fetch(request);
-	event.waitUntil(save(cache, pageKey(request), response.clone()));
+	event.waitUntil(save(cache, pageKey(request), response.clone()).catch(() => {}));
 	return response;
 }
 
