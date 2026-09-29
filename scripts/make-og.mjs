@@ -11,36 +11,64 @@ import { join, resolve } from 'node:path';
 
 const out = resolve(process.argv[2] ?? 'static/og.png');
 
-// 0 = nobody has a class, 1 = 自分, 2 = 友だちA, 3 = 友だちB
-const GRID = [
-	[1, 0, 2, 3, 0],
-	[0, 2, 1, 0, 3],
-	[3, 1, 0, 0, 2],
-	[0, 0, 3, 2, 1]
-];
+// The コマを重ねる screen with made-up people and classes: their colors (the app's icon
+// colors), a class in its people's tints with a stripe down the left, free slots as empty frames.
+const ME = { name: '自分', text: '自', color: '#B9502B' };
+const AO = { name: 'あお', text: 'あ', color: '#2F5F99' };
+const HARU = { name: 'はる', text: 'は', color: '#3E7A4E' };
 const DAYS = ['月', '火', '水', '木', '金'];
-const cells = GRID.flat()
-	.map((w) => `<i class="c w${w}">${w === 0 ? '空き' : ''}</i>`)
+// [day][period]: title and who, or null when nobody has a class
+const CLASSES = [
+	[['英語', [ME, AO]], null, ['統計', [HARU]], null],
+	[null, ['情報', [ME, AO, HARU]], null, ['体育', [AO]]],
+	[['統計', [ME, HARU]], null, ['英語', [HARU]], null],
+	[null, ['体育', [ME]], ['情報', [AO]], null],
+	[['英語', [HARU]], null, null, ['統計', [ME, AO]]]
+];
+const bands = (dir, colors) =>
+	`linear-gradient(to ${dir}, ${colors.map((c, i) => `${c} ${(i / colors.length) * 100}% ${((i + 1) / colors.length) * 100}%`).join(', ')})`;
+const fill = (who) =>
+	`${bands('bottom', who.map((w) => w.color))} left / 5px 100% no-repeat, ${bands('right', who.map((w) => `color-mix(in srgb, ${w.color} 28%, #FFFDF8)`))}`;
+const icon = (w, size) => `<u class="ic" style="background:${w.color};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.55)}px">${w.text}</u>`;
+
+const chips = [ME, AO, HARU]
+	.map((w) => `<span class="chip" style="border-color:${w.color};background:color-mix(in srgb, ${w.color} 16%, #FFFDF8)">${icon(w, 34)}${w.name}</span>`)
 	.join('');
 const days = DAYS.map((d) => `<b>${d}</b>`).join('');
+// Row by row: period 1 to 4 across the five days
+const cells = [0, 1, 2, 3]
+	.flatMap((p) =>
+		CLASSES.map((day) => {
+			const c = day[p];
+			return c
+				? `<div class="c"><span class="t" style="background:${fill(c[1])}"><span>${c[0]}</span><span class="ppl">${c[1].map((w) => icon(w, 18)).join('')}</span></span></div>`
+				: '<div class="c free"></div>';
+		})
+	)
+	.join('');
 
 const html = `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <link rel="stylesheet" href="fonts">
 <style>
 * { box-sizing: border-box; margin: 0; }
-body { width: 1200px; height: 630px; background: #F6F2EA; color: #2B2824; font-family: 'Zen Kaku Gothic New', sans-serif; display: flex; align-items: center; padding: 0 84px; gap: 72px; overflow: hidden; }
+body { width: 1200px; height: 630px; background: #F6F2EA; color: #2B2824; font-family: 'Zen Kaku Gothic New', sans-serif; display: flex; align-items: center; padding: 0 64px; gap: 56px; overflow: hidden; }
 .text { flex: 1; }
 .mark { display: block; margin-bottom: 26px; }
-h1 { font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 88px; line-height: 1.15; letter-spacing: 0.02em; white-space: nowrap; }
+h1 { font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 84px; line-height: 1.15; letter-spacing: 0.02em; white-space: nowrap; }
 .tag { margin-top: 22px; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 33px; white-space: nowrap; }
 .sub { margin-top: 18px; font-size: 26px; line-height: 1.6; color: #6B645A; }
-.card { width: 440px; padding: 26px; border: 2px solid #E4DDCF; border-radius: 28px; background: #FFFDF8; }
-.grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.grid b { text-align: center; font-size: 20px; font-weight: 500; color: #6B645A; }
-.c { height: 62px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 700; font-size: 19px; }
-.w0 { border: 2px dashed #B8AE9C; color: #B9502B; }
-.w1 { background: #FBE3D6; } .w2 { background: #DCE8F5; } .w3 { background: #E6EFD9; }
+.card { width: 500px; padding: 22px; border: 2px solid #E4DDCF; border-radius: 28px; background: #F6F2EA; }
+.chips { display: flex; gap: 8px; margin-bottom: 14px; }
+.chip { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px 0 6px; border: 2px solid; border-radius: 23px; font-size: 20px; font-weight: 700; }
+.ic { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #FFFDF8; font-style: normal; text-decoration: none; font-weight: 700; }
+.grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.grid b { text-align: center; font-size: 18px; font-weight: 500; color: #6B645A; }
+.c { height: 78px; padding: 4px; border: 2px solid #ede7da; border-radius: 12px; background: #ede7da; display: block; }
+.c.free { border-color: #E4DDCF; background: transparent; }
+.t { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 5px 4px 4px 12px; border-radius: 8px; font-size: 17px; font-weight: 700; line-height: 1.2; }
+.ppl { display: flex; gap: 2px; }
+.ic { flex-shrink: 0; }
 </style></head><body>
 <div class="text">
 <svg class="mark" width="96" height="96" viewBox="0 0 48 48"><rect x="4" y="8" width="26" height="26" rx="7" fill="#D9653B"/><rect x="18" y="14" width="26" height="26" rx="7" fill="#3569A8" style="mix-blend-mode:multiply"/></svg>
@@ -48,7 +76,7 @@ h1 { font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 88
 <p class="tag">友だちと、時間割を共有しよう。</p>
 <p class="sub">重ねると、みんなが空いているコマが<br>すぐわかる。</p>
 </div>
-<div class="card"><div class="grid">${days}${cells}</div></div>
+<div class="card"><div class="chips">${chips}</div><div class="grid">${days}${cells}</div></div>
 </body></html>`;
 
 const dir = mkdtempSync(join(tmpdir(), 'og-'));

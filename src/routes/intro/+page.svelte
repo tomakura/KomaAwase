@@ -1,22 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import Icon from '$lib/components/Icon.svelte';
+	import OverlayDemo from '$lib/components/OverlayDemo.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import logo from '$lib/assets/favicon.svg';
 
 	// Readable signed in or not: shared as a link, and reachable from the login page.
 	const signedIn = $derived(page.data.signedIn);
 
-	// The picture of 重ねる: 5 days × 4 periods, who has a class (0 = nobody, 1 = 自分,
-	// 2 = 友だちA, 3 = 友だちB) and the cells all three have free.
-	const GRID = [
-		[1, 0, 2, 3, 0],
-		[0, 2, 1, 0, 3],
-		[3, 1, 0, 0, 2],
-		[0, 0, 3, 2, 1]
-	];
-	const DAYS = ['月', '火', '水', '木', '金'];
-	
 	const features = [
 		{
 			icon: 'edit',
@@ -72,20 +63,8 @@
 	</section>
 
 	<section class="demo" aria-label="時間割を重ねたイメージ">
-		<div class="grid" aria-hidden="true">
-			{#each DAYS as d (d)}<span class="day">{d}</span>{/each}
-			{#each GRID as row, r (r)}
-				{#each row as who, c (c)}
-					<span class="cell who{who}" class:free={who === 0}>{who === 0 ? '空き' : ''}</span>
-				{/each}
-			{/each}
-		</div>
-		<ul class="legend" aria-hidden="true">
-			<li><i class="who1"></i>自分</li>
-			<li><i class="who2"></i>友だちA</li>
-			<li><i class="who3"></i>友だちB</li>
-		</ul>
-		<p class="caption">3人の時間割を重ねたところ。だれも授業のないコマが「空き」になります。</p>
+		<OverlayDemo />
+		<p class="caption">3人の時間割を重ねたところ。だれも授業のないコマが、「みんな空いてるコマ」に出ます。</p>
 	</section>
 
 	<section class="block">
@@ -175,74 +154,6 @@
 
 	.demo {
 		margin: 20px 20px 4px;
-		padding: 14px;
-		border: 1px solid var(--line);
-		border-radius: 14px;
-		background: var(--surface);
-	}
-
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(5, 1fr);
-		gap: 4px;
-	}
-
-	.day {
-		text-align: center;
-		font-size: 11px;
-		color: var(--ink-sub);
-	}
-
-	.cell {
-		height: 34px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 7px;
-		background: var(--slot);
-		font-size: 11px;
-		font-weight: 700;
-	}
-
-	.who1 {
-		background: var(--course-orange);
-	}
-
-	.who2 {
-		background: var(--course-blue);
-	}
-
-	.who3 {
-		background: var(--course-green);
-	}
-
-	.cell.free {
-		background: transparent;
-		border: 1px dashed var(--line-bold);
-		color: var(--accent-text);
-	}
-
-	.legend {
-		display: flex;
-		justify-content: center;
-		gap: 14px;
-		margin: 12px 0 0;
-		padding: 0;
-		list-style: none;
-		font-size: 12px;
-		color: var(--ink-sub);
-	}
-
-	.legend li {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-	}
-
-	.legend i {
-		width: 12px;
-		height: 12px;
-		border-radius: 4px;
 	}
 
 	.caption {
