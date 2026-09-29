@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupImported, readImport, splitTeachers } from './import';
+import { cleanTitle, groupImported, readImport, splitTeachers } from './import';
 
 const empty = { title: '', room: '', teacher: '' };
 const cell = (title: string, room = '', teacher = '') => ({ title, room, teacher });
@@ -37,7 +37,7 @@ describe('readImport', () => {
 			]
 		};
 		expect(readImport(JSON.stringify(answer))).toEqual([
-			{ title: '写真演習Ⅰ', weekday: 1, period: 3, span: 2, room: 'E10 / E11', teachers: [] },
+			{ title: '写真演習I', weekday: 1, period: 3, span: 2, room: 'E10 / E11', teachers: [] },
 			{ title: '映像制作演習応用A', weekday: 2, period: 3, span: 2, room: 'W02', teachers: [] },
 			{ title: '映像制作演習基礎A', weekday: 2, period: 5, span: 2, room: 'W04', teachers: [] },
 			{ title: 'ネットワーク構築演習基礎', weekday: 3, period: 4, span: 1, room: 'E07 / E08', teachers: [] },
@@ -92,6 +92,58 @@ describe('readImport', () => {
 			]
 		});
 		expect(courses).toEqual([{ title: 'プログラミング演習', weekday: 2, period: 3, span: 2, room: 'PC室2', teachers: [] }]);
+	});
+});
+
+describe('cleanTitle', () => {
+	it('writes Roman numeral symbols as the letters they are drawn with', () => {
+		expect(cleanTitle('サンプル演習 Ⅱ')).toBe('サンプル演習 II');
+		expect(cleanTitle('Sample Eng Ⅳ Com-A')).toBe('Sample Eng IV Com-A');
+		expect(cleanTitle('サンプル論Ⅻ')).toBe('サンプル論XII');
+		expect(cleanTitle('sample ⅲ')).toBe('sample iii');
+		// Letters already are letters
+		expect(cleanTitle('Sample Eng IV Com-A')).toBe('Sample Eng IV Com-A');
+	});
+
+	it('leaves out the class group the portal adds', () => {
+		expect(cleanTitle('Sample Eng IV Com-A (G1)')).toBe('Sample Eng IV Com-A');
+		expect(cleanTitle('Sample Eng IV Com-A（Ｇ２）')).toBe('Sample Eng IV Com-A');
+		expect(cleanTitle('Sample Eng IV Com-A(g12)')).toBe('Sample Eng IV Com-A');
+	});
+
+	it('leaves out 【ｾｯﾄ履修】 however it was misread', () => {
+		for (const tag of ['【ｾｯﾄ履修】', '【セット履修】', '【セツト履 修】', '[セット履修]', '［セット履修］', '【ｾｯﾄ履']) {
+			expect(cleanTitle(`サンプル演習 II ${tag}`)).toBe('サンプル演習 II');
+		}
+	});
+
+	it('leaves out several tags, in either order', () => {
+		expect(cleanTitle('Sample Eng IV (G1) 【ｾｯﾄ履修】')).toBe('Sample Eng IV');
+		expect(cleanTitle('Sample Eng IV 【ｾｯﾄ履修】(G1)')).toBe('Sample Eng IV');
+	});
+
+	it('keeps brackets and parentheses that are part of the name', () => {
+		expect(cleanTitle('【前期】サンプル演習')).toBe('【前期】サンプル演習');
+		expect(cleanTitle('サンプル演習【A】')).toBe('サンプル演習【A】');
+		expect(cleanTitle('サンプル(G1)入門')).toBe('サンプル(G1)入門');
+		expect(cleanTitle('Group (Gallery) Design')).toBe('Group (Gallery) Design');
+	});
+});
+
+describe('readImport titles', () => {
+	it('cleans titles before joining, so the same course read two ways is one course', () => {
+		const answer = {
+			days: ['月', '火'],
+			rows: [
+				{ period: 3, cells: [cell('サンプル演習 Ⅱ 【ｾｯﾄ履修】', 'E10'), cell('Sample Eng Ⅳ Com-A (G1)', '', '山田')] },
+				{ period: 4, cells: [cell('サンプル演習 II 【セット履修】', 'E10'), empty] },
+				{ period: 5, cells: [empty, cell('(G1)')] }
+			]
+		};
+		expect(readImport(answer)).toEqual([
+			{ title: 'サンプル演習 II', weekday: 1, period: 3, span: 2, room: 'E10', teachers: [] },
+			{ title: 'Sample Eng IV Com-A', weekday: 2, period: 3, span: 1, room: '', teachers: ['山田'] }
+		]);
 	});
 });
 

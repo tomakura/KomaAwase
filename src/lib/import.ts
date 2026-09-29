@@ -122,6 +122,25 @@ export const IMPORT_COURSES_MAX = 60;
 
 const clip = (s: string, max: number) => [...s.trim()].slice(0, max).join('');
 
+// A Roman numeral symbol (Ⅱ, Ⅳ) becomes the letters it is drawn with (II, IV): the symbol can't
+// be typed on most keyboards, so a title with one would never match a search or a friend's.
+const ROMAN = /[Ⅰ-ⅿ]/g;
+
+// What the student portal adds after a name: the class group "(G1)" and 【ｾｯﾄ履修】. The second
+// is often misread (ｾｯﾄ comes out as セツト and the like), so any trailing bracket with 履 in it
+// goes, closed or not. A bracket without 履 is part of the name.
+const TAG = /\s*(?:[(（]\s*[GgＧｇ]\s*[0-9０-９]+\s*[)）]|[【[［][^】\]］]*履[^】\]］]*(?:[】\]］]|$))\s*$/;
+
+/** A title as it is kept: Roman numerals as letters, the portal's tags left off */
+export function cleanTitle(title: string) {
+	let t = title.replace(ROMAN, (c) => c.normalize('NFKC'));
+	for (let before = ''; before !== t; ) {
+		before = t;
+		t = t.replace(TAG, '');
+	}
+	return t.trim();
+}
+
 /**
  * The AI's answer as courses, or null when it isn't the requested shape. Values are
  * trimmed and bounded; the two halves of a double class given as two entries become one.
@@ -145,7 +164,7 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 	for (const item of list.slice(0, IMPORT_COURSES_MAX * 4)) {
 		if (typeof item !== 'object' || item === null) continue;
 		const c = item as Record<string, unknown>;
-		const title = typeof c.title === 'string' ? clip(c.title, TITLE_MAX) : '';
+		const title = typeof c.title === 'string' ? clip(cleanTitle(c.title), TITLE_MAX) : '';
 		const weekday = Number(c.weekday);
 		const period = Number(c.period);
 		const span = Number(c.span ?? 1);
