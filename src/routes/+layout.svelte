@@ -70,6 +70,7 @@
 			origin: location.origin,
 			path: location.pathname,
 			version,
+			controlled: () => !!navigator.serviceWorker?.controller,
 			fetch: (...args) => (browserFetch ?? fetch)(...args),
 			invalidate: () => invalidateAll(),
 			signedIn

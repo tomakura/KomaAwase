@@ -17,11 +17,11 @@
 </script>
 
 {#if shown}
-	<div class="wait" role="status" aria-label="読み込み中"><i></i></div>
+	<div class="nav-wait" role="status" aria-label="読み込み中"><i></i></div>
 {/if}
 
 <style>
-	.wait {
+	.nav-wait {
 		position: fixed;
 		top: 50%;
 		left: 50%;

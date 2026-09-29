@@ -26,6 +26,11 @@ export type Env = {
 	path: string;
 	/** The app's version: a new one clears the copies on the device */
 	version: string;
+	/**
+	 * Whether the service worker is handling this page's requests. Only then is an answer kept
+	 * (the first visit isn't controlled yet), so only then does it count as a fresh copy.
+	 */
+	controlled: () => boolean;
 	/** The browser's own fetch, for the app's requests about the connection */
 	fetch: typeof fetch;
 	/** Loads what is on screen again */
@@ -362,7 +367,7 @@ export class Connection {
 	}
 
 	#markFresh(key: string) {
-		if (!SYNC_KEYS.has(key)) return;
+		if (!SYNC_KEYS.has(key) || !this.#env?.controlled()) return;
 		this.#fresh[key] = Date.now();
 		this.#remember();
 	}

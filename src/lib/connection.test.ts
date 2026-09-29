@@ -15,7 +15,17 @@ class FakeForm {
 const allFresh = (ago = 0) => JSON.stringify({ version: 'v1', at: Object.fromEntries([...SYNC_KEYS].map((key) => [key, Date.now() - ago])) });
 
 function setup(
-	opts: { onLine?: boolean; cachedAt?: number; signedIn?: boolean; cached?: string[]; synced?: boolean | string; path?: string; saveData?: boolean } = {}
+	opts: {
+		onLine?: boolean;
+		cachedAt?: number;
+		signedIn?: boolean;
+		cached?: string[];
+		synced?: boolean | string;
+		path?: string;
+		saveData?: boolean;
+		/** Whether the service worker handles the page (false: the first visit) */
+		controlled?: boolean;
+	} = {}
 ) {
 	const page = new Map<string, (e?: unknown) => void>();
 	const win = new Map<string, () => void>();
@@ -67,7 +77,7 @@ function setup(
 		return new Response(url === '/' ? '<html></html>' : '{"type":"data","nodes":[]}');
 	});
 	const invalidate = vi.fn(async () => {});
-	const env: Env = { origin: ORIGIN, path: opts.path ?? '/friends', version: 'v1', fetch: fetcher as unknown as typeof fetch, invalidate, signedIn: opts.signedIn ?? true };
+	const env: Env = { origin: ORIGIN, path: opts.path ?? '/friends', version: 'v1', controlled: () => opts.controlled ?? true, fetch: fetcher as unknown as typeof fetch, invalidate, signedIn: opts.signedIn ?? true };
 	const connection = new Connection();
 	const stop = connection.start(env);
 	return { connection, net, asked, fetcher, invalidate, page, win, stored, browser, root: document.documentElement, stop, saved: opts.cached, attributes };
@@ -152,6 +162,33 @@ describe('starting', () => {
 		s.page.get('visibilitychange')!();
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(s.asked).toEqual(['/overlay/__data.json', '/more/__data.json']);
+	});
+
+	it('does not take a page as saved before the service worker handles the app (the first visit)', async () => {
+		// Opened on the top page, but nothing kept it: the whole sync is still due, HTML included
+		const first = setup({ path: '/', synced: false, controlled: false, cached: null as never });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(first.stored.get(FRESH_KEY)).toBeUndefined();
+		first.stop();
+
+		// The same after the sync, whose answers weren't kept either
+		const later = setup({ path: '/', synced: false, controlled: false });
+		const fetch = later.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
+		await fetch('/friends/__data.json');
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(later.stored.get(FRESH_KEY)).toBeUndefined();
+	});
+
+	it('fetches the HTML of the top page too on a first visit, and stops asking for it once it is kept', async () => {
+		const s = setup({ path: '/', synced: false, controlled: true, cached: ['/', '/overlay', '/friends', '/more'] });
+		await vi.advanceTimersByTimeAsync(5_000);
+		// Loaded with the app under the service worker: its HTML is kept
+		expect(s.asked).not.toContain('/');
+		s.stop();
+
+		const first = setup({ path: '/', synced: false, controlled: false });
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(first.asked).toContain('/');
 	});
 
 	it('does not count an answer from a saved copy as fresh', async () => {

@@ -5,10 +5,12 @@
 // Keeps the app opening without a connection: the built files are cached up front, and pages
 // are fetched from the network first, falling back to the last copy seen on this device. The
 // fallback comes when the network fails and also when it is too slow (SLOW_MS), since a bad
-// connection often doesn't fail, it just never answers. The page copies hold the user's
-// timetable, so signing out clears them (see PAGE_CACHE_PREFIX).
+// connection often doesn't fail, it just never answers. A page that is being awaited shows a
+// spinner instead of nothing (see waiting). The page copies hold the user's timetable, so
+// signing out clears them (see PAGE_CACHE_PREFIX).
 import { build, files, version } from '$service-worker';
-import { CACHED_AT_ATTRIBUTE, PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER } from '$lib/offline';
+import { PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER } from '$lib/offline';
+import { WAIT_DONE, leaveScript, stampHtml, themeOf, waitShell } from '$lib/wait';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 const ASSETS = `assets-${version}`;
@@ -17,6 +19,9 @@ const PAGES = `${PAGE_CACHE_PREFIX}${version}`;
 const precached = new Set([...build, ...files]);
 // How long the network gets to answer before a saved copy is shown instead
 const SLOW_MS = 4000;
+// A page not answered within this long is awaited behind a spinner
+const GRACE_MS = 700;
+const sleep = (ms: number) => new Promise<null>((resolve) => setTimeout(resolve, ms, null));
 
 // Never kept: sign-in, anything that changes data, files, the Worker's own routes, and the
 // admin page (other people's reports and feedback)
@@ -71,8 +76,7 @@ async function stamp(request: Request, copy: Response) {
 	const headers = new Headers(copy.headers);
 	headers.delete('content-length');
 	headers.delete('content-encoding');
-	const html = (await copy.text()).replace('<html', `<html ${CACHED_AT_ATTRIBUTE}="${savedAt}"`);
-	return new Response(html, { status: copy.status, statusText: copy.statusText, headers });
+	return new Response(stampHtml(await copy.text(), savedAt), { status: copy.status, statusText: copy.statusText, headers });
 }
 
 function unavailable(request: Request) {
@@ -96,12 +100,59 @@ async function networkFirst(event: FetchEvent) {
 	event.waitUntil(network.then(() => saved, () => {}));
 	const copy = await cache.match(key);
 	try {
+		if (request.mode === 'navigate') {
+			// A quick answer goes straight through; for a slow one the screen gets a spinner
+			const quick = await Promise.race([network, sleep(GRACE_MS)]);
+			return quick ?? waiting(event, network, copy);
+		}
 		if (!copy) return await network;
 		// With a copy to show, the network gets SLOW_MS to answer
-		const answer = await Promise.race([network, new Promise<null>((resolve) => setTimeout(resolve, SLOW_MS, null))]);
-		return answer ?? (await stamp(request, copy));
+		return (await Promise.race([network, sleep(SLOW_MS)])) ?? (await stamp(request, copy));
 	} catch {
 		return copy ? await stamp(request, copy) : unavailable(request);
+	}
+}
+
+// A page still awaited after GRACE_MS: the answer starts with a spinner (src/lib/wait.ts), which
+// is the first thing on screen, and the page follows on the same document. Without this a slow
+// connection leaves the screen blank. With a copy to show, the network gets SLOW_MS in all.
+function waiting(event: FetchEvent, network: Promise<Response>, copy: Response | undefined) {
+	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+	event.waitUntil(follow(event.request, writable, network, copy));
+	return new Response(readable, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+}
+
+async function follow(request: Request, writable: WritableStream<Uint8Array>, network: Promise<Response>, copy: Response | undefined) {
+	const out = writable.getWriter();
+	const encoder = new TextEncoder();
+	const write = (html: string) => out.write(encoder.encode(html));
+	try {
+		const savedAt = copy?.headers.get(SAVED_AT_HEADER) ?? '';
+		const html = copy ? await copy.text() : '';
+		await write(waitShell(themeOf(html)));
+
+		const answer = await (copy ? Promise.race([network, sleep(SLOW_MS - GRACE_MS)]) : network).catch(() => null);
+		if (answer?.type === 'opaqueredirect') {
+			// A stream can't pass a redirect on (its address isn't readable): ask again to learn it
+			const target = await fetch(request.url, { redirect: 'follow' }).then(
+				(res) => {
+					res.body?.cancel();
+					return new URL(res.url).origin === sw.location.origin ? res.url : null;
+				},
+				() => null
+			);
+			await write(target ? leaveScript(target) : OFFLINE);
+		} else if (answer?.body) {
+			const reader = answer.body.getReader();
+			for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) await out.write(chunk.value);
+		} else {
+			await write(copy ? stampHtml(html, savedAt) : OFFLINE);
+		}
+		await write(WAIT_DONE);
+	} catch {
+		// The page was left before it came
+	} finally {
+		await out.close().catch(() => {});
 	}
 }
 
