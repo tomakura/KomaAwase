@@ -6,7 +6,7 @@
 // copies are refreshed as soon as the server answers again (a small request checks, backing off),
 // and whatever needs the server is switched off with a message instead of failing.
 // The service worker (src/service-worker.ts) keeps the copies; src/lib/sync.ts lists the pages.
-import { CACHED_AT_ATTRIBUTE, FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER, cachedPaths } from './offline';
+import { CACHED_AT_ATTRIBUTE, FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER, cachedKeys, dataCopyKey } from './offline';
 import {
 	SYNC_KEYS,
 	SYNC_STEPS,
@@ -216,15 +216,20 @@ export class Connection {
 		};
 	}
 
-	/** For beforeNavigate: false when the page can't be opened now (and says why) */
-	guardNavigation(url: URL) {
+	/**
+	 * For beforeNavigate: false when the page can't be opened now (and says why). `from` is the
+	 * page the navigation starts on: a move within it that changes what it shows (the overlay's
+	 * ?with=, who is laid over) needs the server, unless that very view was kept.
+	 */
+	guardNavigation(url: URL, from?: string) {
 		if (!this.blocked || url.origin !== this.#env?.origin) return true;
 		if (needsServer(url.pathname)) {
 			this.tell(this.#say('add'));
 			return false;
 		}
-		if (!openableOffline(url.pathname, this.#cached)) {
-			this.tell(this.#say('unsaved'));
+		if (!openableOffline(url, this.#cached, from)) {
+			const within = from !== undefined && url.pathname.replace(/\/+$/, '') === from.replace(/\/+$/, '');
+			this.tell(this.#say(within ? 'view' : 'unsaved'));
 			return false;
 		}
 		return true;
@@ -387,13 +392,13 @@ export class Connection {
 	}
 
 	async #scan() {
-		this.#cached = await cachedPaths();
+		this.#cached = await cachedKeys();
 	}
 
 	/** An answer to a page's data request went by */
 	#seen(res: Response, url: URL) {
 		// The service worker keeps every page it gets: it can be opened again offline
-		if (res.ok) this.#cached?.add(url.pathname.slice(0, -'/__data.json'.length) || '/');
+		if (res.ok) this.#cached?.add(dataCopyKey(url));
 		const saved = Number(res.headers.get(SAVED_AT_HEADER));
 		if (saved > 0) {
 			// The service worker gave a copy: the network was down or too slow
@@ -444,9 +449,10 @@ export class Connection {
 		this.tell(this.#say('action'));
 	}
 
-	#say(what: 'action' | 'add' | 'unsaved') {
+	#say(what: 'action' | 'add' | 'unsaved' | 'view') {
 		const cause = CAUSE[this.#link === 'poor' ? 'poor' : 'offline'];
 		if (what === 'add') return `${cause}、授業の追加などはできません。つながってからお試しください。`;
+		if (what === 'view') return `${cause}、この表示にはサーバーの情報が必要です。つながってからお試しください。`;
 		if (what === 'unsaved') return `${cause}、このページは開けません。まだ端末に保存されていません。`;
 		return `${cause}、この操作はできません。つながってからお試しください。`;
 	}

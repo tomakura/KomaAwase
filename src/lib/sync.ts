@@ -5,7 +5,7 @@
 //    date is fetched: a copy that came with a page just opened, or with the last sync, is fine
 //  - which pages can't be used without the server, and which are on the device
 //  - how old the copy on screen is, in words
-import { SYNC_HEADER } from './offline';
+import { SYNC_HEADER, copyKey } from './offline';
 import { daysBetween, monthDay, tokyoTime } from './time';
 
 export type SyncStep = {
@@ -162,12 +162,27 @@ export function needsServer(pathname: string) {
 	return NEEDS_SERVER.test(trimmed(pathname));
 }
 
-/** Whether a page can be opened offline: its data is on the device (`cached`), or it has none */
-export function openableOffline(pathname: string, cached: Set<string> | null) {
+/** Whether a copy of the page (by path) is on the device, under any query */
+export function hasPage(cached: Set<string>, pathname: string) {
 	const path = trimmed(pathname);
+	for (const key of cached) if (key === path || key.startsWith(`${path}?`)) return true;
+	return false;
+}
+
+/**
+ * Whether a page can be opened offline: its copy is on the device (`cached`, by `copyKey`), or it
+ * has none to load. `from` is the page the navigation starts on.
+ */
+export function openableOffline(target: { pathname: string; search?: string }, cached: Set<string> | null, from?: string) {
+	const path = trimmed(target.pathname);
 	if (needsServer(path)) return false;
+	if (NEEDS_NOTHING.test(path)) return true;
 	// When the copies can't be listed, let the navigation try (the worker answers either way)
-	return !cached || cached.has(path) || NEEDS_NOTHING.test(path);
+	if (!cached) return true;
+	if (cached.has(copyKey(path, target.search))) return true;
+	// Another page is shown from the copy of it the worker has, whatever the query. The same page
+	// under another query is other information (who is laid over in the overlay): it needs its own copy.
+	return path !== trimmed(from ?? '') && hasPage(cached, path);
 }
 
 /** 今日 8:05, 昨日 21:40, 9/27 12:30: when the copy on screen was fetched (Japan time) */

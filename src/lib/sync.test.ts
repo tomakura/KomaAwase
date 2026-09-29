@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SYNC_HEADER } from './offline';
-import { SYNC_KEYS, SYNC_STEPS, TIMETABLE_STEPS, dueSteps, needsServer, openableOffline, runSync, savedAtLabel, syncKey, type SyncProgress } from './sync';
+import { SYNC_HEADER, copyKey, dataCopyKey } from './offline';
+import { SYNC_KEYS, SYNC_STEPS, TIMETABLE_STEPS, dueSteps, hasPage, needsServer, openableOffline, runSync, savedAtLabel, syncKey, type SyncProgress } from './sync';
 
 afterEach(() => vi.useRealTimers());
 
@@ -124,31 +124,103 @@ describe('needsServer', () => {
 });
 
 describe('openableOffline', () => {
-	const cached = new Set(['/', '/friends', '/courses/abc']);
+	// Copies by copyKey: the path, and the query that changes what the page shows
+	const cached = new Set(['/', '/friends', '/courses/abc', '/overlay', '/overlay?with=u2&term=T']);
+	const open = (path: string, from?: string, set: Set<string> | null = cached) => {
+		const url = new URL(path, 'https://koma.test');
+		return openableOffline(url, set, from);
+	};
 
 	it('is true for pages on the device', () => {
-		expect(openableOffline('/', cached)).toBe(true);
-		expect(openableOffline('/friends/', cached)).toBe(true);
-		expect(openableOffline('/courses/abc', cached)).toBe(true);
+		expect(open('/')).toBe(true);
+		expect(open('/friends/')).toBe(true);
+		expect(open('/courses/abc')).toBe(true);
 	});
 
 	it('is false for pages not on the device', () => {
-		expect(openableOffline('/overlay', cached)).toBe(false);
-		expect(openableOffline('/courses/other', cached)).toBe(false);
+		expect(open('/more')).toBe(false);
+		expect(open('/courses/other')).toBe(false);
 	});
 
 	it('is false for pages that need the server, even when a copy is there', () => {
-		expect(openableOffline('/courses/search', new Set([...cached, '/courses/search']))).toBe(false);
+		expect(open('/courses/search', undefined, new Set([...cached, '/courses/search']))).toBe(false);
 	});
 
 	it('is true for pages with nothing to load', () => {
-		expect(openableOffline('/install', cached)).toBe(true);
-		expect(openableOffline('/privacy', cached)).toBe(true);
+		expect(open('/install')).toBe(true);
+		expect(open('/privacy')).toBe(true);
 	});
 
 	it('leaves it to the navigation when the copies cannot be listed', () => {
-		expect(openableOffline('/overlay', null)).toBe(true);
-		expect(openableOffline('/courses/search', null)).toBe(false);
+		expect(open('/more', undefined, null)).toBe(true);
+		expect(open('/courses/search', undefined, null)).toBe(false);
+	});
+
+	describe('a page under a query', () => {
+		it('is true when that very view was kept', () => {
+			expect(open('/overlay?with=u2&term=T', '/overlay')).toBe(true);
+			// Whatever order SvelteKit puts its own parameters in
+			expect(open('/overlay?with=u2&term=T&x-sveltekit-invalidated=01', '/overlay')).toBe(true);
+		});
+
+		it('is false within the same page when only another view was kept: it is other information', () => {
+			// Laying someone else over in the overlay
+			expect(open('/overlay?with=u3&term=T', '/overlay')).toBe(false);
+			expect(open('/overlay?with=u2%2Cu3&term=T', '/overlay')).toBe(false);
+			expect(open('/overlay?term=T', '/overlay')).toBe(false);
+			expect(open('/overlay?with=u3&term=T', '/overlay/')).toBe(false);
+		});
+
+		it('is true from another page, which is shown from the copy the device has of it', () => {
+			expect(open('/overlay?with=u3&term=T', '/friends')).toBe(true);
+			expect(open('/?term=T', '/courses/abc')).toBe(true);
+			expect(open('/friends?x=1', '/')).toBe(true);
+		});
+
+		it('is false from another page when the device has no copy of the page at all', () => {
+			expect(open('/more?x=1', '/')).toBe(false);
+			expect(open('/courses/other?term=T', '/courses/abc')).toBe(false);
+		});
+
+		it('does not take a page for another whose path only starts alike', () => {
+			expect(open('/friend', '/', new Set(['/friends']))).toBe(false);
+			expect(open('/overlay2', '/', new Set(['/overlay']))).toBe(false);
+		});
+	});
+});
+
+describe('copyKey', () => {
+	it('is the path and the query that changes what the page shows', () => {
+		expect(copyKey('/overlay', '?with=u2&term=T')).toBe('/overlay?with=u2&term=T');
+		expect(copyKey('/friends', '')).toBe('/friends');
+		expect(copyKey('/friends/', '')).toBe('/friends');
+		expect(copyKey('/', '')).toBe('/');
+	});
+
+	it('leaves SvelteKit\'s own parameters out', () => {
+		expect(copyKey('/', '?x-sveltekit-trailing-slash=1')).toBe('/');
+		expect(copyKey('/overlay', '?with=u2&x-sveltekit-invalidated=01')).toBe('/overlay?with=u2');
+		expect(copyKey('/', '?term=T&x-sveltekit-trailing-slash=1&x-sveltekit-invalidated=11')).toBe('/?term=T');
+	});
+
+	it('is the same for a data request and the page it is for', () => {
+		const data = (href: string) => dataCopyKey(new URL(href, 'https://koma.test'));
+		expect(data('/overlay/__data.json?with=u2&term=T&x-sveltekit-invalidated=01')).toBe('/overlay?with=u2&term=T');
+		expect(data('/__data.json?x-sveltekit-trailing-slash=1')).toBe('/');
+		expect(data('/friends/__data.json')).toBe('/friends');
+		// The comma is written the same whichever way it comes
+		expect(data('/overlay/__data.json?with=u2,u3')).toBe(copyKey('/overlay', '?with=u2%2Cu3'));
+	});
+});
+
+describe('hasPage', () => {
+	it('finds a page kept under any query, and only that page', () => {
+		const set = new Set(['/overlay?with=u2', '/friends', '/']);
+		expect(hasPage(set, '/overlay')).toBe(true);
+		expect(hasPage(set, '/friends')).toBe(true);
+		expect(hasPage(set, '/')).toBe(true);
+		expect(hasPage(set, '/over')).toBe(false);
+		expect(hasPage(set, '/more')).toBe(false);
 	});
 });
 

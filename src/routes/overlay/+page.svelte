@@ -3,6 +3,7 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import { connection } from '$lib/connection.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES } from '$lib/courses';
@@ -38,6 +39,9 @@
 	}
 
 	function apply(next: string[]) {
+		// Others' timetables come from the server. Without a connection the choice stays as it is
+		// (the chip, and the cookie that keeps it), and the reason is shown, unless that view was kept.
+		if (!connection.guardNavigation(new URL(query(next), location.href), location.pathname)) return;
 		selected = next;
 		document.cookie = `${OVERLAY_COOKIE}=${next.join(',')}; path=/; max-age=31536000; samesite=lax`;
 		goto(query(next), { replaceState: true, noScroll: true, keepFocus: true });

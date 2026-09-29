@@ -58,7 +58,12 @@ function setup(
 	if (opts.cached) {
 		// Read when asked, as the service worker keeps adding to it
 		const list = opts.cached;
-		const requests = () => list.map((path) => ({ url: `${ORIGIN}${path === '/' ? '' : path}/__data.json` }));
+		// 'path' or 'path?query': a copy of the page under that query
+		const requests = () =>
+			list.map((key) => {
+				const [path, query] = key.split('?');
+				return { url: `${ORIGIN}${path === '/' ? '' : path}/__data.json${query ? `?${query}` : ''}` };
+			});
 		vi.stubGlobal('caches', { keys: async () => ['pages-v1'], open: async () => ({ keys: async () => requests() }) });
 	}
 
@@ -490,6 +495,45 @@ describe('while the connection is down, what needs the server is off', () => {
 		s.connection.link = 'poor';
 		await flush();
 		expect(s.connection.guardNavigation(new URL('/courses/abc', ORIGIN))).toBe(true);
+	});
+
+	it('stops laying someone else over in the overlay, which needs the server, unless that very view was kept', async () => {
+		const s = setup({ cachedAt: 1, cached: ['/', '/overlay', '/overlay?with=u2&term=T', '/friends'] });
+		s.net.up = false;
+		await flush();
+		const go = (path: string, from?: string) => s.connection.guardNavigation(new URL(path, ORIGIN), from);
+
+		// A view kept before opens; another does not, and says why
+		expect(go('/overlay?with=u2&term=T', '/overlay')).toBe(true);
+		expect(s.connection.notice).toBeNull();
+		expect(go('/overlay?with=u3&term=T', '/overlay')).toBe(false);
+		expect(s.connection.notice?.text).toBe('オフラインのため、この表示にはサーバーの情報が必要です。つながってからお試しください。');
+		expect(go('/overlay?term=T', '/overlay')).toBe(false);
+	});
+
+	it('shows another page from the copy of it, whatever the query', async () => {
+		const s = setup({ cachedAt: 1, cached: ['/', '/overlay', '/courses/abc'] });
+		s.net.up = false;
+		await flush();
+		const go = (path: string, from?: string) => s.connection.guardNavigation(new URL(path, ORIGIN), from);
+
+		// Back from a course to the timetable of a term, or to the overlay as it was last left
+		expect(go('/?term=T', '/courses/abc')).toBe(true);
+		expect(go('/overlay?with=u9&term=T', '/')).toBe(true);
+		// No copy of the page at all
+		expect(go('/more?x=1', '/')).toBe(false);
+		expect(s.connection.notice?.text).toContain('端末に保存されていません');
+	});
+
+	it('counts a view opened while online as kept, so it opens again offline', async () => {
+		const s = setup({ synced: true, cached: ['/', '/overlay', '/friends', '/more'] });
+		await flush();
+		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
+		await fetch('/overlay/__data.json?with=u3&term=T&x-sveltekit-invalidated=01');
+		s.net.hang = true;
+		s.connection.link = 'offline';
+		expect(s.connection.guardNavigation(new URL('/overlay?with=u3&term=T', ORIGIN), '/overlay')).toBe(true);
+		expect(s.connection.guardNavigation(new URL('/overlay?with=u4&term=T', ORIGIN), '/overlay')).toBe(false);
 	});
 
 	it('lets every navigation go when online', () => {
