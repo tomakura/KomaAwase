@@ -3,76 +3,34 @@
 	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Switch from '$lib/components/Switch.svelte';
+	import type { PushState } from '$lib/notify-prompt';
+	import { enablePush, pushState, subscription } from '$lib/push-client';
 	import { REMINDERS_MAX, REMINDER_MINUTES, leadLabel } from '$lib/reminder';
 
 	let { data, form } = $props();
 
 	// What this device can do, found out in the browser
-	type State = 'checking' | 'unsupported' | 'install' | 'denied' | 'off' | 'on';
-	let device = $state<State>('checking');
+	let device = $state<PushState | 'checking'>('checking');
 	let busy = $state(false);
 	let message = $state<string | null>(null);
 
-	// iPhone and iPad only deliver notifications to the app added to the home screen
-	const isIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-	const standalone = () => matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
-
-	async function subscription() {
-		const registration = await navigator.serviceWorker.ready;
-		return registration.pushManager.getSubscription();
-	}
-
-	async function check() {
-		if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-			device = isIos() && !standalone() ? 'install' : 'unsupported';
-			return;
-		}
-		if (Notification.permission === 'denied') {
-			device = 'denied';
-			return;
-		}
-		device = (await subscription()) ? 'on' : 'off';
-	}
-
 	$effect(() => {
-		check();
+		pushState().then((state) => (device = state));
 	});
-
-	function keyBytes(key: string) {
-		const s = atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (key.length % 4)) % 4));
-		return Uint8Array.from(s, (c) => c.charCodeAt(0));
-	}
 
 	async function turnOn() {
 		if (!data.publicKey) return;
 		busy = true;
 		message = null;
-		try {
-			if ((await Notification.requestPermission()) !== 'granted') {
-				device = Notification.permission === 'denied' ? 'denied' : 'off';
-				return;
-			}
-			const registration = await navigator.serviceWorker.ready;
-			const sub =
-				(await registration.pushManager.getSubscription()) ??
-				(await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.publicKey) }));
-			const res = await fetch('/api/push/subscribe', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(sub.toJSON())
-			});
-			if (!res.ok) {
-				message = ((await res.json().catch(() => null)) as { message?: string } | null)?.message ?? 'この端末では通知を受け取れませんでした';
-				await sub.unsubscribe();
-				return;
-			}
+		const result = await enablePush(data.publicKey);
+		if (result.ok) {
 			device = 'on';
 			await invalidateAll();
-		} catch {
-			message = 'この端末では通知を受け取れませんでした';
-		} finally {
-			busy = false;
+		} else {
+			device = result.state;
+			message = result.message ?? null;
 		}
+		busy = false;
 	}
 
 	async function turnOff() {
