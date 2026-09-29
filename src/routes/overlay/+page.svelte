@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto, replaceState } from '$app/navigation';
+	import { fade } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
@@ -7,7 +8,9 @@
 	import TermBar from '$lib/components/TermBar.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES } from '$lib/courses';
-	import { OVERLAY_COOKIE, cellKey, lookingAt, overlay, termOn, type OverlayGroup, type OverlayPerson } from '$lib/overlay';
+	import { glide } from '$lib/glide';
+	import { iconOf } from '$lib/icons';
+	import { OVERLAY_COOKIE, cellKey, classFill, lookingAt, overlay, termOn, type OverlayGroup, type OverlayPerson } from '$lib/overlay';
 	import { currentTerm } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
 
@@ -109,6 +112,9 @@
 	);
 	const time = (t: string) => t.replace(/^0/, '');
 	const personOf = (id: string) => people.get(id) ?? { id, nickname: '?', icon: null };
+	// Everyone's classes are in the color of their icon, so the chip, the icon and the class match
+	const colorOf = (id: string) => iconOf(personOf(id)).hex;
+	const fillOf = (g: OverlayGroup) => classFill(g.people.map((x) => colorOf(x.id)));
 	const differs = (g: OverlayGroup['people'][number]) => {
 		const p = data.people.find((x) => x.id === g.id);
 		return !!p && p.universityId !== data.me.universityId;
@@ -127,14 +133,14 @@
 	<TermBar year={data.year} terms={data.mine.terms} bind:termId onchange={() => replaceState(query(selected), {})} />
 
 	<div class="chips" role="group" aria-label="重ねる人">
-		<span class="chip me"><UserIcon user={data.me} size={24} short />自分</span>
+		<span class="chip me" style:--p={colorOf(data.me.id)}><UserIcon user={data.me} size={24} short />自分</span>
 		{#each friends as f (f.id)}
-			<button type="button" class="chip" aria-pressed={selected.includes(f.id)} onclick={() => toggle(f.id)}>
+			<button type="button" class="chip" style:--p={colorOf(f.id)} aria-pressed={selected.includes(f.id)} onclick={() => toggle(f.id)}>
 				<UserIcon user={f} size={24} short />{f.nickname}
 			</button>
 		{/each}
 		{#each others as f (f.id)}
-			<button type="button" class="chip" aria-pressed="true" onclick={() => toggle(f.id)}>
+			<button type="button" class="chip" style:--p={colorOf(f.id)} aria-pressed="true" onclick={() => toggle(f.id)}>
 				<UserIcon user={f} size={24} short />{f.nickname}
 			</button>
 		{/each}
@@ -160,7 +166,7 @@
 		<p class="hint">重ねる人を選んでください。</p>
 	{/if}
 
-	<div class="grid" style:--days={days.length} style:--periods={data.mine.periods.length}>
+	<div class="grid" use:glide={days.length} style:--days={days.length} style:--periods={data.mine.periods.length}>
 		{#each days as day, i (day)}
 			<span class="day" style:grid-column={i + 2}>{DAY_NAMES[day]}</span>
 		{/each}
@@ -183,7 +189,7 @@
 					onclick={() => (open = { weekday: day, period: p.number })}
 				>
 					{#each groups as g (g.key)}
-						<span class="course">
+						<span class="course" style:background={fillOf(g)} transition:fade={{ duration: 200 }}>
 							<span class="title">{g.title}</span>
 							<span class="people">
 								{#each g.people as x (x.id)}<UserIcon user={personOf(x.id)} size={16} short />{/each}
@@ -232,7 +238,7 @@
 	{#if openGroups.length}
 		<div class="ui-list">
 			{#each openGroups as g (g.key)}
-				<div class="detail">
+				<div class="detail" style:background={fillOf(g)}>
 					<span class="detail-title">{g.title}</span>
 					{#each g.people as x (x.id)}
 						<span class="who">
@@ -300,8 +306,14 @@
 	}
 
 	.chip.me {
-		border-color: var(--line-strong);
 		cursor: default;
+	}
+
+	/* Each person's chip is in their color, the one their classes are in below */
+	.chip:not(.group)[aria-pressed='true'],
+	.chip.me {
+		border-color: var(--p);
+		background: color-mix(in srgb, var(--p) 16%, var(--surface));
 	}
 
 	.chip.group {
@@ -394,7 +406,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		padding: 3px;
+		padding: 3px 3px 3px 8px;
 		border-radius: 5px;
 		background: var(--raised);
 	}
@@ -482,7 +494,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-		padding: 10px 12px;
+		padding: 10px 12px 10px 20px;
 	}
 
 	.detail-title {
