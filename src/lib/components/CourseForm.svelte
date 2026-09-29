@@ -345,7 +345,7 @@
 				{#if v.delivery === 'intensive'}
 					<div class="dates">
 						<label class="field">
-							はじまり（なくてもOK）
+							はじまり（任意）
 							<input type="date" name="intensive_from" bind:value={v.intensiveFrom} />
 						</label>
 						<label class="field">

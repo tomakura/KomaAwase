@@ -217,7 +217,7 @@
 					<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required></textarea></label>
 				{:else if adding === 'task'}
 					<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
-					<label class="field">締切（なくてもOK）<input type="date" name="due" /></label>
+					<label class="field">締切（任意）<input type="date" name="due" /></label>
 				{:else}
 					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
 					<label class="field">

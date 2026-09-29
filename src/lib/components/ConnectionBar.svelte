@@ -24,7 +24,7 @@
 			: mode === 'syncing'
 				? null
 				: fetched
-					? `${fetched} に取得した情報を表示しています`
+					? `${fetched} の情報を表示しています`
 					: null
 	);
 	const step = $derived(
