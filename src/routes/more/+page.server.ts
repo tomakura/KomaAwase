@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	if (!locals.user) redirect(303, '/login');
 	const user = locals.user;
 	const year = thisYear();
-	const timetable = await currentTimetable(locals.db, user);
+	const timetable = await currentTimetable(locals.db, user, locals.timetable);
 	const [shape, [past], [keys], university, verification] = await Promise.all([
 		loadShape(locals.db, timetable.id),
 		locals.db

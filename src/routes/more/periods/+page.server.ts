@@ -6,8 +6,8 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login');
-	await currentTimetable(locals.db, locals.user);
-	const settings = await timetableSettings(locals.db, locals.user, thisYear());
+	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
+	const settings = await timetableSettings(locals.db, locals.user, thisYear(), timetable);
 	return { periods: settings.periods, usedPeriods: settings.usedPeriods };
 };
 

@@ -1,7 +1,7 @@
 import type { Cookies } from '@sveltejs/kit';
-import { eq, lt } from 'drizzle-orm';
+import { and, eq, lt } from 'drizzle-orm';
 import type { Db } from '$lib/server/db';
-import { sessions, users } from '$lib/server/db/schema';
+import { sessions, timetables, users } from '$lib/server/db/schema';
 import { generateToken, hashToken } from './token';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -22,12 +22,23 @@ export async function createSession(db: Db, userId: string) {
 	return { token, expiresAt };
 }
 
-export async function validateSession(db: Db, token: string) {
+export type KnownTimetable = { id: string; year: number; universityId: string | null };
+
+/**
+ * The session's user, and with `year` their timetable for it (null when there is none yet),
+ * read in the same query so a page that shows it waits for the database once less.
+ */
+export async function validateSession(db: Db, token: string, year: number | null = null) {
 	const id = await hashToken(token);
 	const row = await db
-		.select({ user: users, session: sessions })
+		.select({
+			user: users,
+			session: sessions,
+			timetable: { id: timetables.id, year: timetables.year, universityId: timetables.universityId }
+		})
 		.from(sessions)
 		.innerJoin(users, eq(sessions.userId, users.id))
+		.leftJoin(timetables, and(eq(timetables.userId, users.id), eq(timetables.year, year ?? 0)))
 		.where(eq(sessions.id, id))
 		.get();
 	if (!row) return null;
@@ -42,7 +53,7 @@ export async function validateSession(db: Db, token: string) {
 		expiresAt = new Date(now + SESSION_LIFETIME);
 		await db.update(sessions).set({ expiresAt }).where(eq(sessions.id, id));
 	}
-	return { user: row.user, expiresAt };
+	return { user: row.user, timetable: year === null ? undefined : row.timetable, expiresAt };
 }
 
 export async function deleteSession(db: Db, token: string) {

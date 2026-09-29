@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
 import { DEFAULT_PERIODS, termTemplate, type PeriodInput, type TermInput } from '$lib/presets';
 import { remapTerm } from '$lib/terms';
 import { academicYear, isDate, tokyoTime } from '$lib/time';
+import type { KnownTimetable } from './auth/session';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
 import { upcomingCancellations } from './notes';
@@ -178,7 +179,9 @@ export async function createTimetable(
 }
 
 // Returns the user's timetable for the year, making it the first time.
-export async function getOrCreateTimetable(db: Db, owner: Owner, year: number) {
+// `known` is the timetable read with the session (locals.timetable), used when it's for `year`.
+export async function getOrCreateTimetable(db: Db, owner: Owner, year: number, known?: KnownTimetable | null) {
+	if (known?.year === year) return known;
 	const existing = await findTimetable(db, owner.id, year);
 	if (existing) return existing;
 	try {
@@ -192,8 +195,8 @@ export async function getOrCreateTimetable(db: Db, owner: Owner, year: number) {
 }
 
 // The timetable for this academic year
-export function currentTimetable(db: Db, owner: Owner) {
-	return getOrCreateTimetable(db, owner, academicYear(tokyoTime(Date.now()).date));
+export function currentTimetable(db: Db, owner: Owner, known?: KnownTimetable | null) {
+	return getOrCreateTimetable(db, owner, academicYear(tokyoTime(Date.now()).date), known);
 }
 
 const termsQuery = (db: Db, timetableId: string) =>

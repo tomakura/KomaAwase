@@ -8,7 +8,7 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login');
-	const timetable = await currentTimetable(locals.db, locals.user);
+	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
 	const [loaded, university] = await Promise.all([
 		loadTimetable(locals.db, timetable.id, tokyoTime(Date.now()).date),
 		timetable.universityId

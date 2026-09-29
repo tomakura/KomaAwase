@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	if (!me.setupAt) redirect(303, '/');
 	const year = thisYear();
 	const [mine, visible, groups, friendRows] = await Promise.all([
-		currentTimetable(locals.db, me),
+		currentTimetable(locals.db, me, locals.timetable),
 		visibleUserIds(locals.db, me.id),
 		groupsWithSharers(locals.db, me.id),
 		locals.db

@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const me = requireUser(locals, url);
 	if (!me.setupAt) redirect(303, '/');
 	const now = Date.now();
-	const timetable = await currentTimetable(locals.db, me);
+	const timetable = await currentTimetable(locals.db, me, locals.timetable);
 	const loaded = await loadTimetable(locals.db, timetable.id, tokyoTime(now).date);
 	return {
 		now,

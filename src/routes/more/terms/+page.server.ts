@@ -7,10 +7,10 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login');
-	await currentTimetable(locals.db, locals.user);
+	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
 	const year = thisYear();
 	const [settings, list] = await Promise.all([
-		timetableSettings(locals.db, locals.user, year),
+		timetableSettings(locals.db, locals.user, year, timetable),
 		listUniversities(locals.db)
 	]);
 	const preset = presetsFor(list, year).find((p) => p.name === settings.universityName);

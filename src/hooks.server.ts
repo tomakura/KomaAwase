@@ -2,6 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { SESSION_COOKIE, clearSessionCookie, setSessionCookie, validateSession } from '$lib/server/auth/session';
 import { themeColorTags } from '$lib/theme';
+import { academicYear, tokyoTime } from '$lib/time';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const d1 = event.platform?.env.DB;
@@ -11,9 +12,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const token = event.cookies.get(SESSION_COOKIE);
 	if (token) {
-		const result = await validateSession(event.locals.db, token);
+		// This year's timetable comes along for pages. Form posts leave it out: an action
+		// may change it before the page's load runs in the same request.
+		const year = event.request.method === 'GET' ? academicYear(tokyoTime(Date.now()).date) : null;
+		const result = await validateSession(event.locals.db, token, year);
 		if (result) {
 			event.locals.user = result.user;
+			event.locals.timetable = result.timetable;
 			setSessionCookie(event.cookies, token, result.expiresAt);
 		} else {
 			clearSessionCookie(event.cookies);
