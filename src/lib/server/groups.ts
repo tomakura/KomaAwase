@@ -133,12 +133,18 @@ export async function deleteGroup(db: Db, groupId: string) {
 
 /** The user's groups with the members who show them their timetable, for the overlay's chips. */
 export async function groupsWithSharers(db: Db, userId: string) {
-	const mineRows = await listMyGroups(db, userId);
-	if (!mineRows.length) return [];
-	const members = await db
-		.select({ groupId: groupMembers.groupId, userId: groupMembers.userId })
-		.from(groupMembers)
-		.where(and(inArray(groupMembers.groupId, mineRows.slice(0, 90).map((g) => g.id)), eq(groupMembers.shareTimetable, true)));
+	const [mineRows, members] = await db.batch([
+		listMyGroups(db, userId),
+		db
+			.select({ groupId: groupMembers.groupId, userId: groupMembers.userId })
+			.from(groupMembers)
+			.where(
+				and(
+					inArray(groupMembers.groupId, db.select({ id: mine.groupId }).from(mine).where(eq(mine.userId, userId))),
+					eq(groupMembers.shareTimetable, true)
+				)
+			)
+	]);
 	return mineRows.map((g) => ({
 		id: g.id,
 		name: g.name,
