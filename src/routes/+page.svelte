@@ -69,7 +69,7 @@
 		{#if !data.courses.length && !data.imported}
 			<section class="start">
 				<h2>授業を登録する</h2>
-				<a class="way primary" href="/import?back=/">
+				<a class="way primary" href="/import?back=/{termId ? `&term=${encodeURIComponent(termId)}` : ''}">
 					<Icon name="image" size={22} />
 					<span><b>スクショから読み込む</b>ほかのアプリの時間割をまとめて登録</span>
 				</a>

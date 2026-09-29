@@ -13,11 +13,12 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 	// Only this site's pages may send (SvelteKit checks this for forms, not for fetch).
 	if (request.headers.get('origin') !== url.origin) error(403, 'forbidden');
 	if (!platform) error(500);
-	const body = (await request.json().catch(() => null)) as { image?: unknown; tiled?: unknown } | null;
+	const body = (await request.json().catch(() => null)) as { image?: unknown; tiled?: unknown; term?: unknown } | null;
 	if (typeof body?.image !== 'string') error(400, '画像を読み込めませんでした');
 
+	const term = typeof body.term === 'string' && body.term.length <= 64 ? body.term : null;
 	const timetable = await currentTimetable(locals.db, locals.user);
-	const created = await createImportJob(locals.db, locals.user.id, timetable.id, body.image, body.tiled === true);
+	const created = await createImportJob(locals.db, locals.user.id, timetable.id, body.image, body.tiled === true, term);
 	if ('message' in created) return json({ message: created.message }, { status: 400 });
 	try {
 		// No queue consumer runs under `npm run dev`, so the screenshot is read in the background here.

@@ -23,25 +23,54 @@
 	}
 	const same = (a: string, b: string) => normalizeTitle(a) === normalizeTitle(b);
 
+	type Suggestion = (typeof data.groups)[number]['suggestions'][number];
+	type GroupSlot = (typeof data.groups)[number]['slots'][number];
+
+	// Shared courses of the chosen terms; one that names no term fits any
+	function fitting(suggestions: Suggestion[], terms: string[]) {
+		const names = data.terms.filter((t) => terms.includes(t.id)).map((t) => t.name);
+		return suggestions.filter((s) => !s.terms.length || s.terms.some((n) => names.includes(n)));
+	}
+	// Already in the timetable under the same name: left out unless picked
+	function isKept(g: { title: string; slots: GroupSlot[] }, terms: string[]) {
+		return !g.slots.every((s) => {
+			const title = takenBy(s, terms);
+			return title && same(title, g.title);
+		});
+	}
+	// A same-named course others already added is used as it is
+	const autoShared = (suggestions: Suggestion[], terms: string[]) => {
+		const best = fitting(suggestions, terms)[0];
+		return best?.score === 3 ? best.id : null;
+	};
+
 	// svelte-ignore state_referenced_locally
 	const firstTerms = data.defaultTerm ? [data.defaultTerm] : [];
 	// svelte-ignore state_referenced_locally
 	let rows = $state(
 		data.groups.map((g) => ({
-			// Already in the timetable under the same name: left out unless picked
-			include: !g.slots.every((s) => {
-				const title = takenBy({ ...s, room: s.room }, firstTerms);
-				return title && same(title, g.title);
-			}),
+			include: isKept(g, firstTerms),
+			// Set once the person has changed it themselves, so a change of term leaves it alone
+			includeSet: false,
 			title: g.title,
 			teachers: g.teachers.join('、'),
 			slots: g.slots.map((s): Slot => ({ ...s })),
-			// A same-named course others already added is used as it is
-			sharedId: g.suggestions[0]?.score === 3 ? g.suggestions[0].id : null,
+			sharedId: autoShared(g.suggestions, firstTerms),
+			sharedSet: false,
 			suggestions: g.suggestions
 		}))
 	);
 	let termIds = $state<string[]>([...firstTerms]);
+
+	// Choosing other terms: what is already there, and which shared courses fit, are those of the new terms
+	function termsChanged() {
+		rows.forEach((row, i) => {
+			const g = data.groups[i];
+			if (!row.includeSet) row.include = isKept({ title: g.title, slots: row.slots }, termIds);
+			if (!row.sharedSet) row.sharedId = autoShared(row.suggestions, termIds);
+			else if (row.sharedId && !fitting(row.suggestions, termIds).some((s) => s.id === row.sharedId)) row.sharedId = null;
+		});
+	}
 	let sync = $state(true);
 	let saving = $state(false);
 
@@ -113,7 +142,7 @@
 				<div class="term-chips">
 					{#each data.terms as t (t.id)}
 						<label class="chip" class:on={termIds.includes(t.id)}>
-							<input type="checkbox" name="term" value={t.id} bind:group={termIds} />
+							<input type="checkbox" name="term" value={t.id} bind:group={termIds} onchange={termsChanged} />
 							{t.name}
 						</label>
 					{/each}
@@ -134,7 +163,7 @@
 			{#each rows as row, i (i)}
 				<div class="course" class:off={!row.include}>
 					<div class="head">
-						<input class="check" type="checkbox" bind:checked={row.include} aria-label="{row.title}を追加する" />
+						<input class="check" type="checkbox" bind:checked={row.include} onchange={() => (row.includeSet = true)} aria-label="{row.title}を追加する" />
 						{#if row.sharedId}
 							{@const s = row.suggestions.find((x) => x.id === row.sharedId)}
 							<span class="title-fixed">{s?.title}</span>
@@ -143,16 +172,16 @@
 						{/if}
 					</div>
 
-					{#if row.suggestions.length}
+					{#if fitting(row.suggestions, termIds).length}
 						<div class="suggest" role="radiogroup" aria-label="{row.title}の登録のしかた">
-							{#each row.suggestions as s (s.id)}
+							{#each fitting(row.suggestions, termIds) as s (s.id)}
 								<label class="option">
-									<input type="radio" name="shared-{i}" checked={row.sharedId === s.id} onchange={() => (row.sharedId = s.id)} />
+									<input type="radio" name="shared-{i}" checked={row.sharedId === s.id} onchange={() => ((row.sharedId = s.id), (row.sharedSet = true))} />
 									<span>みんなの登録「{s.title}」に合わせる<small>{s.slots.map(slotText).join('・')}</small></span>
 								</label>
 							{/each}
 							<label class="option">
-								<input type="radio" name="shared-{i}" checked={row.sharedId === null} onchange={() => (row.sharedId = null)} />
+								<input type="radio" name="shared-{i}" checked={row.sharedId === null} onchange={() => ((row.sharedId = null), (row.sharedSet = true))} />
 								<span>読み取った内容で登録する</span>
 							</label>
 						</div>
