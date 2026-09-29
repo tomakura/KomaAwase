@@ -42,8 +42,10 @@
 		"producers": [{ "binding": "IMPORT_QUEUE", "queue": "koma-import" }],
 		"consumers": [{ "queue": "koma-import", "max_batch_size": 1, "max_batch_timeout": 5, "max_retries": 10, "max_concurrency": 1 }]
 	},
-	// 03:00 Japan time, after the AI quotas reset: retries, cleanup of old images and sessions
-	"triggers": { "crons": ["0 18 * * *"] },
+	// 03:00 Japan time, after the AI quotas reset: retries, cleanup of old images and sessions.
+	// And every minute from 06:00 to 22:59 Japan time: the class reminders. worker/entry.js
+	// tells the two apart by this text.
+	"triggers": { "crons": ["0 18 * * *", "* 0-13,21-23 * * *"] },
 	// The backup reader for screenshots (Groq, keyed by the GROQ_API_KEY secret, comes first)
 	"ai": { "binding": "AI", "remote": true },
 	// Per-IP limits for endpoints anyone can call. Period must be 10 or 60 seconds.
