@@ -129,11 +129,23 @@ describe('sendDueReminders', () => {
 		expect((await fire(world({ year: 2025 }), TUESDAY_1230)).count).toBe(0);
 	});
 
-	it('sends a double class once, when it starts', async () => {
+	it('sends a double class before each of its periods, but not while the first is still on', async () => {
 		const w = world({ span: 2 });
-		expect((await fire(w, at(12, 30))).count).toBe(1);
-		// The second period starts at 14:20, and has no slot of its own
-		expect((await fire(w, at(14, 10))).count).toBe(0);
+		const titles = async (t: number) => (await fire(w, t)).sent.map((s) => s.message.title);
+		expect(await titles(at(12, 30))).toEqual(['3限 サンプル演習 II が10分後に始まります']);
+		// The second period starts at 14:20, after a break from 14:10
+		expect(await titles(at(14, 10))).toEqual(['4限（2コマ目） サンプル演習 II が10分後に始まります']);
+		expect(await titles(at(14, 0))).toEqual([]);
+		// 30 minutes before 14:20 falls in the first period
+		const early = world({ span: 2, leads: [30] });
+		expect((await fire(early, at(13, 50))).count).toBe(0);
+		expect((await fire(early, at(12, 10))).count).toBe(1);
+	});
+
+	it('sends at the start too, when 0 is chosen', async () => {
+		const w = world({ span: 2, leads: [0] });
+		expect((await fire(w, at(12, 40))).sent.map((s) => s.message.title)).toEqual(['3限 サンプル演習 II が始まります']);
+		expect((await fire(w, at(14, 20))).sent.map((s) => s.message.title)).toEqual(['4限（2コマ目） サンプル演習 II が始まります']);
 	});
 
 	it('sends a class in two terms that are both on only once', async () => {

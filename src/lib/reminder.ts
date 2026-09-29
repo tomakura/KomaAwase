@@ -1,6 +1,6 @@
-// Notifications sent a while before a class starts. A person picks up to three of these
-// times; the Worker sends them from a cron every minute (src/lib/server/reminders.ts).
-export const REMINDER_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120] as const;
+// Notifications sent a while before a class starts, or as it starts (0). A person picks up to
+// three of these times; the Worker sends them from a cron every minute (src/lib/server/reminders.ts).
+export const REMINDER_MINUTES = [0, 5, 10, 15, 30, 45, 60, 90, 120] as const;
 export const REMINDERS_MAX = 3;
 // What the notification screen turns on
 export const REMINDER_DEFAULT = 10;
@@ -24,11 +24,12 @@ function length(minutes: number) {
 	return `${h ? `${h}時間` : ''}${m ? `${m}分` : ''}`;
 }
 
-export const leadLabel = (minutes: number) => `${length(minutes)}前`;
+export const leadLabel = (minutes: number) => (minutes ? `${length(minutes)}前` : '開始時');
 
 export type ClassStart = {
 	lead: number;
 	period: number;
+	part: number; // 1 for the first period of a double class, 2 for the one after it
 	title: string;
 	start: string; // HH:MM
 	room: string | null;
@@ -39,11 +40,12 @@ export type ClassStart = {
 
 /** The notification: how long, which period, which class, when and where */
 export function reminderMessage(c: ClassStart) {
+	const name = `${c.period}限${c.part > 1 ? `（${c.part}コマ目）` : ''} ${c.title}`;
 	return {
-		title: `${c.period}限 ${c.title} が${length(c.lead)}後に始まります`,
+		title: c.lead ? `${name} が${length(c.lead)}後に始まります` : `${name} が始まります`,
 		body: `${c.start.replace(/^0/, '')}開始${c.room ? ` · ${c.room}` : ''}`,
 		url: `/courses/${c.courseId}`,
 		// The same class at the same time replaces itself on the device rather than piling up
-		tag: `class-${c.slotId}-${c.date}-${c.lead}`
+		tag: `class-${c.slotId}-${c.date}-${c.lead}${c.part > 1 ? `-${c.part}` : ''}`
 	};
 }

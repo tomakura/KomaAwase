@@ -143,7 +143,7 @@
 						{/each}
 					</div>
 				</form>
-				<p class="ui-note">授業が始まる前に、授業名・教室・開始時刻をお知らせします。{REMINDERS_MAX}つまで選べます。</p>
+				<p class="ui-note">授業が始まる前や始まる時に、授業名・教室・開始時刻をお知らせします。{REMINDERS_MAX}つまで選べます。</p>
 				{#if device !== 'on' && device !== 'checking'}
 					<p class="ui-note">通知をオンにした端末に届きます。</p>
 				{/if}
