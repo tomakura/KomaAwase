@@ -111,7 +111,7 @@
 <style>
 	main {
 		max-width: 480px;
-		min-height: 100svh;
+		min-height: var(--page-h);
 		box-sizing: border-box;
 		margin: 0 auto;
 		display: flex;

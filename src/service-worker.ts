@@ -4,15 +4,19 @@
 /// <reference lib="webworker" />
 // Keeps the app opening without a connection: the built files are cached up front, and pages
 // are fetched from the network first, falling back to the last copy seen on this device. The
-// page copies hold the user's timetable, so signing out clears them (see PAGE_CACHE_PREFIX).
+// fallback comes when the network fails and also when it is too slow (SLOW_MS), since a bad
+// connection often doesn't fail, it just never answers. The page copies hold the user's
+// timetable, so signing out clears them (see PAGE_CACHE_PREFIX).
 import { build, files, version } from '$service-worker';
-import { PAGE_CACHE_PREFIX } from '$lib/offline';
+import { CACHED_AT_ATTRIBUTE, PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER } from '$lib/offline';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 const ASSETS = `assets-${version}`;
 // Per version, so an old page never points at files a new version dropped
 const PAGES = `${PAGE_CACHE_PREFIX}${version}`;
 const precached = new Set([...build, ...files]);
+// How long the network gets to answer before a saved copy is shown instead
+const SLOW_MS = 4000;
 
 // Never kept: sign-in, anything that changes data, files, the Worker's own routes, and the
 // admin page (other people's reports and feedback)
@@ -46,24 +50,69 @@ function pageKey(request: Request) {
 	return url.href;
 }
 
-async function networkFirst(request: Request) {
-	const cache = await caches.open(PAGES);
-	try {
-		const response = await fetch(request);
-		// Cache-Control isn't read: SvelteKit marks every __data.json no-store (for HTTP caches),
-		// and this copy is the app's own, dropped at sign-out. Pages never to keep are NETWORK_ONLY.
-		if (response.ok && response.type === 'basic' && !response.redirected) {
-			cache.put(pageKey(request), response.clone());
-		}
-		return response;
-	} catch {
-		const cached = await cache.match(pageKey(request));
-		if (cached) return cached;
-		if (request.mode === 'navigate') {
-			return new Response(OFFLINE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8' } });
-		}
-		throw new Error('offline');
+// A copy is kept with the time it was saved, which is passed on when it is shown
+async function save(cache: Cache, key: string, response: Response) {
+	// Cache-Control isn't read: SvelteKit marks every __data.json no-store (for HTTP caches),
+	// and this copy is the app's own, dropped at sign-out. Pages never to keep are NETWORK_ONLY.
+	if (!response.ok || response.type !== 'basic' || response.redirected) return;
+	const headers = new Headers(response.headers);
+	headers.set(SAVED_AT_HEADER, String(Date.now()));
+	await cache.put(key, new Response(response.body, { status: response.status, statusText: response.statusText, headers }));
+}
+
+// A page opened from a copy says so on <html>, with the time it was saved (the page can't read
+// the headers of the document it is in)
+async function stamp(request: Request, copy: Response) {
+	const savedAt = copy.headers.get(SAVED_AT_HEADER);
+	if (request.mode !== 'navigate' || !savedAt || !/^\d+$/.test(savedAt) || !copy.headers.get('content-type')?.includes('text/html')) {
+		return copy;
 	}
+	// The text is read already decoded and is longer now
+	const headers = new Headers(copy.headers);
+	headers.delete('content-length');
+	headers.delete('content-encoding');
+	const html = (await copy.text()).replace('<html', `<html ${CACHED_AT_ATTRIBUTE}="${savedAt}"`);
+	return new Response(html, { status: copy.status, statusText: copy.statusText, headers });
+}
+
+function unavailable(request: Request) {
+	if (request.mode === 'navigate') {
+		return new Response(OFFLINE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8' } });
+	}
+	throw new Error('offline');
+}
+
+async function networkFirst(event: FetchEvent) {
+	const { request } = event;
+	const cache = await caches.open(PAGES);
+	const key = pageKey(request);
+	// Asked before the copy is looked for, so neither waits for the other. It runs on after a
+	// copy has been shown, to save the answer for next time.
+	let saved: Promise<void> = Promise.resolve();
+	const network = fetch(request).then((response) => {
+		saved = save(cache, key, response.clone());
+		return response;
+	});
+	event.waitUntil(network.then(() => saved, () => {}));
+	const copy = await cache.match(key);
+	try {
+		if (!copy) return await network;
+		// With a copy to show, the network gets SLOW_MS to answer
+		const answer = await Promise.race([network, new Promise<null>((resolve) => setTimeout(resolve, SLOW_MS, null))]);
+		return answer ?? (await stamp(request, copy));
+	} catch {
+		return copy ? await stamp(request, copy) : unavailable(request);
+	}
+}
+
+// The app refreshing its copies (src/lib/sync.ts): the network's answer or nothing, saved as it
+// goes by, so the app can tell whether the server really answered
+async function refresh(event: FetchEvent) {
+	const { request } = event;
+	const cache = await caches.open(PAGES);
+	const response = await fetch(request);
+	event.waitUntil(save(cache, pageKey(request), response.clone()));
+	return response;
 }
 
 sw.addEventListener('fetch', (event) => {
@@ -76,8 +125,13 @@ sw.addEventListener('fetch', (event) => {
 		event.respondWith(caches.match(request).then((cached) => cached ?? fetch(request)));
 		return;
 	}
-	if (request.mode === 'navigate' || url.pathname.endsWith('/__data.json')) {
-		event.respondWith(networkFirst(request));
+	const data = url.pathname.endsWith('/__data.json');
+	if (request.headers.has(SYNC_HEADER)) {
+		if (data || url.pathname === '/') event.respondWith(refresh(event));
+		return;
+	}
+	if (request.mode === 'navigate' || data) {
+		event.respondWith(networkFirst(event));
 	}
 });
 

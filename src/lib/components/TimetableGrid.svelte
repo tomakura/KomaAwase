@@ -260,6 +260,13 @@
 		background: var(--slot-today);
 	}
 
+	/* Offline, a course can't be added: the empty cells are only outlines (not dimmed, which
+	   would paint them over the courses next to them) */
+	:global(:root[data-offline]) .slot {
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--line-strong);
+	}
+
 	/* A tap presses the cell in a little */
 	@media (prefers-reduced-motion: no-preference) {
 		a.slot,

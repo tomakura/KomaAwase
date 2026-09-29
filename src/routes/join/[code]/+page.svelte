@@ -41,7 +41,7 @@
 <style>
 	main {
 		max-width: 420px;
-		min-height: 100svh;
+		min-height: var(--page-h);
 		box-sizing: border-box;
 		margin: 0 auto;
 		display: flex;
