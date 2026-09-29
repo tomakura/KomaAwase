@@ -1,12 +1,13 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 import { readImport } from '$lib/import';
-import { addDays, tokyoTime } from '$lib/time';
+import { TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } from '$lib/import-quota';
 import type { Db } from '../db';
 import { authChallenges, emailTokens, importJobs, sessions } from '../db/schema';
 import { notify } from '../notify';
 import { Busy, OutOfQuota, readWithGroq, readWithWorkersAi } from './providers';
 
-// The free tiers read about 150 screenshots a day between them, so each person gets a few.
+// The free tiers read about 110 screenshots a day between them: each person gets a few, and
+// everyone together TOTAL_DAILY_LIMIT (import-quota.ts).
 export const DAILY_LIMIT = 5;
 const ACTIVE_LIMIT = 2;
 const ATTEMPTS_MAX = 3;
@@ -17,6 +18,31 @@ const DAY = 24 * 60 * 60 * 1000;
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 export const IMAGE_MAX = 1_500_000;
 
+/**
+ * How much of today's free quota is spoken for: screenshots waiting or being read (those put
+ * off from an earlier day come back to the queue after the quotas reset, so they count) and
+ * those read since the quotas last reset.
+ */
+export async function quotaUsed(db: Db) {
+	const [row] = await db
+		.select({ n: count() })
+		.from(importJobs)
+		.where(
+			or(
+				inArray(importJobs.status, ['queued', 'processing']),
+				and(
+					or(eq(importJobs.status, 'done'), and(eq(importJobs.status, 'failed'), gt(importJobs.attempts, 0))),
+					gte(importJobs.finishedAt, lastQuotaReset())
+				)
+			)
+		);
+	return row?.n ?? 0;
+}
+
+/**
+ * Saves a screenshot to be read. `deferred` when the day's total is used up: it isn't sent to
+ * the queue, and is read after the quotas reset (see nextRetryTime).
+ */
 export async function createImportJob(db: Db, userId: string, timetableId: string, image: string, tiled = false, termId: string | null = null) {
 	if (image.length > IMAGE_MAX || !IMAGE_PATTERN.test(image)) {
 		return { message: '画像を読み込めませんでした。別の画像でやり直してください' };
@@ -34,12 +60,20 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 	]);
 	if ((today?.n ?? 0) >= DAILY_LIMIT) return { message: `読み込みは1日${DAILY_LIMIT}回までです。明日またやり直してください` };
 	if ((active?.n ?? 0) >= ACTIVE_LIMIT) return { message: '読み込み中のものが終わってから、次の画像を送ってください' };
+	const deferred = (await quotaUsed(db)) >= TOTAL_DAILY_LIMIT;
 	const row = await db
 		.insert(importJobs)
-		.values({ userId, timetableId, image, tiled, termId })
+		.values({
+			userId,
+			timetableId,
+			image,
+			tiled,
+			termId,
+			...(deferred ? { status: 'retry' as const, retryAt: nextRetryTime() } : {})
+		})
 		.returning({ id: importJobs.id })
 		.get();
-	return { id: row.id };
+	return { id: row.id, deferred };
 }
 
 /** Hands the job to the queue, or in development (no consumer runs) reads it right away. */
@@ -57,11 +91,6 @@ export async function enqueue(
 	const work = processImportJob(env, db, jobId).catch((e) => console.error('import failed', e));
 	if (ctx) ctx.waitUntil(work);
 	else await work;
-}
-
-// 3:00 the next morning, Japan time, when the free quotas have reset
-function tomorrowMorning(now = Date.now()) {
-	return new Date(`${addDays(tokyoTime(now).date, 1)}T03:00:00+09:00`);
 }
 
 export type Outcome = { status: 'done' | 'retry' | 'failed' | 'skipped' } | { status: 'busy'; seconds: number };
@@ -164,7 +193,7 @@ async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): P
 		await finish({ status: 'failed', image: null, error: errors.join('; ') || 'no provider', finishedAt: new Date() });
 		return { status: 'failed' };
 	}
-	await finish({ status: 'retry', retryAt: tomorrowMorning(), error: errors.join('; ') });
+	await finish({ status: 'retry', retryAt: nextRetryTime(), error: errors.join('; ') });
 	return { status: 'retry' };
 }
 
@@ -185,7 +214,8 @@ export function latestJobs(db: Db, userId: string) {
 			createdAt: importJobs.createdAt,
 			finishedAt: importJobs.finishedAt,
 			closedAt: importJobs.closedAt,
-			retryAt: importJobs.retryAt
+			retryAt: importJobs.retryAt,
+			attempts: importJobs.attempts
 		})
 		.from(importJobs)
 		.where(eq(importJobs.userId, userId))

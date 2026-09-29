@@ -24,6 +24,8 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 	}
 	const created = await createImportJob(locals.db, locals.user.id, timetable.id, body.image, body.tiled === true, term);
 	if ('message' in created) return json({ message: created.message }, { status: 400 });
+	// Today's total is used up: it waits for the quotas to reset and the daily cron picks it up
+	if (created.deferred) return json({ id: created.id });
 	try {
 		// No queue consumer runs under `npm run dev`, so the screenshot is read in the background here.
 		await enqueue(platform.env, platform.ctx, locals.db, created.id, dev);

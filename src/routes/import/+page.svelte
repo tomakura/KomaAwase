@@ -4,6 +4,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import SharedLock from '$lib/components/SharedLock.svelte';
+	import { nextRetryTime } from '$lib/import-quota';
 	import { monthDay, tokyoTime } from '$lib/time';
 
 	let { data } = $props();
@@ -64,6 +65,13 @@
 		return () => clearInterval(timer);
 	});
 
+	// 「明日の9:30ごろ」: when the limits are back and a put-off screenshot is read
+	function whenLabel(at: number | null) {
+		const time = at ?? nextRetryTime().getTime();
+		const date = tokyoTime(time).date;
+		return date === tokyoTime(Date.now()).date ? '今日の9:30ごろ' : `${date === tokyoTime(Date.now() + 24 * 60 * 60 * 1000).date ? '明日' : monthDay(date)}の9:30ごろ`;
+	}
+
 	const minutes = $derived(Math.max(1, Math.ceil(((data.job?.ahead ?? 0) + 1) * 0.5)));
 
 	// How long ago it was sent, ticking while it waits or is read
@@ -102,10 +110,13 @@
 					{:else if job.status === 'processing'}
 						<b>AIが読み取っています</b>
 						<span>30秒〜1分ほどで終わります。</span>
+					{:else if job.status === 'retry' && job.deferred}
+						<b>読み取りは{whenLabel(job.retryAt)}になります</b>
+						<span>今日は読み取りが混み合っていて、みんなの上限に達しました。上限が戻る{whenLabel(job.retryAt)}に読み取って、終わったらお知らせします。</span>
 					{:else if job.status === 'retry'}
-						<b>明日もう一度読み取ります</b>
+						<b>あとでもう一度読み取ります</b>
 						<span>
-							今日は読み取れなかったため、{job.retryAt ? `${monthDay(tokyoTime(job.retryAt).date)}の3:00ごろに` : '明日'}もう一度試します。終わったらお知らせします。
+							今日は読み取れなかったため、{whenLabel(job.retryAt)}にもう一度試します。終わったらお知らせします。
 						</span>
 					{:else if job.status === 'done'}
 						<b>読み取りが終わりました</b>
@@ -157,6 +168,12 @@
 				</button>
 			{/if}
 
+			{#if data.crowded}
+				<p class="crowded" role="status">
+					今日の読み取りは、みんなの上限に達しています。いま送ると、読み取りは{whenLabel(null)}になります。
+				</p>
+			{/if}
+
 			<div class="notes">
 				<h2>読み込む前に</h2>
 				<div class="item">
@@ -172,6 +189,10 @@
 				<div class="item">
 					<span class="num">3</span>
 					<span>読み取りは1分ほどで終わります。混んでいるときは順番待ちになります。終わったらお知らせします。</span>
+				</div>
+				<div class="item">
+					<span class="num">4</span>
+					<span>読み取りには、みんなで使える1日の上限があります。上限に達した日は、読み取りが翌朝の9:30ごろになります。</span>
 				</div>
 			</div>
 
@@ -206,6 +227,17 @@
 
 	.file {
 		display: none;
+	}
+
+	.crowded {
+		margin: 0;
+		padding: 12px 14px;
+		border: 1px solid var(--line-bold);
+		border-radius: 12px;
+		background: var(--surface);
+		font-size: 13px;
+		line-height: 1.7;
+		color: var(--accent-text);
 	}
 
 	.pick {
