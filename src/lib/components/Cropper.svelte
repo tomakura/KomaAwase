@@ -1,6 +1,9 @@
 <script lang="ts">
 	// Picks the part of a screenshot to send: drag the corners, or the frame itself.
 	// The frame is kept as fractions of the image, so it survives the page resizing.
+	import { findGrid } from '$lib/import-grid';
+	import { drawTiles } from '$lib/import-tiles';
+
 	let { src }: { src: string } = $props();
 
 	let rect = $state({ x: 0, y: 0, w: 1, h: 1 });
@@ -53,8 +56,11 @@
 		rect = { x: 0, y: 0, w: 1, h: 1 };
 	}
 
-	/** The chosen part as a JPEG data URL, at most `longest` pixels on its long side. */
-	export async function crop(longest = 1600): Promise<string | null> {
+	// Grid lines are a few pixels wide, so the table is looked for at (nearly) full size
+	const TABLE_LONGEST = 4096;
+
+	/** The chosen part drawn on a canvas, at most `longest` pixels on its long side */
+	function draw(longest: number) {
 		if (!image?.naturalWidth) return null;
 		const sx = rect.x * image.naturalWidth;
 		const sy = rect.y * image.naturalHeight;
@@ -64,17 +70,43 @@
 		const canvas = document.createElement('canvas');
 		canvas.width = Math.round(sw * scale);
 		canvas.height = Math.round(sh * scale);
-		const ctx = canvas.getContext('2d');
+		const ctx = canvas.getContext('2d', { willReadFrequently: true });
 		if (!ctx) return null;
 		ctx.fillStyle = '#ffffff';
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-		// Smaller until it fits comfortably in a database row
+		return canvas;
+	}
+
+	// Smaller until it fits comfortably in a database row
+	function jpeg(canvas: HTMLCanvasElement) {
 		for (const quality of [0.85, 0.75, 0.6, 0.45]) {
 			const url = canvas.toDataURL('image/jpeg', quality);
 			if (url.length < 1_400_000) return url;
 		}
 		return null;
+	}
+
+	/**
+	 * The chosen part as a JPEG data URL, at most `longest` pixels on its long side. When the
+	 * table can be found in it, `tiled` is true and the image is its filled cells stacked with
+	 * tags (import-grid.ts); otherwise the part is sent as it is.
+	 */
+	export async function crop(longest = 1600): Promise<{ image: string; tiled: boolean } | null> {
+		const table = draw(TABLE_LONGEST);
+		if (table) {
+			try {
+				const grid = findGrid(table.getContext('2d')!.getImageData(0, 0, table.width, table.height));
+				const stacked = grid && drawTiles(table, grid, longest);
+				const url = stacked && jpeg(stacked);
+				if (url) return { image: url, tiled: true };
+			} catch {
+				// Whatever went wrong, the whole part can still be sent
+			}
+		}
+		const whole = draw(longest);
+		const url = whole && jpeg(whole);
+		return url ? { image: url, tiled: false } : null;
 	}
 </script>
 

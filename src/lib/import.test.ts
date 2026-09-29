@@ -56,6 +56,68 @@ describe('readImport', () => {
 		]);
 	});
 
+	it('reads cells cut out and tagged: the column decides the weekday, the row the period', () => {
+		// What Groq gave for the stack of cells of the screenshot above
+		const answer = {
+			courses: [
+				{ cell: 'A0', title: '月', teacher: '', room: '' },
+				{ cell: 'B0', title: '火', teacher: '', room: '' },
+				{ cell: 'C0', title: '水', teacher: '', room: '' },
+				{ cell: 'A3', title: '写真演習Ⅰ', teacher: '', room: 'E10 / E11' },
+				{ cell: 'B3', title: '映像制作演習応用A', teacher: '', room: 'W02' },
+				{ cell: 'A4', title: '写真演習Ⅰ', teacher: '', room: 'E10 / E11' },
+				{ cell: 'B4', title: '映像制作演習応用A', teacher: '', room: 'W02' },
+				{ cell: 'C4', title: 'ネットワーク構築演習基礎', teacher: '山田 太郎', room: 'E07 / E08' }
+			]
+		};
+		expect(readImport(answer)).toEqual([
+			{ title: '写真演習I', weekday: 1, period: 3, span: 2, room: 'E10 / E11', teachers: [] },
+			{ title: '映像制作演習応用A', weekday: 2, period: 3, span: 2, room: 'W02', teachers: [] },
+			{ title: 'ネットワーク構築演習基礎', weekday: 3, period: 4, span: 1, room: 'E07 / E08', teachers: ['山田 太郎'] }
+		]);
+	});
+
+	it('takes the weekdays of tagged cells from the headings, wherever the table starts', () => {
+		const answer = {
+			courses: [
+				{ cell: 'A0', title: '水曜日', teacher: '', room: '' },
+				{ cell: 'B0', title: '木曜日', teacher: '', room: '' },
+				{ cell: 'B2', title: '統計学', teacher: '', room: '' }
+			]
+		};
+		expect(readImport(answer)).toEqual([{ title: '統計学', weekday: 4, period: 2, span: 1, room: '', teachers: [] }]);
+	});
+
+	it('counts columns from Monday when tagged cells come with no headings, and a heading it cannot read follows the one before', () => {
+		expect(readImport({ courses: [{ cell: 'C1', title: 'ゼミ', teacher: '', room: '' }] })).toEqual([
+			{ title: 'ゼミ', weekday: 3, period: 1, span: 1, room: '', teachers: [] }
+		]);
+		const answer = {
+			courses: [
+				{ cell: 'A0', title: '火', teacher: '', room: '' },
+				{ cell: 'B0', title: '?', teacher: '', room: '' },
+				{ cell: 'B1', title: 'ゼミ', teacher: '', room: '' }
+			]
+		};
+		expect(readImport(answer)![0]).toMatchObject({ weekday: 3, period: 1 });
+	});
+
+	it('skips tagged cells with a tag it cannot place, or nothing in them', () => {
+		const answer = {
+			courses: [
+				{ cell: 'ｂ２', title: '全角の札', teacher: '', room: '' },
+				{ cell: 'Z9', title: '知らない札', teacher: '', room: '' },
+				{ cell: '', title: '札なし', teacher: '', room: '' },
+				{ cell: 'C2', title: '', teacher: '', room: '' },
+				{ cell: 'D2', title: '読めた授業', teacher: '', room: '' }
+			]
+		};
+		expect(readImport(answer)).toEqual([
+			{ title: '全角の札', weekday: 2, period: 2, span: 1, room: '', teachers: [] },
+			{ title: '読めた授業', weekday: 4, period: 2, span: 1, room: '', teachers: [] }
+		]);
+	});
+
 	it('takes JSON text or an object', () => {
 		const answer = { courses: [{ title: '統計学入門', weekday: 3, period: 1, span: 1, room: 'A-305', teachers: [] }] };
 		expect(readImport(JSON.stringify(answer))).toEqual(answer.courses);
