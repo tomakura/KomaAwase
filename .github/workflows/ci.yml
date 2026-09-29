@@ -1,5 +1,5 @@
 # Type checks, unit tests and a production build for every pull request and for main.
-# Deploys stay manual (npm run build && npx wrangler deploy), as in README.md.
+# Deploys are not done here: Cloudflare Workers Builds runs them when main is pushed, as in README.md.
 name: CI
 
 on:

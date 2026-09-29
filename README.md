@@ -32,7 +32,9 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 
 ## 本番に出すとき
 
-デプロイは手元から `npm run build && npx wrangler deploy`。GitHub Actions は型チェック・テスト・ビルドだけ行う。
+`main` に push（PR のマージ）すると、Cloudflare の Workers Builds が `npm run build` と `npx wrangler deploy` を実行して本番に出す。手元から出すときも同じ2つ。GitHub Actions は型チェック・テスト・ビルドだけ行う。
+
+マイグレーションは自動では適用されない。テーブルやカラムを変える変更は、マージの前に `npx wrangler d1 migrations apply DB --remote` を流す（その前に Time Travel の bookmark を控える）。
 
 はじめて使うものがあるときの準備：
 
