@@ -5,6 +5,10 @@ import { themeColorTags } from '$lib/theme';
 import { academicYear, tokyoTime } from '$lib/time';
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// The app's check that the server answers (src/lib/connection.svelte.ts), while its
+	// connection is poor. Answered before the database and the session are read.
+	if (event.url.pathname === '/api/ping') return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+
 	const d1 = event.platform?.env.DB;
 	if (!d1) throw new Error('D1 binding "DB" is missing');
 	event.locals.db = getDb(d1);

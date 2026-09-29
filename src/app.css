@@ -40,6 +40,9 @@
 	--font-display: 'Zen Maru Gothic', sans-serif;
 	--font-body: 'Zen Kaku Gothic New', sans-serif;
 
+	/* A page fills the screen less the strip shown while offline (--bar-h, set by ConnectionBar) */
+	--page-h: calc(100svh - var(--bar-h, 0px));
+
 	color-scheme: light;
 }
 
@@ -138,7 +141,7 @@ a {
 /* A page with the bottom menu */
 .screen {
 	max-width: 480px;
-	min-height: 100svh;
+	min-height: var(--page-h);
 	margin: 0 auto;
 	display: flex;
 	flex-direction: column;
@@ -282,6 +285,15 @@ button.ui-row {
 	overflow: hidden;
 	clip-path: inset(50%);
 	white-space: nowrap;
+}
+
+/* Offline or on a poor connection (src/lib/connection.svelte.ts sets data-offline): what needs
+   the server is dimmed. Pressing it says why it can't be used instead. The links are the
+   pages in NEEDS_SERVER (src/lib/sync.ts). The empty cells of a timetable are drawn hollow in
+   TimetableGrid instead: dimmed, they would be painted over the courses beside them. */
+:root[data-offline] form[method='POST' i] :is(button:not([type='button'], [type='reset']), input[type='submit']),
+:root[data-offline] :is(a[href^='/courses/search'], a[href^='/courses/new'], a[href^='/import'], a[href^='/friends/add'], a[href^='/groups/new']):not(.slot) {
+	opacity: 0.45;
 }
 
 /* Motion. Page changes use view transitions (src/routes/+layout.svelte sets data-nav); all

@@ -2,6 +2,10 @@
 	import '../app.css';
 	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
+	import { version } from '$app/environment';
+	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
+	import NavigationWait from '$lib/components/NavigationWait.svelte';
+	import { connection } from '$lib/connection.svelte';
 	import { pageData } from '$lib/page-data';
 
 	let { data, children } = $props();
@@ -13,7 +17,9 @@
 		let hiddenAt = 0;
 		const changed = () => {
 			if (document.hidden) hiddenAt = Date.now();
-			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER) invalidateAll();
+			// Not while the connection is down: the copy on screen is all there is (src/lib/connection.svelte.ts
+			// loads it again once it's back)
+			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER && !connection.blocked) invalidateAll();
 		};
 		document.addEventListener('visibilitychange', changed);
 		return () => document.removeEventListener('visibilitychange', changed);
@@ -30,9 +36,14 @@
 	// Going back shows the page as it was left and updates it after (see src/lib/page-data.ts).
 	// A tab the app opened on has no copy yet, so one is read a moment after it opens.
 	let pages: ReturnType<typeof pageData> | undefined;
+	// The browser's own fetch, for the app's requests about the connection (they aren't pages
+	// to keep copies of in memory)
+	let browserFetch: typeof fetch | undefined;
 	$effect(() => {
 		const original = window.fetch;
-		const kept = pageData(original, {
+		browserFetch = original;
+		// The connection watches what goes by: how old an answer is, and whether requests fail
+		const kept = pageData(connection.observe(original, location.origin), {
 			origin: location.origin,
 			path: () => location.pathname,
 			now: Date.now,
@@ -46,9 +57,30 @@
 			clearTimeout(seed);
 			window.fetch = original;
 			pages = undefined;
+			browserFetch = undefined;
 		};
 	});
 	beforeNavigate(({ type, to }) => pages?.returningTo(type === 'popstate' && to ? to.url.pathname : null));
+
+	// Offline or on a poor connection: keeps the timetable on screen, refreshes the copies of the
+	// tabs when the server answers, and switches off what needs it (src/lib/connection.svelte.ts).
+	$effect(() => {
+		const signedIn = data.signedIn;
+		return connection.start({
+			origin: location.origin,
+			path: location.pathname,
+			version,
+			controlled: () => !!navigator.serviceWorker?.controller,
+			fetch: (...args) => (browserFetch ?? fetch)(...args),
+			invalidate: () => invalidateAll(),
+			signedIn
+		});
+	});
+	// A page that can't be opened now stays where it is, with the reason (not a reload into the offline page)
+	beforeNavigate((navigation) => {
+		if (navigation.willUnload || !navigation.to) return;
+		if (!connection.guardNavigation(navigation.to.url)) navigation.cancel();
+	});
 
 	// How a navigation moves: between the tabs it fades, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
@@ -88,4 +120,6 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<ConnectionBar />
+<NavigationWait />
 {@render children()}

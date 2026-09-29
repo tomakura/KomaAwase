@@ -368,7 +368,8 @@
 
 	header {
 		position: sticky;
-		top: 0;
+		/* Under the strip shown while offline */
+		top: var(--bar-h, 0px);
 		z-index: 1;
 		display: flex;
 		align-items: center;

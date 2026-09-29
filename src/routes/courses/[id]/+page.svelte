@@ -337,7 +337,7 @@
 
 <style>
 	.page {
-		min-height: 100svh;
+		min-height: var(--page-h);
 		display: flex;
 		flex-direction: column;
 		background: var(--scrim);

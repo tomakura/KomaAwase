@@ -113,7 +113,7 @@
 
 <style>
 	main {
-		min-height: 100svh;
+		min-height: var(--page-h);
 		box-sizing: border-box;
 		max-width: 420px;
 		margin: 0 auto;
