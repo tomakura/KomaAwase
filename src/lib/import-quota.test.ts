@@ -11,12 +11,12 @@ describe('lastQuotaReset', () => {
 });
 
 describe('nextRetryTime', () => {
-	it('is 9:30 the same morning when a job fails before then', () => {
-		expect(nextRetryTime(jst('2026-10-01T03:00:00')).getTime()).toBe(jst('2026-10-01T09:30:00'));
+	it('is 10:00 the same morning when a job fails before then', () => {
+		expect(nextRetryTime(jst('2026-10-01T03:00:00')).getTime()).toBe(jst('2026-10-01T10:00:00'));
 	});
 
-	it('is 9:30 the next morning after that', () => {
-		expect(nextRetryTime(jst('2026-10-01T09:30:00')).getTime()).toBe(jst('2026-10-02T09:30:00'));
-		expect(nextRetryTime(jst('2026-10-01T22:00:00')).getTime()).toBe(jst('2026-10-02T09:30:00'));
+	it('is 10:00 the next morning after that', () => {
+		expect(nextRetryTime(jst('2026-10-01T10:00:00')).getTime()).toBe(jst('2026-10-02T10:00:00'));
+		expect(nextRetryTime(jst('2026-10-01T22:00:00')).getTime()).toBe(jst('2026-10-02T10:00:00'));
 	});
 });

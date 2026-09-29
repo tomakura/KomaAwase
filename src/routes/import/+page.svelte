@@ -65,12 +65,13 @@
 		return () => clearInterval(timer);
 	});
 
-	// 「明日の9:30ごろ」: when the limits are back and a put-off screenshot is read
+	// 「明日の朝」: when a screenshot that could not be read today is read (a few days on if those mornings are taken too)
 	function whenLabel(at: number | null) {
-		const time = at ?? nextRetryTime().getTime();
-		const date = tokyoTime(time).date;
-		return date === tokyoTime(Date.now()).date ? '今日の9:30ごろ' : `${date === tokyoTime(Date.now() + 24 * 60 * 60 * 1000).date ? '明日' : monthDay(date)}の9:30ごろ`;
+		const days = deferredDays(at);
+		return `${days <= 0 ? '今日' : days === 1 ? '明日' : `${days}日後`}の朝`;
 	}
+	const deferredDays = (at: number | null) => daysBetween(tokyoTime(Date.now()).date, tokyoTime(at ?? nextRetryTime().getTime()).date);
+	const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / (24 * 60 * 60 * 1000));
 
 	const minutes = $derived(Math.max(1, Math.ceil(((data.job?.ahead ?? 0) + 1) * 0.5)));
 
@@ -111,12 +112,16 @@
 						<b>AIが読み取っています</b>
 						<span>30秒〜1分ほどで終わります。</span>
 					{:else if job.status === 'retry' && job.deferred}
-						<b>読み取りは{whenLabel(job.retryAt)}になります</b>
-						<span>今日は読み取りが混み合っていて、みんなの上限に達しました。上限が戻る{whenLabel(job.retryAt)}に読み取って、終わったらお知らせします。</span>
+						<b>{whenLabel(job.retryAt)}に読み取ります</b>
+						<span>
+							{deferredDays(job.retryAt) <= 1
+								? '今日の読み取りは、アプリ全体の上限に達しました。'
+								: '混み合っているため、'}{whenLabel(job.retryAt)}（10時ごろ）に読み取って、終わったらお知らせします。{deferredDays(job.retryAt) <= 1 ? 'この画面は閉じても大丈夫です。' : ''}
+						</span>
 					{:else if job.status === 'retry'}
 						<b>あとでもう一度読み取ります</b>
 						<span>
-							今日は読み取れなかったため、{whenLabel(job.retryAt)}にもう一度試します。終わったらお知らせします。
+							今日は読み取れなかったため、{whenLabel(job.retryAt)}（10時ごろ）にもう一度読み取ります。終わったらお知らせします。
 						</span>
 					{:else if job.status === 'done'}
 						<b>読み取りが終わりました</b>
@@ -168,9 +173,9 @@
 				</button>
 			{/if}
 
-			{#if data.crowded}
+			{#if data.readAt}
 				<p class="crowded" role="status">
-					今日の読み取りは、みんなの上限に達しています。いま送ると、読み取りは{whenLabel(null)}になります。
+					今日の読み取りは、アプリ全体の上限に達しました。いま送ると、{whenLabel(data.readAt)}に読み取って結果をお知らせします。
 				</p>
 			{/if}
 
@@ -192,7 +197,7 @@
 				</div>
 				<div class="item">
 					<span class="num">4</span>
-					<span>読み取りには、みんなで使える1日の上限があります。上限に達した日は、読み取りが翌朝の9:30ごろになります。</span>
+					<span>この機能には、アプリ全体で1日の利用上限があります。混み合っているときは、結果が届くまで時間がかかることがあります。</span>
 				</div>
 			</div>
 

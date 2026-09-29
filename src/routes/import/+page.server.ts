@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { TOTAL_DAILY_LIMIT } from '$lib/import-quota';
-import { DAILY_LIMIT, latestJobs, queuePosition, quotaUsed } from '$lib/server/import/jobs';
+import { DAILY_LIMIT, latestJobs, queuePosition, quotaUsed, readSlot } from '$lib/server/import/jobs';
 import { currentTimetable } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
 import type { PageServerLoad } from './$types';
@@ -31,8 +31,8 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	const current = jobs.find((j) => !j.closedAt);
 	return {
 		access,
-		// Everyone's screenshots for today are taken: one sent now is read tomorrow morning
-		crowded: used >= TOTAL_DAILY_LIMIT,
+		// Everyone's screenshots for today are taken: when one sent now would be read (null when it is read at once)
+		readAt: used >= TOTAL_DAILY_LIMIT ? (await readSlot(locals.db)).getTime() : null,
 		dailyLimit: DAILY_LIMIT,
 		back: safeNext(url.searchParams.get('back')) ?? '/',
 		// The term the person was looking at when they came here, so the review starts with it

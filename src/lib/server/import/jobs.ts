@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 import { readImport } from '$lib/import';
-import { TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } from '$lib/import-quota';
+import { RETRY_AFTER_RESET, TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } from '$lib/import-quota';
 import type { Db } from '../db';
 import { authChallenges, emailTokens, importJobs, sessions } from '../db/schema';
 import { notify } from '../notify';
@@ -40,6 +40,24 @@ export async function quotaUsed(db: Db) {
 }
 
 /**
+ * When a screenshot that can't be read today would be read: the next morning, or the one
+ * after when the queue for that morning already holds a day's worth, and so on.
+ */
+export async function readSlot(db: Db) {
+	let at = nextRetryTime();
+	for (let day = 0; day < 14; day++) {
+		const from = new Date(at.getTime() - RETRY_AFTER_RESET);
+		const [row] = await db
+			.select({ n: count() })
+			.from(importJobs)
+			.where(and(eq(importJobs.status, 'retry'), gte(importJobs.retryAt, from), lt(importJobs.retryAt, new Date(from.getTime() + DAY))));
+		if ((row?.n ?? 0) < TOTAL_DAILY_LIMIT) break;
+		at = new Date(at.getTime() + DAY);
+	}
+	return at;
+}
+
+/**
  * Saves a screenshot to be read. `deferred` when the day's total is used up: it isn't sent to
  * the queue, and is read after the quotas reset (see nextRetryTime).
  */
@@ -69,7 +87,7 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 			image,
 			tiled,
 			termId,
-			...(deferred ? { status: 'retry' as const, retryAt: nextRetryTime() } : {})
+			...(deferred ? { status: 'retry' as const, retryAt: await readSlot(db) } : {})
 		})
 		.returning({ id: importJobs.id })
 		.get();
