@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import { compareJa } from '$lib/sort';
 import type { Db } from './db';
 import { blocks, courses, friendships, groupMembers, timetables, universities, users } from './db/schema';
+import { verifiedColumn } from './verify';
 
 // No 0/O or 1/I, so a code read aloud or off a screen is typed right. 256 is a multiple
 // of 32, so every character is equally likely; 10 characters are 50 bits.
@@ -163,7 +164,8 @@ export async function listFriendships(db: Db, meId: string) {
 			requesterId: friendships.requesterId,
 			status: friendships.status,
 			createdAt: friendships.createdAt,
-			...person
+			...person,
+			verified: verifiedColumn()
 		})
 		.from(friendships)
 		.innerJoin(
@@ -224,10 +226,6 @@ export async function visibleUserIds(db: Db, meId: string): Promise<Set<string>>
 	for (const b of blockRows) ids.delete(b.blockerId === meId ? b.blockedId : b.blockerId);
 	ids.delete(meId);
 	return ids;
-}
-
-export async function canSeeTimetable(db: Db, viewerId: string, ownerId: string) {
-	return viewerId === ownerId || (await visibleUserIds(db, viewerId)).has(ownerId);
 }
 
 // In chunks, since D1 takes at most 100 bound values per query

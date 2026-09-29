@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
 import { groupMembers, groups, universities, users } from './db/schema';
 import { person, randomCode } from './friends';
+import { verifiedColumn } from './verify';
 
 export const GROUP_NAME_MAX = 30;
 export const GROUP_MEMBERS_MAX = 100;
@@ -96,16 +97,22 @@ export function listMyGroups(db: Db, userId: string) {
 
 /** The group with its members, for someone in it; undefined otherwise. */
 export async function loadGroup(db: Db, groupId: string, viewerId: string) {
-	const group = await db.select().from(groups).where(eq(groups.id, groupId)).get();
-	if (!group) return undefined;
-	const members = await db
-		.select({ ...person, shareTimetable: groupMembers.shareTimetable, joinedAt: groupMembers.joinedAt })
-		.from(groupMembers)
-		.innerJoin(users, eq(users.id, groupMembers.userId))
-		.leftJoin(universities, eq(universities.id, users.universityId))
-		.where(eq(groupMembers.groupId, groupId))
-		.orderBy(asc(groupMembers.joinedAt));
-	if (!members.some((m) => m.id === viewerId)) return undefined;
+	const [[group], members] = await db.batch([
+		db.select().from(groups).where(eq(groups.id, groupId)),
+		db
+			.select({
+				...person,
+				verified: verifiedColumn(),
+				shareTimetable: groupMembers.shareTimetable,
+				joinedAt: groupMembers.joinedAt
+			})
+			.from(groupMembers)
+			.innerJoin(users, eq(users.id, groupMembers.userId))
+			.leftJoin(universities, eq(universities.id, users.universityId))
+			.where(eq(groupMembers.groupId, groupId))
+			.orderBy(asc(groupMembers.joinedAt))
+	]);
+	if (!group || !members.some((m) => m.id === viewerId)) return undefined;
 	return { group, members };
 }
 

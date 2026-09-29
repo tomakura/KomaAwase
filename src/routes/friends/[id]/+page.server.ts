@@ -2,7 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { requireUser } from '$lib/server/auth/next';
 import { timetables } from '$lib/server/db/schema';
-import { block, canSeeTimetable, friendshipBetween, loadPeople, removeFriendship } from '$lib/server/friends';
+import { block, friendshipBetween, loadPeople, removeFriendship, visibleUserIds } from '$lib/server/friends';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
 import { thisYear } from '$lib/server/setup';
 import { verifiedIds } from '$lib/server/verify';
@@ -13,20 +13,21 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const me = requireUser(locals, url);
 	if (params.id === me.id) redirect(303, '/');
-	const [person] = await loadPeople(locals.db, [params.id]);
-	if (!person || !(await canSeeTimetable(locals.db, me.id, person.id))) error(404, '時間割が見つかりません');
-
+	// Read side by side; nothing is shown unless the check passes.
 	const now = Date.now();
 	const year = thisYear();
-	const [timetable, friendship, verified] = await Promise.all([
+	const [[person], visible, timetable, friendship, verified] = await Promise.all([
+		loadPeople(locals.db, [params.id]),
+		visibleUserIds(locals.db, me.id),
 		locals.db
 			.select({ id: timetables.id })
 			.from(timetables)
-			.where(and(eq(timetables.userId, person.id), eq(timetables.year, year)))
+			.where(and(eq(timetables.userId, params.id), eq(timetables.year, year)))
 			.get(),
-		friendshipBetween(locals.db, me.id, person.id),
-		verifiedIds(locals.db, [person.id])
+		friendshipBetween(locals.db, me.id, params.id),
+		verifiedIds(locals.db, [params.id])
 	]);
+	if (!person || !visible.has(person.id)) error(404, '時間割が見つかりません');
 	const loaded = timetable ? await loadTimetable(locals.db, timetable.id, tokyoTime(now).date) : null;
 	const { daysShown, universityId: _, ...profile } = person;
 	return {
