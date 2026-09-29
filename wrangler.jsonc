@@ -25,6 +25,9 @@
 	// Preview versions would share the production D1 and secrets, and the mail relay only
 	// accepts production sign-in links, so previews stay off.
 	"preview_urls": false,
+	// Lets Cloudflare run the Worker near D1 when it measures that pages come back sooner:
+	// from Tokyo each query waited about 85ms, and a page makes two or three in a row.
+	"placement": { "mode": "smart" },
 	"d1_databases": [
 		{
 			"binding": "DB",
