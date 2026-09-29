@@ -3,6 +3,8 @@ import { requireUser, safeNext } from '$lib/server/auth/next';
 import { DAILY_LIMIT, latestJobs, queuePosition } from '$lib/server/import/jobs';
 import type { PageServerLoad } from './$types';
 
+const backTerm = (back: string | null) => (back ? new URL(back, 'https://x.invalid').searchParams.get('term') : null);
+
 export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	const me = requireUser(locals, url);
 	if (!me.setupAt) redirect(303, '/');
@@ -13,6 +15,8 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	return {
 		dailyLimit: DAILY_LIMIT,
 		back: safeNext(url.searchParams.get('back')) ?? '/',
+		// The term the person was looking at when they came here, so the review starts with it
+		term: url.searchParams.get('term') ?? backTerm(url.searchParams.get('back')),
 		job: current
 			? {
 					id: current.id,

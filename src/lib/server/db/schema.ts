@@ -501,6 +501,8 @@ export const importJobs = sqliteTable(
 		image: text('image'),
 		// The table was cut into cells and stacked in the browser (import-grid.ts), so it is read another way
 		tiled: integer('tiled', { mode: 'boolean' }).notNull().default(false),
+		// The term that was showing when the screenshot was sent; the review starts with it chosen
+		termId: text('term_id'),
 		provider: text('provider', { enum: ['groq', 'workers-ai'] }),
 		result: text('result', { mode: 'json' }).$type<import('$lib/import').ImportedCourse[]>(),
 		error: text('error'),

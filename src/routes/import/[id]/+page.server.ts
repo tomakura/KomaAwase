@@ -62,7 +62,7 @@ async function suggestions(
 				if (!course) return [];
 				const other = normalizeTitle(course.values.title);
 				const score = other === title ? 3 : other.includes(title) || title.includes(other) ? 2 : 1;
-				return [{ id, version: course.version, score, ...course.values }];
+				return [{ id, version: course.version, terms: course.terms, score, ...course.values }];
 			})
 			.sort((a, b) => b.score - a.score)
 			.slice(0, 3);
@@ -82,7 +82,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		job: { id: job.id, status: job.status, closed: !!job.closedAt, provider: job.provider },
 		terms: loaded.terms,
 		periods: loaded.periods,
-		defaultTerm: currentTerm(loaded.terms, today)?.id ?? null,
+		// The term the screenshot was sent from, else the one running now
+		defaultTerm: loaded.terms.find((t) => t.id === job.termId)?.id ?? currentTerm(loaded.terms, today)?.id ?? null,
 		// What is already in each term, to point out slots that are taken
 		taken: loaded.courses.flatMap((c) => c.slots.map((s) => ({ ...s, title: c.title, termIds: c.termIds }))),
 		groups: groups.map((g, i) => ({ ...g, suggestions: suggested[i] }))

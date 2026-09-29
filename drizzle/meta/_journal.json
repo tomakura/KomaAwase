@@ -134,6 +134,13 @@
       "when": 1790673636174,
       "tag": "0018_import_tiled",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1790683427203,
+      "tag": "0019_import_term",
+      "breakpoints": true
     }
   ]
 }

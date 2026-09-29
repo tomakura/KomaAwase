@@ -1,0 +1,1 @@
+ALTER TABLE `import_jobs` ADD `term_id` text;

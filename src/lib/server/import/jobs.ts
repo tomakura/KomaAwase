@@ -17,7 +17,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 export const IMAGE_MAX = 1_500_000;
 
-export async function createImportJob(db: Db, userId: string, timetableId: string, image: string, tiled = false) {
+export async function createImportJob(db: Db, userId: string, timetableId: string, image: string, tiled = false, termId: string | null = null) {
 	if (image.length > IMAGE_MAX || !IMAGE_PATTERN.test(image)) {
 		return { message: '画像を読み込めませんでした。別の画像でやり直してください' };
 	}
@@ -36,7 +36,7 @@ export async function createImportJob(db: Db, userId: string, timetableId: strin
 	if ((active?.n ?? 0) >= ACTIVE_LIMIT) return { message: '読み込み中のものが終わってから、次の画像を送ってください' };
 	const row = await db
 		.insert(importJobs)
-		.values({ userId, timetableId, image, tiled })
+		.values({ userId, timetableId, image, tiled, termId })
 		.returning({ id: importJobs.id })
 		.get();
 	return { id: row.id };
