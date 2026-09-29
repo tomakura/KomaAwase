@@ -57,7 +57,8 @@ const STALE_AFTER_CHANGE = ['/overlay/__data.json', '/more/__data.json'];
 // The attribute on <body> that has links prepare their page when the pointer nears (src/app.html)
 const PRELOAD = 'data-sveltekit-preload-data';
 
-const CAUSE = { offline: 'オフラインです', poor: '通信が不安定です' } as const;
+const OFFLINE_NOTICE = 'オフラインのため、その操作はできません';
+const POOR_NOTICE = '通信が不安定のため、更新できません';
 
 const onLine = () => typeof navigator === 'undefined' || navigator.onLine !== false;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
@@ -200,7 +201,7 @@ export class Connection {
 			const ours = url.origin === origin && !new Headers(init?.headers ?? request?.headers).has(SYNC_HEADER);
 			const change = ours && method !== 'GET' && method !== 'HEAD';
 			if (change && this.blocked) {
-				this.tell(this.#say('action'));
+				this.tell(this.#say());
 				throw new TypeError('offline');
 			}
 			let res: Response;
@@ -224,12 +225,11 @@ export class Connection {
 	guardNavigation(url: URL, from?: string) {
 		if (!this.blocked || url.origin !== this.#env?.origin) return true;
 		if (needsServer(url.pathname)) {
-			this.tell(this.#say('add'));
+			this.tell(this.#say());
 			return false;
 		}
 		if (!openableOffline(url, this.#cached, from)) {
-			const within = from !== undefined && url.pathname.replace(/\/+$/, '') === from.replace(/\/+$/, '');
-			this.tell(this.#say(within ? 'view' : 'unsaved'));
+			this.tell(this.#say());
 			return false;
 		}
 		return true;
@@ -274,7 +274,7 @@ export class Connection {
 		if (ok) return;
 		if (this.blocked) {
 			this.#retrySoon();
-			if (opts.manual) this.tell(`${CAUSE[this.#link as Exclude<Link, 'online'>]}。まだ更新できません`);
+			if (opts.manual) this.tell(this.#say());
 		}
 	}
 
@@ -446,15 +446,12 @@ export class Connection {
 		if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post') return;
 		e.preventDefault();
 		e.stopImmediatePropagation();
-		this.tell(this.#say('action'));
+		this.tell(this.#say());
 	}
 
-	#say(what: 'action' | 'add' | 'unsaved' | 'view') {
-		const cause = CAUSE[this.#link === 'poor' ? 'poor' : 'offline'];
-		if (what === 'add') return `${cause}。追加の画面は開けません`;
-		if (what === 'view') return `${cause}。この表示は開けません`;
-		if (what === 'unsaved') return `${cause}。このページは開けません`;
-		return `${cause}。この操作はできません`;
+	// One sentence for whatever can't be done: what's wrong is the connection
+	#say() {
+		return this.#link === 'poor' ? POOR_NOTICE : OFFLINE_NOTICE;
 	}
 }
 
