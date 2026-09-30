@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	import { motion } from '$lib/motion';
+	import Switch from '$lib/components/Switch.svelte';
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
@@ -16,6 +17,7 @@
 		weekLabel
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
+	import { whenLabel } from '$lib/plans';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
 
 	let { data, form } = $props();
@@ -35,7 +37,8 @@
 	);
 	const delivery = $derived(deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo));
 
-	let adding = $state<'memo' | 'task' | 'cancel' | null>(null);
+	let adding = $state<'memo' | 'task' | 'cancel' | 'event' | null>(null);
+	let allDay = $state(false);
 
 	// 10/2（金）
 	const withDay = (date: string) => `${monthDay(date)}（${DAY_NAMES[weekdayOf(date)]}）`;
@@ -194,6 +197,13 @@
 				</svg>
 				休講
 			</button>
+			<button type="button" aria-pressed={adding === 'event'} onclick={() => ((allDay = false), (adding = adding === 'event' ? null : 'event'))}>
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+					<path d="M3.5 9.5h17M8 3v4M16 3v4M8.5 14.5h7" />
+				</svg>
+				イベント
+			</button>
 		</div>
 
 		<input
@@ -211,20 +221,35 @@
 			<form
 				class="add-form"
 				method="POST"
-				action={actionHref('note', data.termParam)}
+				action={actionHref(adding === 'event' ? 'event' : 'note', data.termParam)}
 				use:enhance={() =>
 					async ({ result, update }) => {
 						await update();
 						if (result.type === 'success') adding = null;
 					}}
 			>
-				<input type="hidden" name="kind" value={adding} />
+				{#if adding !== 'event'}<input type="hidden" name="kind" value={adding} />{/if}
 				{#if adding === 'memo'}
 					<label class="field">日付<input type="date" name="date" value={data.today} required /></label>
 					<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required></textarea></label>
 				{:else if adding === 'task'}
 					<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
 					<label class="field">締切（任意）<input type="date" name="due" /></label>
+				{:else if adding === 'event'}
+					<label class="field">名前<input name="title" maxlength="100" required autocomplete="off" placeholder="期末試験" /></label>
+					<label class="field">日付<input type="date" name="date" required value={data.today} /></label>
+					<div class="all-day">
+						<span id="all-day-label">終日</span>
+						<Switch bind:checked={allDay} name="allDay" labelledby="all-day-label" />
+					</div>
+					{#if !allDay}
+						<div class="times">
+							<label class="field">はじまり<input type="time" name="start" /></label>
+							<label class="field">終わり<input type="time" name="end" /></label>
+						</div>
+					{/if}
+					<label class="field">場所<input name="place" maxlength="50" autocomplete="off" /></label>
+					<label class="field">メモ（任意）<textarea name="memo" rows="3" maxlength="500"></textarea></label>
 				{:else}
 					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
 					<label class="field">
@@ -291,6 +316,22 @@
 								<span class="due" class:late={due.late}>{due.text}</span>
 							{/if}
 							{@render removeButton(task.id, `課題「${task.body}」`)}
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			{#if data.events.length}
+				<section>
+					<h2>イベント</h2>
+					{#each data.events as e (e.id)}
+						<div transition:slide={motion()} class="item" class:done={e.date < data.today}>
+							<span class="text">
+								<span class="main">{e.title}</span>
+								<span class="sub">{[whenLabel(e), e.place].filter(Boolean).join(' · ')}</span>
+								{#if e.memo}<span class="sub memo-line">{e.memo}</span>{/if}
+							</span>
+							{@render removeButton(e.id, `イベント「${e.title}」`, 'removeEvent')}
 						</div>
 					{/each}
 				</section>
@@ -526,8 +567,8 @@
 
 	.add-buttons {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 8px;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		gap: 6px;
 		padding: 0 16px;
 	}
 
@@ -647,6 +688,34 @@
 
 	.add-form .field input {
 		background: var(--bg);
+	}
+
+	.all-day {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 44px;
+		padding: 0 4px;
+		font-size: 14px;
+	}
+
+	.times {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+
+	.times :global(input) {
+		min-width: 0;
+	}
+
+	.add-form :global(textarea) {
+		width: 100%;
+	}
+
+	.memo-line {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 
 	.form-actions {

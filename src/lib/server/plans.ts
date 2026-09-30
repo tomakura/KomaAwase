@@ -104,6 +104,25 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 	];
 }
 
+// The events attached to one class, for its detail sheet (the caller has checked the class is the user's)
+export function listCourseEvents(db: Db, courseId: string) {
+	return db
+		.select({
+			id: events.id,
+			title: events.title,
+			date: events.date,
+			start: events.startTime,
+			end: events.endTime,
+			place: events.place,
+			memo: events.memo
+		})
+		.from(events)
+		.where(eq(events.courseId, courseId))
+		.orderBy(events.date, events.startTime)
+		.limit(200)
+		.all();
+}
+
 /** Only a course of this person's can be attached */
 async function ownCourseId(db: Db, userId: string, courseId: string | null) {
 	if (!courseId) return null;

@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { courseAbsences } from '$lib/server/db/schema';
 import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
+import { addEvent, deleteEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
 import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
 import { tokyoTime } from '$lib/time';
 import { sharedAccess } from '$lib/server/verify';
@@ -10,10 +11,11 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, url, platform }) => {
 	if (!locals.user) redirect(303, '/login');
-	const [loaded, files, used] = await Promise.all([
+	const [loaded, files, used, courseEvents] = await Promise.all([
 		loadCourse(locals.db, locals.user.id, params.id),
 		listFiles(locals.db, params.id),
-		usedBytes(locals.db, locals.user.id)
+		usedBytes(locals.db, locals.user.id),
+		listCourseEvents(locals.db, params.id)
 	]);
 	if (!loaded) error(404, '授業が見つかりません');
 	// The みんなの授業データ page is for people with an enrollment check
@@ -22,6 +24,7 @@ export const load: PageServerLoad = async ({ locals, params, url, platform }) =>
 		...loaded,
 		shareable,
 		files,
+		events: courseEvents,
 		usedBytes: used,
 		quotaBytes: USER_QUOTA_BYTES,
 		filesEnabled: !!platform && filesEnabled(platform.env),
@@ -43,6 +46,21 @@ export const actions: Actions = {
 		if ('message' in parsed) return fail(400, { message: parsed.message });
 		await addNote(event.locals.db, courseId, parsed.note);
 		return { added: true };
+	},
+	// An event of this class (an exam, say); it also shows in the 予定 tab
+	event: async (event) => {
+		const courseId = await ownCourse(event);
+		const form = await event.request.formData();
+		form.set('courseId', courseId);
+		const parsed = parseEvent(form);
+		if ('message' in parsed) return fail(400, { message: parsed.message });
+		await addEvent(event.locals.db, event.locals.user!.id, parsed.event);
+		return { added: true };
+	},
+	removeEvent: async (event) => {
+		await ownCourse(event);
+		const form = await event.request.formData();
+		await deleteEvent(event.locals.db, event.locals.user!.id, String(form.get('id') ?? ''));
 	},
 	// Today (Japan time); a day already recorded stays one
 	absent: async (event) => {
