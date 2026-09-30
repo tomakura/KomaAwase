@@ -31,6 +31,11 @@ declare global {
 			cf?: IncomingRequestCfProperties
 		}
 
+		// A course opened over the timetable without leaving it (shallow routing, see the home page)
+		interface PageState {
+			course?: import('./routes/courses/[id]/$types').PageData;
+		}
+
 		// interface Error {}
 		interface Locals {
 			db: import('$lib/server/db').Db;
@@ -41,7 +46,6 @@ declare global {
 			timetable?: import('$lib/server/auth/session').KnownTimetable | null;
 		}
 		// interface PageData {}
-		// interface PageState {}
 	}
 }
 

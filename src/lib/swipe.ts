@@ -9,11 +9,15 @@ const CLOSE_SPEED = 0.6; // px per ms
 const FLICK_DISTANCE = 32;
 
 // Anything between the finger and the sheet that has been scrolled down, and the page too
-// when the sheet is part of it (a dialog scrolls on its own)
+// when the sheet is part of it (a dialog scrolls on its own, and so does a box marked
+// data-swipe-scroll around the sheet)
 function scrolled(from: EventTarget | null, sheet: HTMLElement) {
 	for (let el = from as HTMLElement | null; el && el !== sheet.parentElement; el = el.parentElement) {
 		if (el.scrollTop > 0) return true;
 	}
+	// A sheet in a box of its own that scrolls (data-swipe-scroll) is judged by that box, not the page
+	const box = sheet.closest<HTMLElement>('[data-swipe-scroll]');
+	if (box) return box.scrollTop > 0;
 	return !sheet.closest('dialog') && (document.scrollingElement?.scrollTop ?? 0) > 0;
 }
 

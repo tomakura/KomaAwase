@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { replaceState } from '$app/navigation';
+	import { goto, preloadData, pushState, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import CourseDetail from '$lib/components/CourseDetail.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
@@ -31,7 +34,50 @@
 	const days = $derived(data.days.toSorted((a, b) => a - b));
 	const termCourses = $derived(data.courses.filter((c) => termId && c.termIds.includes(termId)));
 	const unscheduled = $derived(termCourses.filter((c) => c.slots.length === 0));
+
+	// A course opens over the timetable, which stays as it is behind it (its address is the
+	// course's, so reloading or sharing it opens the course's own page). Anything that can't
+	// be done that way, such as a click with a modifier key or a course that can't be loaded,
+	// goes the usual way.
+	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
+	async function openCourse(e: MouseEvent) {
+		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+		const link = (e.target as Element | null)?.closest?.('a');
+		if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+		const url = new URL(link.href, location.href);
+		if (url.origin !== location.origin || !COURSE.test(url.pathname)) return;
+		e.preventDefault();
+		const href = url.pathname + url.search;
+		try {
+			const result = await preloadData(href);
+			if (result.type === 'loaded' && result.status === 200) return pushState(href, { course: result.data as NonNullable<typeof page.state.course> });
+		} catch {
+			// Fall through to the page itself
+		}
+		void goto(href);
+	}
+	// The timetable reloading (back in the app after a while, say) reads an open course again too
+	let loadedOnce = false;
+	$effect(() => {
+		void data;
+		if (!loadedOnce) return void (loadedOnce = true);
+		if (untrack(() => page.state.course)) void refreshCourse();
+	});
+	// After a change made there (a memo added, say), the course as it is now
+	async function refreshCourse() {
+		// The browser's address is the course's (page.url stays the timetable's). A made-up
+		// parameter makes the answer a new one, not the one kept from opening it.
+		const href = `${location.pathname}${location.search}${location.search ? '&' : '?'}at=${Date.now()}`;
+		try {
+			const result = await preloadData(href);
+			if (result.type === 'loaded' && result.status === 200) replaceState('', { course: result.data as NonNullable<typeof page.state.course> });
+		} catch {
+			// The copy shown stays
+		}
+	}
 </script>
+
+<svelte:window onclickcapture={openCourse} />
 
 <svelte:head>
 	<title>時間割 · コマあわせ</title>
@@ -122,6 +168,12 @@
 	<BottomNav current="timetable" />
 </div>
 
+{#if page.state.course}
+	<div class="course-over" data-swipe-scroll in:fade={motion(200)} out:fade={motion(240)}>
+		<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} />
+	</div>
+{/if}
+
 <style>
 	header {
 		display: flex;
@@ -142,6 +194,15 @@
 
 	.overlap {
 		mix-blend-mode: var(--logo-blend);
+	}
+
+	.course-over {
+		position: fixed;
+		inset: var(--bar-h, 0px) 0 0;
+		z-index: 30;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		background: color-mix(in srgb, var(--scrim), transparent 30%);
 	}
 
 	.start {
