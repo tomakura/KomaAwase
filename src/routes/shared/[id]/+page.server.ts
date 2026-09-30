@@ -6,12 +6,14 @@ import { REPORT_REASONS, saveReport } from '$lib/server/reports';
 import {
 	adminSearchShared,
 	canEditShared,
+	deleteShared,
 	loadEdits,
 	loadSharedCourse,
 	mergePreview,
 	mergeShared,
 	restoreShared,
 	syncedCount,
+	usageCounts,
 	writeShared
 } from '$lib/server/shared-courses';
 import { sharedAccess } from '$lib/server/verify';
@@ -64,11 +66,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			: [],
 		target ? mergePreview(locals.db, course.id, target.id) : null
 	]);
+	const using = isAdmin ? ((await usageCounts(locals.db, [course.id])).get(course.id)?.linked ?? 0) : 0;
 	return {
+		using,
 		merge: isAdmin
 			? {
 					query: mergeQuery,
-					candidates: candidates.map((c) => ({ id: c.id, version: c.version, users: c.users, source: c.source, values: c.values })),
+					candidates: candidates.map((c) => ({ id: c.id, version: c.version, users: c.users, using: c.using, source: c.source, values: c.values })),
 					target: target && preview ? { id: target.id, version: target.version, values: target.values, ...preview } : null
 				}
 			: null,
@@ -170,6 +174,23 @@ export const actions: Actions = {
 			return fail(409, { message: '同期させられませんでした。読み込み直してから、もう一度やり直してください', merge: true });
 		}
 		redirect(303, `/shared/${into.id}?back=${encodeURIComponent(safeNext(String(form.get('back') ?? '')) ?? '/')}&merged=1`);
+	},
+	// Delete a course nobody has in a timetable
+	remove: async ({ locals, params, url }) => {
+		const me = requireUser(locals, url);
+		if (me.role !== 'admin') error(404, 'Not found');
+		const course = await usable(locals.db, me, params.id);
+		if (((await usageCounts(locals.db, [course.id])).get(course.id)?.linked ?? 0) > 0) {
+			return fail(409, { message: '使っている人がいるので、削除できません', remove: true });
+		}
+		try {
+			const statements = deleteShared(locals.db, course.id);
+			await locals.db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
+		} catch (e) {
+			console.error('shared course delete failed', e);
+			return fail(409, { message: '削除できませんでした。だれかが追加した可能性があります。読み込み直してください', remove: true });
+		}
+		redirect(303, '/admin/courses');
 	},
 	report: async ({ locals, params, url, request }) => {
 		const me = requireUser(locals, url);

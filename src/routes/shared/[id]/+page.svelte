@@ -84,7 +84,7 @@
 				{/if}
 			</dl>
 			<p class="meta">
-				{data.course.university} · {data.course.source === 'syllabus' ? 'シラバスから' : 'みんなの登録'} · {data.users}人が同期中
+				{data.course.university} · {data.course.source === 'syllabus' ? 'シラバスから' : 'みんなの登録'} · {data.users}人が同期中{data.isAdmin ? `・使用中 ${data.using}人` : ''}
 			</p>
 		</div>
 		<p class="ui-note">
@@ -164,7 +164,7 @@
 							{@const v = fields(c.values)}
 							<a class="candidate" href={mergeHref(data.merge.query, c.id)}>
 								<b>{v['授業名']}</b>
-								<span>{v['先生']} · {v['曜日・時限']} · {c.source === 'syllabus' ? 'シラバス' : `${c.users}人が同期中`}</span>
+								<span>{v['先生']} · {v['曜日・時限']} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人</span>
 							</a>
 						{:else}
 							<p class="ui-note">見つかりませんでした。</p>
@@ -173,11 +173,30 @@
 				{/if}
 			</section>
 		{/if}
+
+		<section class="ui-section">
+			<h2 class="ui-section-title">削除</h2>
+			{#if data.using === 0}
+				<p class="ui-note">この授業を時間割に入れている人はいません。削除すると、変更の履歴と、この授業への報告も消えます。元に戻せません。</p>
+				<form
+					method="POST"
+					action="?/remove"
+					use:enhance={({ cancel }) => {
+						if (!confirm(`「${data.course.values.title}」を削除します。変更の履歴と報告も消えて、元に戻せません`)) cancel();
+					}}
+				>
+					{#if form?.message && form.remove}<p class="error" role="alert">{form.message}</p>{/if}
+					<button class="btn danger" type="submit">この授業を削除する</button>
+				</form>
+			{:else}
+				<p class="ui-note">時間割に入れている人が{data.using}人いるので、削除できません。同期を切って残している人も数えています。</p>
+			{/if}
+		</section>
 	{/if}
 
 	<section class="ui-section">
 		<h2 class="ui-section-title">変更の履歴</h2>
-		{#if form?.message && !form.edit && !form.merge}<p class="error" role="alert">{form.message}</p>{/if}
+		{#if form?.message && !form.edit && !form.merge && !form.remove}<p class="error" role="alert">{form.message}</p>{/if}
 		{#if form?.restored}<p class="done" role="status">元に戻しました。</p>{/if}
 		<div class="ui-list">
 			{#each data.edits as edit, i (edit.id)}
@@ -333,6 +352,12 @@
 		font-size: 12px;
 		font-weight: 700;
 		cursor: pointer;
+	}
+
+	.danger {
+		border-color: var(--accent-text);
+		background: var(--accent-text);
+		color: var(--surface);
 	}
 
 	.merge {

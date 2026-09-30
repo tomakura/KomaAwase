@@ -47,9 +47,7 @@
 					<a class="course" href="/shared/{c.id}?back={back}">
 						<b>{c.title}</b>
 						<span>
-							{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus'
-								? 'シラバス'
-								: `${c.users}人が同期中`}
+							{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人
 						</span>
 					</a>
 				{:else}
