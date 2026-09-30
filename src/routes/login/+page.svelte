@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import { canAutofillPasskey, loginWithPasskey, stopPasskeyAutofill } from '$lib/passkey';
-	import logo from '$lib/assets/favicon.svg';
+	import Logo from '$lib/components/Logo.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import MailSent from '$lib/components/MailSent.svelte';
 	import { clearPageCaches } from '$lib/offline';
@@ -66,7 +66,7 @@
 
 <main>
 	<div class="brand">
-		<img src={logo} alt="" width="88" height="88" />
+		<Logo size={88} />
 		<h1>コマあわせ</h1>
 		{#if data.reauth}
 			<p class="lead">{data.reauth.lead}</p>
@@ -162,15 +162,15 @@
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
-		padding: 0 24px 32px;
+		gap: 40px;
+		/* The logo stays where it is however much is below it (same place on the mail-link pages) */
+		padding: clamp(48px, 12vh, 112px) 24px 32px;
 	}
 
 	.brand {
-		flex-grow: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
 		gap: 16px;
 	}
 
