@@ -26,8 +26,10 @@ export type EventInput = {
 export function parseEvent(form: FormData): { event: EventInput } | { message: string } {
 	const title = String(form.get('title') ?? '').trim();
 	const date = String(form.get('date') ?? '');
-	const startTime = String(form.get('start') ?? '') || null;
-	const endTime = String(form.get('end') ?? '') || null;
+	// An all-day event has no times, whatever was left in the fields
+	const allDay = form.get('allDay') === 'on';
+	const startTime = (!allDay && String(form.get('start') ?? '')) || null;
+	const endTime = (!allDay && String(form.get('end') ?? '')) || null;
 	const place = String(form.get('place') ?? '').trim() || null;
 	const memo = String(form.get('memo') ?? '').trim() || null;
 	const courseId = String(form.get('courseId') ?? '') || null;

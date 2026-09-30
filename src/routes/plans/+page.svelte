@@ -5,6 +5,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Segmented from '$lib/components/Segmented.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import Switch from '$lib/components/Switch.svelte';
 	import { motion } from '$lib/motion';
 	import { SECTIONS, dueLabel, groupPlans, whenLabel, type Plan } from '$lib/plans';
 	import { tokyoTime } from '$lib/time';
@@ -20,6 +21,7 @@
 	let open = $state(false);
 	let kind = $state<'task' | 'event'>('task');
 	let editing = $state<Plan | null>(null);
+	let allDay = $state(false);
 	const kinds = [
 		{ id: 'task', label: '課題' },
 		{ id: 'event', label: 'イベント' }
@@ -27,12 +29,14 @@
 
 	function add() {
 		editing = null;
+		allDay = false;
 		kind = data.courses.length ? 'task' : 'event';
 		open = true;
 	}
 
 	function edit(p: Plan) {
 		editing = p;
+		allDay = !p.start;
 		kind = 'event';
 		open = true;
 	}
@@ -147,10 +151,16 @@
 			{:else}
 				<label class="field">名前<input name="title" maxlength="100" required autocomplete="off" value={editing?.title ?? ''} /></label>
 				<label class="field">日付<input type="date" name="date" required value={editing?.date ?? today} /></label>
-				<div class="times">
-					<label class="field">はじまり<input type="time" name="start" value={editing?.start ?? ''} /></label>
-					<label class="field">終わり<input type="time" name="end" value={editing?.end ?? ''} /></label>
+				<div class="all-day">
+					<span id="all-day-label">終日</span>
+					<Switch bind:checked={allDay} name="allDay" labelledby="all-day-label" />
 				</div>
+				{#if !allDay}
+					<div class="times">
+						<label class="field">はじまり<input type="time" name="start" value={editing?.start ?? ''} /></label>
+						<label class="field">終わり<input type="time" name="end" value={editing?.end ?? ''} /></label>
+					</div>
+				{/if}
 				<label class="field">場所<input name="place" maxlength="50" autocomplete="off" value={editing?.place ?? ''} /></label>
 				<label class="field">
 					授業
@@ -341,6 +351,15 @@
 	.add-form :global(textarea) {
 		padding: 10px 12px;
 		resize: vertical;
+	}
+
+	.all-day {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 48px;
+		padding: 0 4px;
+		font-size: 14px;
 	}
 
 	.times {

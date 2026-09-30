@@ -74,7 +74,7 @@ describe('groupPlans', () => {
 
 describe('whenLabel', () => {
 	it('writes the day and the time', () => {
-		expect(whenLabel({ date: '2026-10-02', start: null, end: null })).toBe('10/2（金）');
+		expect(whenLabel({ date: '2026-10-02', start: null, end: null })).toBe('10/2（金） 終日');
 		expect(whenLabel({ date: '2026-10-02', start: '14:00', end: '15:30' })).toBe('10/2（金） 14:00〜15:30');
 	});
 });

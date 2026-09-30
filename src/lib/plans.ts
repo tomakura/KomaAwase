@@ -59,10 +59,10 @@ export function groupPlans(plans: Plan[], today: string): Record<SectionId, Plan
 // 10/2（金）
 export const dayLabel = (date: string) => `${monthDay(date)}（${DAY_NAMES[weekdayOf(date)]}）`;
 
-// 10/2（金）14:00〜15:30
+// 10/2（金）14:00〜15:30, or 10/2（金）終日
 export function whenLabel(p: Pick<Plan, 'date' | 'start' | 'end'>) {
 	if (!p.date) return '';
-	const time = p.start ? ` ${p.start}${p.end ? `〜${p.end}` : ''}` : '';
+	const time = p.start ? ` ${p.start}${p.end ? `〜${p.end}` : ''}` : ' 終日';
 	return `${dayLabel(p.date)}${time}`;
 }
 
