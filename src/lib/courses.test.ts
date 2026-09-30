@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysLabel, meetsInWeek, periodLabel, readNumber } from './courses';
+import { absenceLimitOf, creditsOf, daysLabel, meetsInWeek, periodLabel, readNumber } from './courses';
 
 describe('meetsInWeek', () => {
 	// Q3 starts on Thursday 2026-09-24: its first week is Monday 9/21 to Sunday 9/27.
@@ -43,5 +43,34 @@ describe('readNumber', () => {
 		expect(readNumber('-1', 20, 0.5)).toBe('invalid');
 		expect(readNumber('0', 99, 1)).toBe('invalid');
 		expect(readNumber('abc', 99, 1)).toBe('invalid');
+	});
+});
+
+describe('credits and absences by the university rule', () => {
+	const slot = (span: number) => ({ span });
+
+	it('counts each period as one credit at dhw when none is typed', () => {
+		expect(creditsOf({ credits: null, slots: [slot(1)] }, 'dhw')).toBe(1);
+		expect(creditsOf({ credits: null, slots: [slot(2)] }, 'dhw')).toBe(2);
+		expect(creditsOf({ credits: null, slots: [slot(1), slot(1)] }, 'dhw')).toBe(2);
+	});
+
+	it('has no default for a class with no periods, or at another university', () => {
+		expect(creditsOf({ credits: null, slots: [] }, 'dhw')).toBeNull();
+		expect(creditsOf({ credits: null, slots: [slot(1)] }, 'other')).toBeNull();
+		expect(creditsOf({ credits: null, slots: [slot(1)] }, null)).toBeNull();
+	});
+
+	it('prefers what was typed', () => {
+		expect(creditsOf({ credits: 4, slots: [slot(1)] }, 'dhw')).toBe(4);
+		expect(creditsOf({ credits: 2, slots: [] }, 'other')).toBe(2);
+	});
+
+	it('allows two absences per credit, or the typed limit', () => {
+		expect(absenceLimitOf({ credits: null, absenceLimit: null, slots: [slot(1)] }, 'dhw')).toBe(2);
+		expect(absenceLimitOf({ credits: null, absenceLimit: null, slots: [slot(2)] }, 'dhw')).toBe(4);
+		expect(absenceLimitOf({ credits: 3, absenceLimit: null, slots: [slot(1)] }, 'dhw')).toBe(6);
+		expect(absenceLimitOf({ credits: null, absenceLimit: 5, slots: [slot(1)] }, 'dhw')).toBe(5);
+		expect(absenceLimitOf({ credits: null, absenceLimit: null, slots: [slot(1)] }, 'other')).toBeNull();
 	});
 });

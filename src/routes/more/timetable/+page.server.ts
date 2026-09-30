@@ -18,6 +18,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const system = termSystemOf(loaded.terms);
 	return {
 		year: timetable.year,
+		universityId: timetable.universityId,
 		universityName: university?.name ?? null,
 		termsLabel: TERM_SYSTEMS.find((s) => s.id === system)?.label ?? `${loaded.terms.length}学期`,
 		periodsLabel: periodsRange(loaded.periods),

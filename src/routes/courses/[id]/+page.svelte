@@ -8,9 +8,11 @@
 	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
+		absenceLimitOf,
 		actionHref,
 		courseColor,
 		courseHref,
+		creditsOf,
 		deliveryLabel,
 		periodLabel,
 		timetableHref,
@@ -85,7 +87,9 @@
 
 	// Absences: recorded by date, one a day
 	const absentToday = $derived(data.absences.some((a) => a.date === data.today));
-	const absenceLeft = $derived(course.absenceLimit ? course.absenceLimit - data.absences.length : null);
+	const credits = $derived(creditsOf(course, data.timetable.universityId));
+	const absenceLimit = $derived(absenceLimitOf(course, data.timetable.universityId));
+	const absenceLeft = $derived(absenceLimit ? absenceLimit - data.absences.length : null);
 
 	function dueLabel(due: string) {
 		const days = daysBetween(data.today, due);
@@ -138,7 +142,7 @@
 					<span class="chip"><b>{slotLabels[i]}</b>{#if slot.room}&nbsp;· {slot.room}{/if}</span>
 				{/each}
 				{#if delivery}<span class="chip"><b>{delivery}</b></span>{/if}
-				{#if course.credits}<span class="chip muted">{course.credits}単位</span>{/if}
+				{#if credits}<span class="chip muted">{credits}単位</span>{/if}
 				{#if termNames}<span class="chip muted">{termNames}</span>{/if}
 				{#if course.syncMode === 'synced' && data.shared}
 					<span class="chip muted synced">
@@ -270,7 +274,7 @@
 				<h2>欠席</h2>
 				<div class="item">
 					<span class="text">
-						<span class="main">{data.absences.length}回{course.absenceLimit ? `（${course.absenceLimit}回まで）` : ''}</span>
+						<span class="main">{data.absences.length}回{absenceLimit ? `（${absenceLimit}回まで）` : ''}</span>
 						{#if absenceLeft !== null && absenceLeft < 0}
 							<span class="sub warn">上限を超えています</span>
 						{:else if absenceLeft === 0}

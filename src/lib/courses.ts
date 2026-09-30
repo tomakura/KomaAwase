@@ -97,6 +97,32 @@ export function meetsInWeek(week: WeekPattern | undefined, termStart: string | n
 }
 
 export const CREDITS_MAX = 20;
+
+// Universities where a class period is one credit, and a class can be missed twice per credit
+const PERIOD_CREDIT_UNIVERSITIES = ['dhw'];
+const ABSENCES_PER_CREDIT = 2;
+
+/** The credits typed in, or else what the university's rule gives (未入力のとき) */
+export function creditsOf(
+	course: { credits: number | null; slots: { span: number }[] },
+	universityId: string | null | undefined
+): number | null {
+	if (course.credits) return course.credits;
+	if (!universityId || !PERIOD_CREDIT_UNIVERSITIES.includes(universityId)) return null;
+	const periods = course.slots.reduce((n, s) => n + s.span, 0);
+	return periods || null;
+}
+
+/** The limit typed in, or else two absences for each credit where the university has that rule */
+export function absenceLimitOf(
+	course: { credits: number | null; absenceLimit: number | null; slots: { span: number }[] },
+	universityId: string | null | undefined
+): number | null {
+	if (course.absenceLimit) return course.absenceLimit;
+	if (!universityId || !PERIOD_CREDIT_UNIVERSITIES.includes(universityId)) return null;
+	const credits = creditsOf(course, universityId);
+	return credits ? Math.max(1, Math.round(credits * ABSENCES_PER_CREDIT)) : null;
+}
 export const ABSENCE_LIMIT_MAX = 99;
 
 // An empty field is no value; a number in steps of `step` up to `max` is one; anything else is invalid

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, courseColor, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
+	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, absenceLimitOf, courseColor, creditsOf, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
 
 	type Slot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
 	type SharedValues = {
@@ -38,6 +38,7 @@
 		terms,
 		periods,
 		others = [],
+		universityId = null,
 		message
 	}: {
 		heading: string;
@@ -49,6 +50,7 @@
 		periods: { number: number }[];
 		// The timetable's other courses, which a slot's length stops short of
 		others?: { weekday: number; period: number; span: number; week: WeekPattern; termIds: string[] }[];
+		universityId?: string | null;
 		message?: string;
 	} = $props();
 
@@ -66,6 +68,15 @@
 	});
 
 	const periodNumbers = $derived(periods.map((p) => p.number));
+
+	// What each blank stands for, where the university has a rule for it
+	const ruleCourse = $derived({
+		slots: v.unscheduled ? [] : v.slots,
+		credits: v.credits === '' ? null : Number(v.credits),
+		absenceLimit: null
+	});
+	const creditsHint = $derived(creditsOf({ ...ruleCourse, credits: null }, universityId));
+	const absenceHint = $derived(absenceLimitOf(ruleCourse, universityId));
 	let saving = $state(false);
 
 	// Syncing again shows the shared values, so local edits never overwrite them by accident.
@@ -280,11 +291,11 @@
 		<div class="numbers">
 			<label class="field">
 				単位数（任意）
-				<input name="credits" type="number" inputmode="decimal" min="0" max="20" step="0.5" bind:value={v.credits} />
+				<input name="credits" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder={creditsHint ? `${creditsHint}` : ""} bind:value={v.credits} />
 			</label>
 			<label class="field">
 				欠席できる回数（任意）
-				<input name="absence_limit" type="number" inputmode="numeric" min="1" max="99" step="1" bind:value={v.absenceLimit} />
+				<input name="absence_limit" type="number" inputmode="numeric" min="1" max="99" step="1" placeholder={absenceHint ? `${absenceHint}` : ""} bind:value={v.absenceLimit} />
 			</label>
 		</div>
 

@@ -26,6 +26,7 @@
 	terms={data.terms}
 	periods={data.periods}
 	others={data.others}
+	universityId={data.timetable.universityId}
 	message={form?.message}
 />
 

@@ -45,6 +45,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		...shape,
 		termParam: term?.id ?? null,
+		universityId: timetable.universityId,
 		others,
 		backHref: inTimetable ? `/courses/search?${search}` : timetableHref(term?.id ?? null),
 		sync: {

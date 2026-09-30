@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { DAY_NAMES, courseColor, deliveryLabel, periodLabel, weekLabel } from '$lib/courses';
+	import { DAY_NAMES, courseColor, creditsOf, deliveryLabel, periodLabel, weekLabel } from '$lib/courses';
 	import { compareJa } from '$lib/sort';
 
 	let { data } = $props();
@@ -22,7 +22,9 @@
 
 	// Credits by term, for the courses that have them. A course in several terms is counted apart,
 	// so a year-long class isn't counted twice; the total counts every course once.
-	const credited = $derived(data.courses.filter((c) => c.credits));
+	const credited = $derived(
+		data.courses.map((c) => ({ ...c, credits: creditsOf(c, data.universityId) })).filter((c) => c.credits)
+	);
 	const creditRows = $derived([
 		...data.terms.map((t) => ({
 			label: t.name,
