@@ -7,6 +7,7 @@
 	import Switch from '$lib/components/Switch.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { daysLabel } from '$lib/courses';
+	import { subscription } from '$lib/push-client';
 	import { THEMES, applyTheme, type Theme } from '$lib/theme';
 
 	let { data, form } = $props();
@@ -126,6 +127,7 @@
 				{@render link('/more/nickname', 'ニックネーム', data.user.nickname)}
 				{@render link('/more/university', '大学', data.universityName ?? '未設定')}
 				{@render link('/more/passkeys', 'パスキー', data.passkeyCount ? `${data.passkeyCount}台` : 'なし')}
+				{@render link('/more/sessions', 'ログイン中の端末', `${data.sessionCount}台`)}
 				<a class="ui-row" href="/more/verify">
 					<span>在籍確認</span>
 					<span class="ui-row-value">
@@ -150,6 +152,7 @@
 			<h2 class="ui-section-title">サポート</h2>
 			<div class="ui-list">
 				{@render link('/feedback?from=/more', '不具合・要望を送る')}
+				{@render link('/contact', 'お問い合わせ')}
 				{#if data.supportUrl}
 					<a class="ui-row" href={data.supportUrl} target="_blank" rel="noopener">
 						<span>開発を応援する</span>
@@ -160,8 +163,8 @@
 				{@render link('/privacy', 'プライバシーポリシー')}
 				{@render link('/about', 'このアプリについて')}
 				{#if data.isAdmin}
-					<a class="ui-row" href="/admin">
-						<span>運営（通報・要望）</span>
+					<a class="ui-row" href="/login?reauth=admin&next=%2Fadmin">
+						<span>運営（問い合わせ・通報・要望）</span>
 						<span class="ui-row-value">
 							<span class="value" class:soon={data.openReports > 0}>{data.openReports ? `未対応 ${data.openReports}件` : 'なし'}</span>
 							<Icon name="chevron" size={16} />
@@ -172,10 +175,21 @@
 		</section>
 
 		<section class="ui-section account-actions">
-			<form method="POST" action="/logout">
+			<form
+				method="POST"
+				action="/logout"
+				use:enhance={async ({ formData }) => {
+					// This browser stops getting notifications for the account it leaves
+					const sub = await subscription(1000).catch(() => null);
+					if (sub) {
+						formData.set('endpoint', sub.endpoint);
+						await sub.unsubscribe().catch(() => {});
+					}
+				}}
+			>
 				<button class="btn logout" type="submit">ログアウト</button>
 			</form>
-			<a class="delete" href="/more/delete">退会する</a>
+			<a class="delete" href="/login?reauth=delete&next=%2Fmore%2Fdelete">退会する</a>
 		</section>
 	</main>
 

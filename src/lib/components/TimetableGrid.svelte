@@ -29,7 +29,8 @@
 		courseHref,
 		slotLabel = (day: number, period: number) => `${DAY_NAMES[day]}曜${period}限に授業を追加`,
 		showToday = true,
-		termStart = null
+		termStart = null,
+		stagger = false
 	}: {
 		periods: { number: number; start: string; end: string }[];
 		days: number[];
@@ -45,6 +46,8 @@
 		showToday?: boolean;
 		// The term's first day, from which odd and even weeks are counted
 		termStart?: string | null;
+		// The cells appear one after another from the top left, once (a term just chosen)
+		stagger?: boolean;
 	} = $props();
 
 	const rowOf = $derived(new Map(periods.map((p, i) => [p.number, i + 2])));
@@ -149,9 +152,9 @@
 	</svelte:element>
 {/snippet}
 
-<div class="grid" style:--days={days.length} style:--periods={periods.length}>
+<div class="grid" class:stagger style:--days={days.length} style:--periods={periods.length}>
 	{#each days as day, i (day)}
-		<div class="day" style:grid-column={i + 2}>
+		<div class="day" style:grid-column={i + 2} style:--n={i}>
 			{#if isToday(day)}
 				<span class="today-mark" aria-label="{DAY_NAMES[day]}曜日（今日）">{DAY_NAMES[day]}</span>
 			{:else}
@@ -161,7 +164,7 @@
 	{/each}
 
 	{#each periods as p, i (p.number)}
-		<div class="period" class:now={todayShown && isNow(p.start, p.end)} style:grid-row={i + 2}>
+		<div class="period" class:now={todayShown && isNow(p.start, p.end)} style:grid-row={i + 2} style:--n={i}>
 			<span class="number">{p.number}</span>
 			<span class="start">{time(p.start)}</span>
 			<span class="end">{time(p.end)}</span>
@@ -175,17 +178,18 @@
 				aria-label={slotHref ? slotLabel(day, p.number) : undefined}
 				style:grid-row={i + 2}
 				style:grid-column={j + 2}
+				style:--n={i + j}
 			></svelte:element>
 		{/each}
 	{/each}
 
 	{#each stacks as stack (`${stack.col}-${stack.row}`)}
 		{#if stack.cells.length === 1}
-			<div class="place" style:grid-row="{stack.row} / span {stack.span}" style:grid-column={stack.col}>
+			<div class="place" style:grid-row="{stack.row} / span {stack.span}" style:grid-column={stack.col} style:--n={stack.row + stack.col - 4}>
 				{@render course(stack.cells[0])}
 			</div>
 		{:else}
-			<div class="place stacked" style:grid-row="{stack.row} / span {stack.span}" style:grid-column={stack.col}>
+			<div class="place stacked" style:grid-row="{stack.row} / span {stack.span}" style:grid-column={stack.col} style:--n={stack.row + stack.col - 4}>
 				{#each stack.cells as cell (`${cell.course.id}-${cell.slot.period}`)}
 					{@render course(cell)}
 				{/each}
@@ -195,6 +199,21 @@
 </div>
 
 <style>
+	/* Each cell fades in a little after the one above and to the left of it */
+	@media (prefers-reduced-motion: no-preference) {
+		.grid.stagger > :global(*) {
+			animation: cell-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+			animation-delay: calc(var(--n, 0) * 20ms);
+		}
+	}
+
+	@keyframes cell-in {
+		from {
+			opacity: 0;
+			transform: scale(0.94);
+		}
+	}
+
 	.grid {
 		display: grid;
 		grid-template-columns: 36px repeat(var(--days), minmax(0, 1fr));

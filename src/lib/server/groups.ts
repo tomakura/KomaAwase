@@ -1,7 +1,7 @@
-import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
-import { groupMembers, groups, universities, users } from './db/schema';
+import { groupBans, groupMembers, groupRequests, groups, universities, users } from './db/schema';
 import { person, randomCode } from './friends';
 import { verifiedColumn } from './verify';
 
@@ -29,6 +29,15 @@ export function findGroupByInvite(db: Db, code: string) {
 export async function memberCount(db: Db, groupId: string) {
 	const [row] = await db.select({ n: count() }).from(groupMembers).where(eq(groupMembers.groupId, groupId));
 	return row?.n ?? 0;
+}
+
+export async function isBanned(db: Db, groupId: string, userId: string) {
+	const row = await db
+		.select({ userId: groupBans.userId })
+		.from(groupBans)
+		.where(and(eq(groupBans.groupId, groupId), eq(groupBans.userId, userId)))
+		.get();
+	return !!row;
 }
 
 /** 'full', or whether they were already in. Joining twice keeps the first choice of sharing. */
@@ -91,7 +100,14 @@ const mine = alias(groupMembers, 'mine');
 
 export function listMyGroups(db: Db, userId: string) {
 	return db
-		.select({ id: groups.id, name: groups.name, members: count(groupMembers.userId), share: mine.shareTimetable })
+		.select({
+			id: groups.id,
+			name: groups.name,
+			members: count(groupMembers.userId),
+			share: mine.shareTimetable,
+			// For the owner: people waiting to be let in
+			requests: sql<number>`case when ${groups.ownerId} = ${userId} then (select count(*) from ${groupRequests} where ${groupRequests.groupId} = ${groups.id}) else 0 end`
+		})
 		.from(groups)
 		.innerJoin(mine, and(eq(mine.groupId, groups.id), eq(mine.userId, userId)))
 		.innerJoin(groupMembers, eq(groupMembers.groupId, groups.id))
@@ -135,8 +151,75 @@ export async function regenerateInvite(db: Db, groupId: string) {
 	await db.update(groups).set({ inviteCode: randomCode() }).where(eq(groups.id, groupId));
 }
 
+/** 退出させる: out of the group, and the invite no longer lets them back in */
 export async function removeMember(db: Db, groupId: string, userId: string) {
-	await db.delete(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
+	await db.batch([
+		db.delete(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId))),
+		db.delete(groupRequests).where(and(eq(groupRequests.groupId, groupId), eq(groupRequests.userId, userId))),
+		db.insert(groupBans).values({ groupId, userId }).onConflictDoNothing()
+	]);
+}
+
+/** 参加できるようにする: the invite works for them again */
+export async function unban(db: Db, groupId: string, userId: string) {
+	await db.delete(groupBans).where(and(eq(groupBans.groupId, groupId), eq(groupBans.userId, userId)));
+}
+
+export async function setApproval(db: Db, groupId: string, approval: boolean) {
+	await db.update(groups).set({ approval }).where(eq(groups.id, groupId));
+}
+
+/** Asks to join a group that needs approval; asking again only updates the choice of sharing */
+export async function requestToJoin(db: Db, groupId: string, userId: string, share: boolean) {
+	await db
+		.insert(groupRequests)
+		.values({ groupId, userId, shareTimetable: share })
+		.onConflictDoUpdate({ target: [groupRequests.groupId, groupRequests.userId], set: { shareTimetable: share } });
+}
+
+export function requestOf(db: Db, groupId: string, userId: string) {
+	return db
+		.select({ shareTimetable: groupRequests.shareTimetable })
+		.from(groupRequests)
+		.where(and(eq(groupRequests.groupId, groupId), eq(groupRequests.userId, userId)))
+		.get();
+}
+
+export async function cancelRequest(db: Db, groupId: string, userId: string) {
+	await db.delete(groupRequests).where(and(eq(groupRequests.groupId, groupId), eq(groupRequests.userId, userId)));
+}
+
+/** The owner lets someone in, with the sharing they chose when asking. 'full', 'gone' or 'joined'. */
+export async function approveRequest(db: Db, groupId: string, userId: string) {
+	const request = await requestOf(db, groupId, userId);
+	if (!request) return 'gone';
+	if ((await memberCount(db, groupId)) >= GROUP_MEMBERS_MAX) return 'full';
+	await db.batch([
+		db.insert(groupMembers).values({ groupId, userId, shareTimetable: request.shareTimetable }).onConflictDoNothing(),
+		db.delete(groupRequests).where(and(eq(groupRequests.groupId, groupId), eq(groupRequests.userId, userId)))
+	]);
+	return 'joined';
+}
+
+/** Who is waiting to join and who was made to leave, for the owner's screen */
+export async function ownerLists(db: Db, groupId: string) {
+	const [requests, bans] = await db.batch([
+		db
+			.select(person)
+			.from(groupRequests)
+			.innerJoin(users, eq(users.id, groupRequests.userId))
+			.leftJoin(universities, eq(universities.id, users.universityId))
+			.where(eq(groupRequests.groupId, groupId))
+			.orderBy(asc(groupRequests.createdAt)),
+		db
+			.select(person)
+			.from(groupBans)
+			.innerJoin(users, eq(users.id, groupBans.userId))
+			.leftJoin(universities, eq(universities.id, users.universityId))
+			.where(eq(groupBans.groupId, groupId))
+			.orderBy(asc(groupBans.createdAt))
+	]);
+	return { requests, bans };
 }
 
 export async function deleteGroup(db: Db, groupId: string) {

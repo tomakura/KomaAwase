@@ -95,7 +95,9 @@
 							<span class="group-icon"><Icon name="users" size={20} /></span>
 							<span class="text">
 								<span class="name">{g.name}</span>
-								<span class="sub">{g.members}人{g.share ? '' : ' · 時間割を見せていません'}</span>
+								<span class="sub">
+									{g.members}人{g.share ? '' : ' · 時間割を見せていません'}{#if g.requests}<span class="requests"> · 参加の申請 {g.requests}件</span>{/if}
+								</span>
 							</span>
 							<Icon name="chevron" size={16} />
 						</a>
@@ -214,6 +216,11 @@
 	.sub {
 		font-size: 12px;
 		color: var(--ink-sub);
+	}
+
+	.requests {
+		color: var(--accent-text);
+		font-weight: 700;
 	}
 
 	.group-icon {

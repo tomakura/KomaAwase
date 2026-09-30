@@ -56,7 +56,11 @@ describe('web push', () => {
 		expect(isPushEndpoint('https://fcm.googleapis.com/fcm/send/abc')).toBe(true);
 		expect(isPushEndpoint('https://web.push.apple.com/QK...')).toBe(true);
 		expect(isPushEndpoint('https://updates.push.services.mozilla.com/wpush/v2/x')).toBe(true);
+		expect(isPushEndpoint('https://wns2-ty1p.notify.windows.com/w/?token=x')).toBe(true);
 		expect(isPushEndpoint('https://evil.example/googleapis.com')).toBe(false);
+		// Other services on the same domains are not push services
+		expect(isPushEndpoint('https://storage.googleapis.com/bucket/x')).toBe(false);
+		expect(isPushEndpoint('https://www.mozilla.com/x')).toBe(false);
 		expect(isPushEndpoint('http://fcm.googleapis.com/x')).toBe(false);
 		expect(isPushEndpoint('not a url')).toBe(false);
 	});

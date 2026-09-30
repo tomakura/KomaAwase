@@ -78,8 +78,9 @@ export async function vapidAuthorization(endpoint: string, keys: { publicKey: st
 	return `vapid t=${unsigned}.${base64url(signature)}, k=${keys.publicKey}`;
 }
 
-// Only the browsers' push services, so a subscription can't point the Worker anywhere else
-const PUSH_HOSTS = [/\.googleapis\.com$/, /\.push\.apple\.com$/, /\.mozilla\.com$/, /\.notify\.windows\.com$/];
+// Only the browsers' push services, so a subscription can't point the Worker anywhere else.
+// Chrome, Edge on Android, Samsung and Opera use FCM; Edge on Windows uses WNS, whose hosts are numbered.
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^web\.push\.apple\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/];
 
 export function isPushEndpoint(endpoint: string) {
 	try {

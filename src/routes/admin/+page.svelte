@@ -25,6 +25,7 @@
 	<section class="ui-section">
 		<h2 class="ui-section-title">対応が必要</h2>
 		<div class="ui-list">
+			{@render link('/admin/contact', '問い合わせ', data.contact)}
 			{@render link('/admin/reports', '通報', data.reports)}
 			{@render link('/admin/feedback', '不具合・要望', data.feedback)}
 		</div>
@@ -35,6 +36,7 @@
 		<div class="ui-list">
 			{@render link('/admin/users', '利用者（警告・利用停止）')}
 			{@render link('/admin/courses', '授業（直す・まとめる）')}
+			{@render link('/admin/universities', '利用者が作った大学')}
 		</div>
 	</section>
 

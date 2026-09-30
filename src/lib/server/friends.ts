@@ -69,9 +69,9 @@ export function friendshipBetween(db: Db, a: string, b: string) {
 }
 
 /**
- * Whether `viewerId` may see `ownerId`'s icon photo: themselves, anyone with a request or
- * friendship between them, or a member of a group they share, unless either blocked the
- * other. Others (someone opening a friend link, say) see the letters.
+ * Whether `viewerId` may see `ownerId`'s icon photo: themselves, an accepted friend, or a
+ * member of a group they share, unless either blocked the other. Others (someone with a
+ * pending request, or opening a friend link) see the letters.
  */
 export async function canSeePhoto(db: Db, viewerId: string, ownerId: string) {
 	if (viewerId === ownerId) return true;
@@ -86,7 +86,7 @@ export async function canSeePhoto(db: Db, viewerId: string, ownerId: string) {
 			.where(eq(groupMembers.userId, viewerId))
 			.get()
 	]);
-	return !blocked && (!!friendship || !!group);
+	return !blocked && (friendship?.status === 'accepted' || !!group);
 }
 
 export type RequestResult = 'sent' | 'accepted' | 'friends' | 'pending' | 'unavailable' | 'limit';

@@ -26,7 +26,7 @@ export const actions: Actions = {
 	send: async (event) => {
 		if (!event.locals.user) redirect(303, '/login');
 		const sent = await sendVerificationMail(event);
-		if ('message' in sent) return fail(sent.status, { message: sent.message });
+		if ('message' in sent) return fail(sent.status, { message: sent.message, email: sent.email });
 		await markVerifyPrompt(event.locals.db, event.locals.user.id, STAGE_NEED);
 		return { sentTo: sent.sentTo };
 	},

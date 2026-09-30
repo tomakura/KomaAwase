@@ -1,6 +1,8 @@
 import {
+	browserSupportsWebAuthnAutofill,
 	startAuthentication,
 	startRegistration,
+	WebAuthnAbortService,
 	WebAuthnError,
 	type PublicKeyCredentialCreationOptionsJSON,
 	type PublicKeyCredentialRequestOptionsJSON
@@ -19,23 +21,37 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 	return (await res.json()) as T;
 }
 
-/** Returns an error message to show, or null on success / when the user cancelled. */
+/**
+ * Null when the person cancelled (or, when signing in, the device has no passkey for this
+ * site, which browsers report the same way); else the message to show.
+ */
 function toMessage(e: unknown): string | null {
 	if (e instanceof WebAuthnError && e.code === 'ERROR_CEREMONY_ABORTED') return null;
-	if (e instanceof Error && e.name === 'NotAllowedError') return null;
+	if (e instanceof WebAuthnError && e.code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED') return 'この端末のパスキーは、すでに存在します。';
+	if (e instanceof Error && (e.name === 'NotAllowedError' || e.name === 'AbortError')) return null;
 	return e instanceof Error ? e.message : 'うまくいきませんでした';
 }
 
-export async function loginWithPasskey(): Promise<{ ok: boolean; message: string | null }> {
+/**
+ * Signs in with a passkey. With `autofill`, it waits for one picked from the email field's
+ * suggestions (the field has autocomplete="username webauthn"), until another sign-in starts.
+ */
+export async function loginWithPasskey(autofill = false): Promise<{ ok: boolean; message: string | null }> {
 	try {
 		const optionsJSON = await post<PublicKeyCredentialRequestOptionsJSON>('/api/passkey/login/options');
-		const response = await startAuthentication({ optionsJSON });
+		const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
 		await post('/api/passkey/login/verify', response);
 		return { ok: true, message: null };
 	} catch (e) {
 		return { ok: false, message: toMessage(e) };
 	}
 }
+
+/** Whether this browser offers passkeys among the email field's suggestions */
+export const canAutofillPasskey = () => browserSupportsWebAuthnAutofill().catch(() => false);
+
+/** Stops a sign-in waiting on the email field, when leaving the page */
+export const stopPasskeyAutofill = () => WebAuthnAbortService.cancelCeremony();
 
 export async function registerPasskey(): Promise<{ ok: boolean; message: string | null }> {
 	try {

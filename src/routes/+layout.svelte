@@ -1,6 +1,12 @@
 <script lang="ts">
+	// The fonts come from this site, split by characters so a page loads only what it shows
+	import '@fontsource/zen-kaku-gothic-new/400.css';
+	import '@fontsource/zen-kaku-gothic-new/500.css';
+	import '@fontsource/zen-kaku-gothic-new/700.css';
+	import '@fontsource/zen-maru-gothic/500.css';
+	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
-	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
+	import { beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
 	import { SvelteSet } from 'svelte/reactivity';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
@@ -25,11 +31,12 @@
 		const res = await fetch('/api/warning', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) });
 		if (!res.ok) return;
 		answered.add(id);
-		await invalidateAll();
+		await refreshAll();
 	}
 
 	// Back in the app after a while (it stays open in the background on a phone): show what
-	// changed meanwhile, such as a friend's timetable or a finished screenshot.
+	// changed meanwhile, such as a friend's timetable or a finished screenshot. (refreshAll, not
+	// invalidateAll, which would also close a course opened over the timetable.)
 	const STALE_AFTER = 60 * 1000;
 	$effect(() => {
 		let hiddenAt = 0;
@@ -37,7 +44,7 @@
 			if (document.hidden) hiddenAt = Date.now();
 			// Not while the connection is down: the copy on screen is all there is (src/lib/connection.svelte.ts
 			// loads it again once it's back)
-			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER && !connection.blocked) invalidateAll();
+			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER && !connection.blocked) refreshAll();
 		};
 		document.addEventListener('visibilitychange', changed);
 		return () => document.removeEventListener('visibilitychange', changed);
@@ -65,7 +72,7 @@
 			origin: location.origin,
 			path: () => location.pathname,
 			now: Date.now,
-			refresh: () => void invalidateAll()
+			refresh: () => void refreshAll()
 		});
 		window.fetch = kept.fetch;
 		pages = kept;
@@ -90,7 +97,7 @@
 			version,
 			controlled: () => !!navigator.serviceWorker?.controller,
 			fetch: (...args) => (browserFetch ?? fetch)(...args),
-			invalidate: () => invalidateAll(),
+			invalidate: () => refreshAll(),
 			signedIn
 		});
 	});
@@ -100,7 +107,7 @@
 		if (!connection.guardNavigation(navigation.to.url, navigation.from?.url.pathname)) navigation.cancel();
 	});
 
-	// How a navigation moves: between the tabs it fades, deeper pages come in from the right
+	// How a navigation moves: between the tabs it slides, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
 	const TABS = ['/', '/plans', '/friends', '/more'];
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
@@ -109,7 +116,8 @@
 	function motion(from: string, to: string) {
 		if (COURSE.test(to) && !from.startsWith('/courses/')) return 'sheet-open';
 		if (COURSE.test(from) && !to.startsWith('/courses/')) return 'sheet-close';
-		if (TABS.includes(from) && TABS.includes(to)) return 'fade';
+		// Between the tabs the screen slides the way the tab is: from the right to a tab on the right
+		if (TABS.includes(from) && TABS.includes(to)) return TABS.indexOf(to) > TABS.indexOf(from) ? 'tab-right' : 'tab-left';
 		if (depth(to) > depth(from)) return 'forward';
 		if (depth(to) < depth(from)) return 'back';
 		return 'fade';

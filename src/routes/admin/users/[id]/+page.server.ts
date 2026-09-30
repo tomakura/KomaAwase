@@ -1,26 +1,22 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth/reauth';
 import { deleteAccount } from '$lib/server/account';
 import { users } from '$lib/server/db/schema';
 import { readWarning } from '$lib/moderation';
 import { deletePhoto, loadUser, resetNickname, resumeUser, sendWarning, suspendUser } from '$lib/server/moderation';
 import type { Actions, PageServerLoad } from './$types';
 
-function requireAdmin(locals: App.Locals) {
-	if (locals.user?.role !== 'admin') error(404, 'Not found');
-	return locals.user;
-}
-
-export const load: PageServerLoad = async ({ locals, params }) => {
-	requireAdmin(locals);
+export const load: PageServerLoad = async ({ locals, params, url }) => {
+	await requireAdmin(locals, url);
 	const user = await loadUser(locals.db, params.id);
 	if (!user) error(404, '利用者が見つかりません');
 	return { user };
 };
 
 /** The person to act on: an admin's own account is never touched from here */
-async function target({ locals, params }: RequestEvent<{ id: string }>) {
-	const admin = requireAdmin(locals);
+async function target({ locals, params, url }: RequestEvent<{ id: string }>) {
+	const admin = await requireAdmin(locals, url);
 	const row = await locals.db.select().from(users).where(eq(users.id, params.id)).get();
 	if (!row) error(404, '利用者が見つかりません');
 	if (row.role === 'admin') error(400, '運営の人には使えません');

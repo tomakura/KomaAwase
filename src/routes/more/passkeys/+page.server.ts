@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { and, desc, eq } from 'drizzle-orm';
-import { passkeys } from '$lib/server/db/schema';
+import { and, count, desc, eq, gt, ne } from 'drizzle-orm';
+import { endOtherSessions } from '$lib/server/auth/session';
+import { passkeys, sessions } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
 
 const NAME_MAX = 30;
@@ -37,5 +38,17 @@ export const actions: Actions = {
 		if (!locals.user) redirect(303, '/login');
 		const id = String((await request.formData()).get('id'));
 		await locals.db.delete(passkeys).where(and(eq(passkeys.id, id), eq(passkeys.userId, locals.user.id)));
+		// Which passkey each device signed in with isn't kept, so the page offers to log out
+		// every other device, when there are any
+		const [others] = await locals.db
+			.select({ n: count() })
+			.from(sessions)
+			.where(and(eq(sessions.userId, locals.user.id), ne(sessions.id, locals.session?.id ?? ''), gt(sessions.expiresAt, new Date())));
+		return { removed: true, others: others?.n ?? 0 };
+	},
+	endOthers: async ({ locals }) => {
+		if (!locals.user) redirect(303, '/login');
+		await endOtherSessions(locals.db, locals.user.id, locals.session?.id);
+		return { ended: true };
 	}
 };

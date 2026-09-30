@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
+	import MailSent from '$lib/components/MailSent.svelte';
+	import SendButton from '$lib/components/SendButton.svelte';
+	import { pauseAfterSent } from '$lib/send';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import VerifyBenefits from '$lib/components/VerifyBenefits.svelte';
 	import { tokyoTime } from '$lib/time';
 
 	let { data, form } = $props();
-	let sending = $state(false);
+	let phase = $state<'idle' | 'sending' | 'done'>('idle');
+	// 「別のアドレスにする」 after the mail was sent
+	let other = $state(false);
+	$effect(() => {
+		if (form?.sentTo) other = false;
+	});
 	const day = (ms: number) => tokyoTime(ms).date.replace(/-0?/g, '/');
 </script>
 
@@ -45,16 +53,25 @@
 				{data.university.name}はまだ在籍確認に対応していません。対応してほしいときは、大学のメールアドレスの@から後ろを添えて
 				<a href="/feedback?from=/more/verify">要望</a>を送ってください。
 			</p>
-		{:else if form?.sentTo}
-			<p class="sent" role="status">{form.sentTo} に確認のメールを送りました。1日以内にリンクを開いてください。</p>
+		{:else if form?.sentTo && !other}
+			{#key form}
+				<MailSent email={form.sentTo} action="" onother={() => (other = true)}>
+					{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
+				</MailSent>
+			{/key}
 		{:else}
 			<form
 				method="POST"
 				use:enhance={() => {
-					sending = true;
-					return async ({ update }) => {
-						await update();
-						sending = false;
+					phase = 'sending';
+					return async ({ result, update }) => {
+						// The wheel turns into a check, then what was sent comes up
+						if (result.type === 'success') {
+							phase = 'done';
+							await pauseAfterSent();
+						}
+						await update({ reset: false });
+						phase = 'idle';
 					};
 				}}
 			>
@@ -65,13 +82,14 @@
 						type="email"
 						autocomplete="off"
 						placeholder={`…@${data.university.domains[0]}`}
+						value={form?.email ?? ''}
 						required
 					/>
 				</label>
 				{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-				<button class="btn btn-primary" type="submit" disabled={sending}>
-					{sending ? '送っています…' : data.verification?.current ? '確認し直す' : '確認のメールを送る'}
-				</button>
+				<SendButton {phase} class="btn btn-primary">
+					{data.verification?.current ? '確認し直す' : '確認のメールを送る'}
+				</SendButton>
 			</form>
 			<p class="ui-note">このアドレスはほかの人には見えません。1つのアドレスで確認できるのは1人だけです。</p>
 		{/if}
@@ -143,14 +161,4 @@
 		gap: 12px;
 	}
 
-	.sent {
-		margin: 0;
-		padding: 14px;
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		background: var(--surface);
-		font-size: 14px;
-		line-height: 1.7;
-		overflow-wrap: anywhere;
-	}
 </style>

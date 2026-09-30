@@ -4,7 +4,7 @@ import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { eq } from 'drizzle-orm';
 import { SUSPENDED_MESSAGE } from '$lib/moderation';
 import { passkeys, users } from '$lib/server/db/schema';
-import { createSession, setSessionCookie } from '$lib/server/auth/session';
+import { signIn } from '$lib/server/auth/session';
 import { relyingParty, takeChallenge } from '$lib/server/auth/webauthn';
 import type { RequestHandler } from './$types';
 
@@ -46,7 +46,6 @@ export const POST: RequestHandler = async ({ locals, cookies, url, request }) =>
 		.set({ counter: verification.authenticationInfo.newCounter, lastUsedAt: new Date() })
 		.where(eq(passkeys.id, passkey.id));
 
-	const { token, expiresAt } = await createSession(locals.db, passkey.userId);
-	setSessionCookie(cookies, token, expiresAt);
+	await signIn(locals.db, cookies, request, passkey.userId);
 	return json({ ok: true });
 };

@@ -3,7 +3,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import OverlayDemo from '$lib/components/OverlayDemo.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import logo from '$lib/assets/favicon.svg';
+	import Logo from '$lib/components/Logo.svelte';
 
 	// Readable signed in or not: shared as a link, and reachable from the login page.
 	const signedIn = $derived(page.data.signedIn);
@@ -52,7 +52,7 @@
 	<PageHeader title="コマあわせとは" back={signedIn ? '/about' : '/login'} />
 
 	<section class="hero">
-		<img src={logo} alt="" width="72" height="72" />
+		<Logo size={72} />
 		<h2>友だちと、時間割を共有しよう。</h2>
 		<p>
 			時間割を友だちや仲間と重ねて、みんなが空いているコマをすぐ見つけられるアプリです。「今度いつ集まれる？」を、話し合わずに決められます。

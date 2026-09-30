@@ -1,20 +1,15 @@
-import { error } from '@sveltejs/kit';
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth/reauth';
 import { hideCancellation, parseCancelTarget } from '$lib/server/cancellations';
 import { monthDay } from '$lib/time';
 import { groups, reports, sharedCourses, users } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
 
-function requireAdmin(locals: App.Locals) {
-	if (locals.user?.role !== 'admin') error(404, 'Not found');
-	return locals.user;
-}
-
 // Pages by ?page=2, oldest open items included.
 const PAGE = 50;
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	requireAdmin(locals);
+	await requireAdmin(locals, url);
 	const page = Math.min(Math.max(Math.floor(Number(url.searchParams.get('page'))) || 1, 1), 1000);
 	const [reportRows, [total]] = await locals.db.batch([
 		locals.db
@@ -85,14 +80,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	closeReport: async ({ locals, request }) => {
-		requireAdmin(locals);
+	closeReport: async ({ locals, request, url }) => {
+		await requireAdmin(locals, url);
 		const id = String((await request.formData()).get('id') ?? '');
 		await locals.db.update(reports).set({ status: 'closed' }).where(and(eq(reports.id, id), eq(reports.status, 'open')));
 	},
 	// Takes a shared cancellation down for everyone, and closes the reports about it
-	hideCancel: async ({ locals, request }) => {
-		requireAdmin(locals);
+	hideCancel: async ({ locals, request, url }) => {
+		await requireAdmin(locals, url);
 		await hideCancellation(locals.db, String((await request.formData()).get('targetId') ?? ''));
 	}
 };

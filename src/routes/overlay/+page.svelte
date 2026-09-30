@@ -12,7 +12,7 @@
 	import { freeText } from '$lib/free-text';
 	import { glide } from '$lib/glide';
 	import { iconOf } from '$lib/icons';
-	import { motion } from '$lib/motion';
+	import { motion, still } from '$lib/motion';
 	import { OVERLAY_COOKIE, cellKey, classFill, lookingAt, overlay, termOn, type OverlayGroup, type OverlayPerson } from '$lib/overlay';
 	import { copyText, shareText } from '$lib/share';
 	import { currentTerm } from '$lib/terms';
@@ -109,6 +109,12 @@
 		const result = await shareText(text);
 		sent = result === 'copied' ? 'コピーしました' : result === 'failed' ? 'コピーできませんでした' : null;
 	}
+
+	// Free slots come and go one after another rather than all at once
+	const freeOrder = $derived(new Map(freeByDay.flatMap(([day, periods]) => periods.map((p) => `${day}-${p}`)).map((key, n) => [key, n])));
+	const stagger = (day: number, period: number) => (still() ? 0 : Math.min(freeOrder.get(`${day}-${period}`) ?? 0, 16) * 30);
+	// With nobody else chosen every empty slot is "free", which says nothing
+	const alone = $derived(layers.length < 2);
 
 	const elsewhere = $derived(
 		selected.flatMap((id) => {
@@ -218,14 +224,16 @@
 
 	<section class="free-card">
 		<h2>みんな空いてるコマ</h2>
-		{#if result.free.length}
+		{#if alone}
+			<p>友だちを選択すると表示されます</p>
+		{:else if result.free.length}
 			<!-- By day, which reads faster than one chip per slot -->
 			<div class="free-days">
 				{#each freeByDay as [day, periods] (day)}
 					<div class="free-day" transition:slide={motion(200)}>
 						<span class="free-label">{DAY_NAMES[day]}</span>
 						<span class="free-list">
-							{#each periods as period (period)}<span class="free-chip" transition:fade={motion(180)}>{period}限</span>{/each}
+							{#each periods as period (period)}<span class="free-chip" transition:fade={{ ...motion(180), delay: stagger(day, period) }}>{period}限</span>{/each}
 						</span>
 					</div>
 				{/each}

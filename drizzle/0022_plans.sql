@@ -55,5 +55,4 @@ ALTER TABLE `courses` ADD `credits` real;--> statement-breakpoint
 ALTER TABLE `courses` ADD `absence_limit` integer;--> statement-breakpoint
 ALTER TABLE `shared_courses` ADD `credits` real;--> statement-breakpoint
 ALTER TABLE `users` ADD `suspended_at` integer;--> statement-breakpoint
-ALTER TABLE `users` ADD `share_cancellations` integer DEFAULT true NOT NULL;--> statement-breakpoint
-ALTER TABLE `users` ADD `last_seen_at` integer;
+ALTER TABLE `users` ADD `share_cancellations` integer DEFAULT true NOT NULL;

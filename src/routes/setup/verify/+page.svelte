@@ -1,9 +1,17 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import MailSent from '$lib/components/MailSent.svelte';
+	import SendButton from '$lib/components/SendButton.svelte';
+	import { pauseAfterSent } from '$lib/send';
 	import VerifyBenefits from '$lib/components/VerifyBenefits.svelte';
 
 	let { data, form } = $props();
-	let sending = $state(false);
+	let phase = $state<'idle' | 'sending' | 'done'>('idle');
+	// 「別のアドレスにする」 after the mail was sent
+	let other = $state(false);
+	$effect(() => {
+		if (form?.sentTo) other = false;
+	});
 </script>
 
 <svelte:head>
@@ -18,8 +26,12 @@
 
 	<VerifyBenefits />
 
-	{#if form?.sentTo}
-		<p class="sent" role="status">{form.sentTo} に確認のメールを送りました。1日以内にリンクを開いてください。</p>
+	{#if form?.sentTo && !other}
+		{#key form}
+			<MailSent email={form.sentTo} action="?/send" onother={() => (other = true)}>
+				{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
+			</MailSent>
+		{/key}
 		<form method="POST" action="?/skip" use:enhance>
 			<button class="btn btn-primary" type="submit">はじめる</button>
 		</form>
@@ -28,19 +40,24 @@
 			method="POST"
 			action="?/send"
 			use:enhance={() => {
-				sending = true;
-				return async ({ update }) => {
-					await update();
-					sending = false;
+				phase = 'sending';
+				return async ({ result, update }) => {
+					// The wheel turns into a check, then what was sent comes up
+					if (result.type === 'success') {
+						phase = 'done';
+						await pauseAfterSent();
+					}
+					await update({ reset: false });
+					phase = 'idle';
 				};
 			}}
 		>
 			<label class="field">
 				{data.university.name}のメールアドレス
-				<input name="email" type="email" autocomplete="off" placeholder={`…@${data.university.domains[0]}`} required />
+				<input name="email" type="email" autocomplete="off" placeholder={`…@${data.university.domains[0]}`} value={form?.email ?? ''} required />
 			</label>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-			<button class="btn btn-primary" type="submit" disabled={sending}>{sending ? '送っています…' : '確認のメールを送る'}</button>
+			<SendButton {phase} class="btn btn-primary">確認のメールを送る</SendButton>
 			<p class="note">このアドレスはほかの人には見えません。あとから「その他」→「在籍確認」でもできます。</p>
 		</form>
 		<form method="POST" action="?/skip" use:enhance>
@@ -94,16 +111,6 @@
 		color: var(--ink-sub);
 	}
 
-	.sent {
-		margin: 0;
-		padding: 14px;
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		background: var(--surface);
-		font-size: 14px;
-		line-height: 1.7;
-		overflow-wrap: anywhere;
-	}
 
 	.later {
 		align-self: center;

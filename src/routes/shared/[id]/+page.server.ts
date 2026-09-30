@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth/reauth';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { timetables, universities } from '$lib/server/db/schema';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
@@ -115,8 +116,7 @@ export const actions: Actions = {
 	},
 	// Whoever runs the app fixes what others registered: the name, the teachers and the rooms
 	edit: async ({ locals, params, url, request }) => {
-		const me = requireUser(locals, url);
-		if (me.role !== 'admin') error(404, 'Not found');
+		const me = await requireAdmin(locals, url);
 		const course = await usable(locals.db, me, params.id);
 		const form = await request.formData();
 		// The version the form was opened at: someone may have changed the course since
@@ -154,8 +154,7 @@ export const actions: Actions = {
 	},
 	// Fold this course into another: everyone syncing it syncs the other, and this one is deleted
 	merge: async ({ locals, params, url, request }) => {
-		const me = requireUser(locals, url);
-		if (me.role !== 'admin') error(404, 'Not found');
+		const me = await requireAdmin(locals, url);
 		const course = await usable(locals.db, me, params.id);
 		const form = await request.formData();
 		const into = await loadSharedCourse(locals.db, String(form.get('into') ?? ''));
@@ -177,8 +176,7 @@ export const actions: Actions = {
 	},
 	// Delete a course nobody has in a timetable
 	remove: async ({ locals, params, url }) => {
-		const me = requireUser(locals, url);
-		if (me.role !== 'admin') error(404, 'Not found');
+		const me = await requireAdmin(locals, url);
 		const course = await usable(locals.db, me, params.id);
 		if (((await usageCounts(locals.db, [course.id])).get(course.id)?.linked ?? 0) > 0) {
 			return fail(409, { message: '使っている人がいるので、削除できません', remove: true });

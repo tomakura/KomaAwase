@@ -5,7 +5,7 @@ import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
 import { addEvent, deleteEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
-import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
+import { addNote, deleteNote, orderMemoIds, parseNote, setTaskDone, updateNote } from '$lib/server/notes';
 import { isDate, tokyoTime } from '$lib/time';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
@@ -111,6 +111,20 @@ export const actions: Actions = {
 		await event.locals.db
 			.delete(courseAbsences)
 			.where(and(eq(courseAbsences.id, String(form.get('id'))), eq(courseAbsences.courseId, courseId)));
+	},
+	edit: async (event) => {
+		const courseId = await ownCourse(event);
+		const form = await event.request.formData();
+		const parsed = parseNote(form);
+		if ('message' in parsed) return fail(400, { message: parsed.message, editing: String(form.get('id')) });
+		await updateNote(event.locals.db, courseId, String(form.get('id')), parsed.note);
+		return { edited: true };
+	},
+	order: async (event) => {
+		const courseId = await ownCourse(event);
+		const ids = (await event.request.formData()).getAll('id').map(String).slice(0, 500);
+		await orderMemoIds(event.locals.db, courseId, ids);
+		return { ordered: true };
 	},
 	done: async (event) => {
 		const courseId = await ownCourse(event);

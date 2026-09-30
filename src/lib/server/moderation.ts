@@ -24,7 +24,7 @@ export async function listUsers(db: Db, q: string, page: number) {
 				email: users.email,
 				university: universities.name,
 				createdAt: users.createdAt,
-				lastSeenAt: users.lastSeenAt,
+				lastSeenAt: lastSeenAt,
 				suspendedAt: users.suspendedAt,
 				reported: sql<number>`(select count(*) from ${reports} where ${reports.targetType} = 'user' and ${reports.targetId} = ${users.id})`
 			})
@@ -40,6 +40,12 @@ export async function listUsers(db: Db, q: string, page: number) {
 	return { users: rows.map((r) => ({ ...r, verified: verified.has(r.id) })), total: total?.n ?? 0, pageSize: PAGE };
 }
 
+// When they last opened the app: the latest use of any of their sign-ins (kept by the session
+// check at most once an hour). Someone signed out everywhere has none.
+const lastSeenAt = sql<Date | null>`(select max(${sessions.lastUsedAt}) from ${sessions} where ${sessions.userId} = ${users.id})`.mapWith(
+	(v) => (v == null ? null : new Date(Number(v)))
+);
+
 export async function loadUser(db: Db, userId: string) {
 	const user = await db
 		.select({
@@ -48,7 +54,7 @@ export async function loadUser(db: Db, userId: string) {
 			email: users.email,
 			university: universities.name,
 			createdAt: users.createdAt,
-			lastSeenAt: users.lastSeenAt,
+			lastSeenAt: lastSeenAt,
 			suspendedAt: users.suspendedAt,
 			hasPhoto: sql<number>`exists (select 1 from ${userPhotos} where ${userPhotos.userId} = ${users.id})`
 		})

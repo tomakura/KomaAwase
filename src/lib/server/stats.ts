@@ -12,6 +12,7 @@ import {
 	friendships,
 	groups,
 	pushSubscriptions,
+	sessions,
 	sharedCourses,
 	timetables,
 	univVerifications,
@@ -22,6 +23,11 @@ import {
 const DAY = 24 * 60 * 60 * 1000;
 export const GRAPH_DAYS = 30;
 
+// People who used the app since then: the latest use of each of their sign-ins (kept at most once
+// an hour by the session check)
+const seenSince = (db: Db, ms: number) =>
+	db.select({ n: countDistinct(sessions.userId) }).from(sessions).where(gte(sessions.lastUsedAt, new Date(ms)));
+
 const jstDay = (column: unknown) => sql<string>`date(${column} / 1000, 'unixepoch', '+9 hours')`;
 
 /** Written by the daily cron: today's opened-the-app counts, which can't be worked out later */
@@ -29,8 +35,8 @@ export async function recordDailyStats(db: Db, now = Date.now()) {
 	const date = tokyoTime(now).date;
 	const [[total], [day], [week], [verified]] = await db.batch([
 		db.select({ n: count() }).from(users),
-		db.select({ n: count() }).from(users).where(gte(users.lastSeenAt, new Date(now - DAY))),
-		db.select({ n: count() }).from(users).where(gte(users.lastSeenAt, new Date(now - 7 * DAY))),
+		seenSince(db, now - DAY),
+		seenSince(db, now - 7 * DAY),
 		db.select({ n: count() }).from(univVerifications).where(gt(univVerifications.expiresAt, new Date(now)))
 	]);
 	const row = { date, users: total?.n ?? 0, activeDay: day?.n ?? 0, activeWeek: week?.n ?? 0, verified: verified?.n ?? 0 };
@@ -67,9 +73,9 @@ export async function loadStats(db: Db, now = Date.now()) {
 	] = await db.batch([
 		db.select({ n: count() }).from(users),
 		db.select({ n: count() }).from(users).where(gte(users.createdAt, new Date(now - 7 * DAY))),
-		db.select({ n: count() }).from(users).where(gte(users.lastSeenAt, new Date(now - DAY))),
-		db.select({ n: count() }).from(users).where(gte(users.lastSeenAt, new Date(now - 7 * DAY))),
-		db.select({ n: count() }).from(users).where(gte(users.lastSeenAt, new Date(now - 30 * DAY))),
+		seenSince(db, now - DAY),
+		seenSince(db, now - 7 * DAY),
+		seenSince(db, now - 30 * DAY),
 		db.select({ n: count() }).from(univVerifications).where(gt(univVerifications.expiresAt, new Date(now))),
 		db.select({ n: count() }).from(users).where(sql`${users.suspendedAt} is not null`),
 		db.select({ n: countDistinct(pushSubscriptions.userId) }).from(pushSubscriptions),
