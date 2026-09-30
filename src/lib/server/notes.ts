@@ -1,4 +1,5 @@
-import { and, asc, eq, gte } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
+import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseNotes, courses } from './db/schema';
@@ -38,7 +39,39 @@ export function parseNote(form: FormData): { note: NoteInput } | { message: stri
 }
 
 export async function addNote(db: Db, courseId: string, note: NoteInput) {
-	await db.insert(courseNotes).values({ courseId, ...note });
+	// After the memos were put in an order by hand, a new one goes above all of them
+	const top =
+		note.kind === 'memo'
+			? sql<number | null>`(select min(sort_order) - 1 from course_notes where course_id = ${courseId} and kind = 'memo')`
+			: null;
+	await db.insert(courseNotes).values({ courseId, ...note, sortOrder: top });
+}
+
+// Changes what was written; the kind, the day it was added and the place in the order stay.
+export async function updateNote(db: Db, courseId: string, noteId: string, note: NoteInput) {
+	const { kind, ...fields } = note;
+	await db
+		.update(courseNotes)
+		.set(fields)
+		.where(and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId), eq(courseNotes.kind, kind)));
+}
+
+// The memos in the order given, top first. Ids that aren't this course's memos are ignored.
+export async function orderMemoIds(db: Db, courseId: string, ids: string[]) {
+	const own = await db
+		.select({ id: courseNotes.id })
+		.from(courseNotes)
+		.where(and(eq(courseNotes.courseId, courseId), eq(courseNotes.kind, 'memo'), inArray(courseNotes.id, ids)));
+	const mine = new Set(own.map((n) => n.id));
+	const wanted = ids.filter((id, i) => mine.has(id) && ids.indexOf(id) === i);
+	if (!wanted.length) return;
+	const statements: BatchItem<'sqlite'>[] = wanted.map((id, place) =>
+		db
+			.update(courseNotes)
+			.set({ sortOrder: place })
+			.where(and(eq(courseNotes.id, id), eq(courseNotes.courseId, courseId)))
+	);
+	await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
 export function loadNotes(db: Db, courseId: string) {
@@ -49,11 +82,13 @@ export function loadNotes(db: Db, courseId: string) {
 			date: courseNotes.date,
 			body: courseNotes.body,
 			due: courseNotes.due,
-			done: courseNotes.done
+			done: courseNotes.done,
+			sortOrder: courseNotes.sortOrder
 		})
 		.from(courseNotes)
 		.where(eq(courseNotes.courseId, courseId))
-		.orderBy(asc(courseNotes.createdAt));
+		// In the order they were added (orderMemos in src/lib/notes.ts relies on it)
+		.orderBy(asc(courseNotes.createdAt), sql`rowid`);
 }
 
 // Cancellations from `today` on in a timetable, for its 休講 labels

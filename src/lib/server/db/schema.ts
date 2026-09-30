@@ -318,6 +318,8 @@ export const courseNotes = sqliteTable(
 		body: text('body').notNull().default(''),
 		due: text('due'), // task, YYYY-MM-DD
 		done: integer('done', { mode: 'boolean' }).notNull().default(false),
+		// memo: place in the order the person set by hand (top is smallest); null until they do
+		sortOrder: integer('sort_order'),
 		createdAt: createdAt()
 	},
 	(t) => [index('course_notes_course_idx').on(t.courseId)]

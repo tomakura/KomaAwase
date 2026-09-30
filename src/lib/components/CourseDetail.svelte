@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flip } from 'svelte/animate';
 	import { fly, slide } from 'svelte/transition';
 	import { motion, still } from '$lib/motion';
 	import { enhance } from '$app/forms';
@@ -16,6 +17,7 @@
 		weekLabel
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
+	import { moveId, orderMemos } from '$lib/notes';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
 	import type { ActionData, PageData } from '../../routes/courses/[id]/$types';
 
@@ -74,11 +76,26 @@
 			.filter((n) => n.kind === 'cancel' && n.date)
 			.toSorted((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
 	);
-	const memos = $derived(
-		data.notes
-			.filter((n) => n.kind === 'memo')
-			.toSorted((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
-	);
+	const memos = $derived(orderMemos(data.notes.filter((n) => n.kind === 'memo')));
+
+	// The note being changed (its form is where the note was)
+	let editing = $state<string | null>(null);
+	// Putting the memos in an order: the ids as they are lined up until 完了
+	let sorting = $state(false);
+	let draft = $state<string[]>([]);
+	const lined = $derived.by(() => {
+		const byId = new Map(memos.map((m) => [m.id, m]));
+		const inDraft = draft.flatMap((id) => byId.get(id) ?? []);
+		// A memo that came after the list was lined up (from another screen) goes on top
+		return [...memos.filter((m) => !draft.includes(m.id)), ...inDraft];
+	});
+	const shown = $derived(sorting ? lined : memos);
+	function startSorting() {
+		editing = null;
+		adding = null;
+		draft = memos.map((m) => m.id);
+		sorting = true;
+	}
 
 	let fileInput = $state<HTMLInputElement>();
 	let uploading = $state(false);
@@ -105,6 +122,50 @@
 		return { text: `${-days}日過ぎ`, late: true };
 	}
 </script>
+
+{#snippet noteFields(kind: 'memo' | 'task' | 'cancel', note?: { date: string | null; body: string; due: string | null })}
+	{#if kind === 'memo'}
+		<label class="field">日付<input type="date" name="date" value={note?.date ?? data.today} required /></label>
+		<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required>{note?.body ?? ''}</textarea></label>
+	{:else if kind === 'task'}
+		<label class="field">課題<input name="body" value={note?.body ?? ''} maxlength="100" required autocomplete="off" /></label>
+		<label class="field">締切（任意）<input type="date" name="due" value={note?.due ?? ''} /></label>
+	{:else}
+		<label class="field">休講の日<input type="date" name="date" value={note?.date ?? nextClassDay} required /></label>
+		<label class="field">
+			メモ（任意）
+			<input name="body" value={note?.body ?? ''} maxlength="100" autocomplete="off" />
+		</label>
+	{/if}
+{/snippet}
+
+{#snippet editButton(id: string, label: string)}
+	<button class="remove" type="button" aria-label="{label}を直す" onclick={() => (editing = id)}>
+		<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l1-4L16 5a2.1 2.1 0 0 1 3 3L8.5 18.5zM14.5 6.5l3 3" /></svg>
+	</button>
+{/snippet}
+
+{#snippet editForm(note: { id: string; kind: 'memo' | 'task' | 'cancel'; date: string | null; body: string; due: string | null })}
+	<form
+		class="add-form inline"
+		method="POST"
+		action={actionHref('edit', data.termParam)}
+		use:enhance={() =>
+			async ({ result, update }) => {
+				await settle(update);
+				if (result.type === 'success') editing = null;
+			}}
+	>
+		<input type="hidden" name="id" value={note.id} />
+		<input type="hidden" name="kind" value={note.kind} />
+		{@render noteFields(note.kind, note)}
+		{#if form?.message && form.editing === note.id}<p class="error" role="alert">{form.message}</p>{/if}
+		<div class="form-actions">
+			<button class="btn" type="button" onclick={() => (editing = null)}>やめる</button>
+			<button class="btn btn-primary" type="submit">保存</button>
+		</div>
+	</form>
+{/snippet}
 
 {#snippet removeButton(id: string, label: string, action = 'remove')}
 	<form
@@ -230,7 +291,7 @@
 			onchange={(e) => upload(e.currentTarget.files)}
 		/>
 		{#each uploadErrors as message, i (i)}<p class="error block" role="alert">{message}</p>{/each}
-		{#if form?.message && !adding}<p class="error block" role="alert">{form.message}</p>{/if}
+		{#if form?.message && !adding && !form.editing}<p class="error block" role="alert">{form.message}</p>{/if}
 
 		{#if adding}
 			<form
@@ -244,20 +305,8 @@
 					}}
 			>
 				<input type="hidden" name="kind" value={adding} />
-				{#if adding === 'memo'}
-					<label class="field">日付<input type="date" name="date" value={data.today} required /></label>
-					<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required></textarea></label>
-				{:else if adding === 'task'}
-					<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
-					<label class="field">締切（任意）<input type="date" name="due" /></label>
-				{:else}
-					<label class="field">休講の日<input type="date" name="date" value={nextClassDay} required /></label>
-					<label class="field">
-						メモ（任意）
-						<input name="body" maxlength="100" autocomplete="off" />
-					</label>
-				{/if}
-				{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
+				{@render noteFields(adding)}
+				{#if form?.message && !form.editing}<p class="error" role="alert">{form.message}</p>{/if}
 				<div class="form-actions">
 					<button class="btn" type="button" onclick={() => (adding = null)}>やめる</button>
 					<button class="btn btn-primary" type="submit">追加</button>
@@ -270,6 +319,9 @@
 				<section>
 					<h2>課題</h2>
 					{#each tasks as task (task.id)}
+						{#if editing === task.id}
+							{@render editForm(task)}
+						{:else}
 						<div transition:slide={motion()} class="item" class:done={task.done}>
 							<form
 								method="POST"
@@ -294,8 +346,10 @@
 								{@const due = dueLabel(task.due)}
 								<span class="due" class:late={due.late}>{due.text}</span>
 							{/if}
+							{@render editButton(task.id, `課題「${task.body}」`)}
 							{@render removeButton(task.id, `課題「${task.body}」`)}
 						</div>
+						{/if}
 					{/each}
 				</section>
 			{/if}
@@ -304,13 +358,18 @@
 				<section>
 					<h2>休講</h2>
 					{#each cancels as c (c.id)}
+						{#if editing === c.id}
+							{@render editForm(c)}
+						{:else}
 						<div transition:slide={motion()} class="item" class:done={(c.date ?? '') < data.today}>
 							<span class="text">
 								<span class="main">{withDay(c.date ?? '')} 休講</span>
 								{#if c.body}<span class="sub">{c.body}</span>{/if}
 							</span>
+							{@render editButton(c.id, `${withDay(c.date ?? '')}の休講`)}
 							{@render removeButton(c.id, `${withDay(c.date ?? '')}の休講`)}
 						</div>
+						{/if}
 					{/each}
 				</section>
 			{/if}
@@ -351,14 +410,70 @@
 
 			{#if memos.length}
 				<section>
-					<h2>メモ</h2>
-					{#each memos as memo (memo.id)}
-						<div transition:slide={motion()} class="item memo">
-							<span class="text">
-								{#if memo.date}<span class="sub">{withDay(memo.date)}</span>{/if}
-								<span class="body">{memo.body}</span>
-							</span>
-							{@render removeButton(memo.id, 'このメモ')}
+					<div class="heading">
+						<h2>メモ</h2>
+						{#if sorting}
+							<form
+								method="POST"
+								action={actionHref('order', data.termParam)}
+								use:enhance={({ cancel }) => {
+									// Left as it was: nothing to save
+									if (lined.every((m, i) => m.id === memos[i].id)) {
+										cancel();
+										sorting = false;
+										return;
+									}
+									return async ({ update }) => {
+										await settle(update);
+										sorting = false;
+									};
+								}}
+							>
+								{#each lined as m (m.id)}<input type="hidden" name="id" value={m.id} />{/each}
+								<button class="link" type="submit">完了</button>
+							</form>
+						{:else if memos.length > 1}
+							<button class="link" type="button" onclick={startSorting}>並び替え</button>
+						{/if}
+					</div>
+					{#each shown as memo (memo.id)}
+						<div class="row" animate:flip={motion(200)} transition:slide={motion()}>
+						{#if editing === memo.id}
+							{@render editForm(memo)}
+						{:else}
+							<div class="item memo">
+								<span class="text">
+									{#if memo.date}<span class="sub">{withDay(memo.date)}</span>{/if}
+									<span class="body">{memo.body}</span>
+								</span>
+								{#if sorting}
+									{@const at = lined.indexOf(memo)}
+									<span class="arrows">
+										<button
+											class="remove"
+											type="button"
+											disabled={at === 0}
+											aria-label="このメモを上へ"
+											onclick={() => (draft = moveId(lined.map((m) => m.id), memo.id, -1))}
+										>
+											<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 14.5l6-6 6 6" /></svg>
+										</button>
+										<button
+											class="remove"
+											type="button"
+											disabled={at === lined.length - 1}
+											aria-label="このメモを下へ"
+											onclick={() => (draft = moveId(lined.map((m) => m.id), memo.id, 1))}
+										>
+											<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6" /></svg>
+										</button>
+									</span>
+								{:else}
+									{@render editButton(memo.id, 'このメモ')}
+									{@render removeButton(memo.id, 'このメモ')}
+								{/if}
+							</div>
+						{/if}
 						</div>
 					{/each}
 				</section>
@@ -755,6 +870,42 @@
 	.due.late {
 		background: var(--ink);
 		color: var(--surface);
+	}
+
+	.heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.heading form {
+		display: block;
+	}
+
+	.link {
+		height: 32px;
+		padding: 0 4px;
+		border: none;
+		background: none;
+		color: var(--accent-text);
+		font-family: inherit;
+		font-size: 13px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.arrows {
+		flex-shrink: 0;
+		display: flex;
+	}
+
+	.arrows .remove:disabled {
+		opacity: 0.3;
+		cursor: default;
+	}
+
+	.add-form.inline {
+		margin: 0;
 	}
 
 	.remove {

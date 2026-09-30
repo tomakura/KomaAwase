@@ -35,6 +35,7 @@ CREATE TABLE `rate_counts` (
 	`expires_at` integer NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE `course_notes` ADD `sort_order` integer;--> statement-breakpoint
 ALTER TABLE `friend_groups` ADD `approval` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `push_subscriptions` ADD `session_id` text;--> statement-breakpoint
 ALTER TABLE `sessions` ADD `created_at` integer;--> statement-breakpoint
