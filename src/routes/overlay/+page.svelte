@@ -2,16 +2,19 @@
 	import { goto, replaceState } from '$app/navigation';
 	import { fade, slide } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { connection } from '$lib/connection.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES } from '$lib/courses';
+	import { freeText } from '$lib/free-text';
 	import { glide } from '$lib/glide';
 	import { iconOf } from '$lib/icons';
 	import { motion, still } from '$lib/motion';
 	import { OVERLAY_COOKIE, cellKey, classFill, lookingAt, overlay, termOn, type OverlayGroup, type OverlayPerson } from '$lib/overlay';
+	import { copyText, shareText } from '$lib/share';
 	import { currentTerm } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
 
@@ -94,6 +97,19 @@
 		})
 	);
 
+	// Sending the free slots to the people to meet
+	const text = $derived(freeText(term && { year: data.year, groupName: term.groupName, name: term.name }, freeByDay));
+	let sent = $state<string | null>(null);
+
+	async function copy() {
+		sent = (await copyText(text)) === 'copied' ? 'コピーしました' : 'コピーできませんでした';
+	}
+
+	async function share() {
+		const result = await shareText(text);
+		sent = result === 'copied' ? 'コピーしました' : result === 'failed' ? 'コピーできませんでした' : null;
+	}
+
 	// Free slots come and go one after another rather than all at once
 	const freeOrder = $derived(new Map(freeByDay.flatMap(([day, periods]) => periods.map((p) => `${day}-${p}`)).map((key, n) => [key, n])));
 	const stagger = (day: number, period: number) => (still() ? 0 : Math.min(freeOrder.get(`${day}-${period}`) ?? 0, 16) * 30);
@@ -133,9 +149,7 @@
 </svelte:head>
 
 <div class="screen">
-	<header>
-		<h1>コマを重ねる</h1>
-	</header>
+	<PageHeader title="コマを重ねる" back="/friends" />
 
 	<TermBar year={data.year} terms={data.mine.terms} bind:termId onchange={() => replaceState(query(selected), {})} />
 
@@ -224,6 +238,11 @@
 					</div>
 				{/each}
 			</div>
+			<div class="free-actions">
+				<button class="small" type="button" onclick={copy}><Icon name="copy" size={16} />コピー</button>
+				<button class="small" type="button" onclick={share}><Icon name="share" size={16} />共有</button>
+			</div>
+			{#if sent}<p role="status">{sent}</p>{/if}
 		{:else}
 			<p>重なる空きコマはありません</p>
 		{/if}
@@ -236,7 +255,7 @@
 	</section>
 
 	<div class="spacer"></div>
-	<BottomNav current="overlay" />
+	<BottomNav current="friends" />
 </div>
 
 <Sheet
@@ -267,17 +286,6 @@
 </Sheet>
 
 <style>
-	header {
-		padding: 18px 16px 4px;
-	}
-
-	h1 {
-		margin: 0;
-		font-family: var(--font-display);
-		font-weight: 700;
-		font-size: 22px;
-	}
-
 	.chips {
 		display: flex;
 		flex-wrap: wrap;
@@ -493,6 +501,27 @@
 		border: 1px solid var(--line-strong);
 		border-radius: 7px;
 		font-size: 12px;
+	}
+
+	.free-actions {
+		display: flex;
+		gap: 8px;
+	}
+
+	.free-actions button {
+		height: 36px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 0 12px;
+		border: 1px solid var(--line-strong);
+		border-radius: 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 13px;
+		font-weight: 700;
+		cursor: pointer;
 	}
 
 	.spacer {

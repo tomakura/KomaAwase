@@ -1,4 +1,4 @@
-import { addDays, daysBetween, monthDay, weekdayOf } from './time';
+import { addDays, daysBetween, isDate, monthDay, weekdayOf } from './time';
 
 // Ids match the --course-* variables in app.css.
 export const COURSE_COLORS = [
@@ -94,4 +94,60 @@ export function meetsInWeek(week: WeekPattern | undefined, termStart: string | n
 	const monday = (d: string) => addDays(d, 1 - weekdayOf(d));
 	const index = Math.floor(daysBetween(monday(termStart), monday(date)) / 7) + 1;
 	return (index % 2 === 1) === (week === 'odd');
+}
+
+/**
+ * When the class meets on `date`: from the start of its first period to the end of its last,
+ * for the first slot that falls on that weekday. Null if it doesn't meet then.
+ */
+export function classTimeOn(
+	date: string,
+	slots: { weekday: number; period: number; span: number }[],
+	periods: { number: number; start: string; end: string }[]
+): { start: string; end: string } | null {
+	if (!isDate(date)) return null;
+	const weekday = weekdayOf(date);
+	const slot = slots.filter((s) => s.weekday === weekday).toSorted((a, b) => a.period - b.period)[0];
+	if (!slot) return null;
+	const first = periods.find((p) => p.number === slot.period);
+	const last = periods.find((p) => p.number === slot.period + slot.span - 1);
+	return first && last ? { start: first.start, end: last.end } : null;
+}
+
+export const CREDITS_MAX = 20;
+
+// Universities where a class period is one credit, and a class can be missed twice per credit
+const PERIOD_CREDIT_UNIVERSITIES = ['dhw'];
+const ABSENCES_PER_CREDIT = 2;
+
+/** The credits typed in, or else what the university's rule gives (未入力のとき) */
+export function creditsOf(
+	course: { credits: number | null; slots: { span: number }[] },
+	universityId: string | null | undefined
+): number | null {
+	if (course.credits) return course.credits;
+	if (!universityId || !PERIOD_CREDIT_UNIVERSITIES.includes(universityId)) return null;
+	const periods = course.slots.reduce((n, s) => n + s.span, 0);
+	return periods || null;
+}
+
+/** The limit typed in, or else two absences for each credit where the university has that rule */
+export function absenceLimitOf(
+	course: { credits: number | null; absenceLimit: number | null; slots: { span: number }[] },
+	universityId: string | null | undefined
+): number | null {
+	if (course.absenceLimit) return course.absenceLimit;
+	if (!universityId || !PERIOD_CREDIT_UNIVERSITIES.includes(universityId)) return null;
+	const credits = creditsOf(course, universityId);
+	return credits ? Math.max(1, Math.round(credits * ABSENCES_PER_CREDIT)) : null;
+}
+export const ABSENCE_LIMIT_MAX = 99;
+
+// An empty field is no value; a number in steps of `step` up to `max` is one; anything else is invalid
+export function readNumber(value: FormDataEntryValue | null, max: number, step: number): number | null | 'invalid' {
+	const text = String(value ?? '').trim();
+	if (!text) return null;
+	const n = Number(text);
+	const ok = Number.isFinite(n) && n >= (step < 1 ? 0 : step) && n <= max && Number.isInteger(n / step);
+	return ok ? n : 'invalid';
 }

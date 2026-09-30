@@ -29,6 +29,15 @@
 	</header>
 
 	<main>
+		<a class="overlay" href="/overlay">
+			<Icon name="overlap" size={20} />
+			<span class="text">
+				<span class="name">コマを重ねる</span>
+				<span class="sub">友だちと時間割を重ねて、みんな空いてるコマを探す</span>
+			</span>
+			<Icon name="chevron" size={16} />
+		</a>
+
 		{#if data.incoming.length}
 			<section class="ui-section">
 				<h2 class="ui-section-title">申請が届いています（{data.incoming.length}）</h2>
@@ -156,6 +165,20 @@
 		display: flex;
 		flex-direction: column;
 		padding-bottom: 28px;
+	}
+
+	.overlay {
+		min-height: 60px;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin: 14px 16px 0;
+		padding: 8px 14px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink);
+		text-decoration: none;
 	}
 
 	.person {

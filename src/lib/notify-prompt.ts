@@ -14,7 +14,7 @@ export type PromptKind =
 	| 'reminder';
 
 // Only on the tabs, so it never covers a form someone is in the middle of
-export const PROMPT_ROUTES = ['/', '/overlay', '/friends', '/more'];
+export const PROMPT_ROUTES = ['/', '/plans', '/friends', '/more'];
 
 /**
  * `reminders` is how many times before a class were chosen, and `devices` how many of the

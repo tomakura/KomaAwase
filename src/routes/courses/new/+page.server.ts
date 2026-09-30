@@ -36,7 +36,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				slots: inTimetable ? [{ weekday: day, period, span: 1, room: null }] : [],
 				delivery: null,
 				intensiveFrom: null,
-				intensiveTo: null
+				intensiveTo: null,
+				credits: null
 			};
 	const search = new URLSearchParams(url.search);
 	search.delete('shared');
@@ -44,6 +45,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		...shape,
 		termParam: term?.id ?? null,
+		universityId: timetable.universityId,
 		others,
 		backHref: inTimetable ? `/courses/search?${search}` : timetableHref(term?.id ?? null),
 		sync: {

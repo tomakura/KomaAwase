@@ -19,6 +19,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		terms: loaded.terms,
 		periods: loaded.periods,
 		// Cancellations are the owner's notes and stay out of shared images.
-		courses: loaded.courses.map(({ cancels: _, ...c }) => c)
+		courses: loaded.courses.map(({ cancels: _, maybeCancels: __, ...c }) => c)
 	};
 };

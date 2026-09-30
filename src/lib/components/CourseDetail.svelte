@@ -2,15 +2,19 @@
 	import { flip } from 'svelte/animate';
 	import { fly, slide } from 'svelte/transition';
 	import { motion, still } from '$lib/motion';
+	import Switch from '$lib/components/Switch.svelte';
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
 	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
+		absenceLimitOf,
 		actionHref,
+		classTimeOn,
 		courseColor,
 		courseHref,
+		creditsOf,
 		deliveryLabel,
 		periodLabel,
 		timetableHref,
@@ -18,6 +22,8 @@
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
 	import { moveId, orderMemos } from '$lib/notes';
+	import { votesLabel } from '$lib/cancellations';
+	import { whenLabel } from '$lib/plans';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
 	import type { ActionData, PageData } from '../../routes/courses/[id]/$types';
 
@@ -54,7 +60,35 @@
 	);
 	const delivery = $derived(deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo));
 
-	let adding = $state<'memo' | 'task' | 'cancel' | null>(null);
+	let adding = $state<'memo' | 'task' | 'cancel' | 'event' | null>(null);
+	let allDay = $state(false);
+	// The event's own date and times, which "授業の時間にする" fills in
+	let evDate = $state('');
+	let evStart = $state('');
+	let evEnd = $state('');
+	let evClass = $state(false);
+	const classTime = $derived(classTimeOn(evDate, course.slots, data.periods));
+
+	function openEvent() {
+		if (adding === 'event') return (adding = null);
+		allDay = false;
+		evClass = false;
+		evDate = data.today;
+		evStart = '';
+		evEnd = '';
+		adding = 'event';
+	}
+
+	// While it is on, the times follow the class on that day; editing them by hand is still fine
+	$effect(() => {
+		if (!evClass) return;
+		if (classTime) {
+			evStart = classTime.start;
+			evEnd = classTime.end;
+		} else {
+			evClass = false;
+		}
+	});
 
 	// 10/2（金）
 	const withDay = (date: string) => `${monthDay(date)}（${DAY_NAMES[weekdayOf(date)]}）`;
@@ -114,6 +148,12 @@
 		else await invalidateAll();
 		uploading = false;
 	}
+
+	// Absences: recorded by date, one a day
+	const absentToday = $derived(data.absences.some((a) => a.date === data.today));
+	const credits = $derived(creditsOf(course, data.timetable.universityId));
+	const absenceLimit = $derived(absenceLimitOf(course, data.timetable.universityId));
+	const absenceLeft = $derived(absenceLimit ? absenceLimit - data.absences.length : null);
 
 	function dueLabel(due: string) {
 		const days = daysBetween(data.today, due);
@@ -222,6 +262,7 @@
 					<span class="chip"><b>{slotLabels[i]}</b>{#if slot.room}&nbsp;· {slot.room}{/if}</span>
 				{/each}
 				{#if delivery}<span class="chip"><b>{delivery}</b></span>{/if}
+				{#if credits}<span class="chip muted">{credits}単位</span>{/if}
 				{#if termNames}<span class="chip muted">{termNames}</span>{/if}
 				{#if course.syncMode === 'synced' && data.shared}
 					<span class="chip muted synced">
@@ -280,6 +321,13 @@
 				</svg>
 				休講
 			</button>
+			<button type="button" aria-pressed={adding === 'event'} onclick={openEvent}>
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+					<path d="M3.5 9.5h17M8 3v4M16 3v4M8.5 14.5h7" />
+				</svg>
+				イベント
+			</button>
 		</div>
 
 		<input
@@ -297,15 +345,43 @@
 			<form
 				class="add-form"
 				method="POST"
-				action={actionHref('note', data.termParam)}
+				action={actionHref(adding === 'event' ? 'event' : 'note', data.termParam)}
 				use:enhance={() =>
 					async ({ result, update }) => {
 						await settle(update);
 						if (result.type === 'success') adding = null;
 					}}
 			>
-				<input type="hidden" name="kind" value={adding} />
-				{@render noteFields(adding)}
+				{#if adding !== 'event'}<input type="hidden" name="kind" value={adding} />{/if}
+				{#if adding === 'event'}
+					<label class="field">名前<input name="title" maxlength="100" required autocomplete="off" placeholder="期末試験" /></label>
+					<label class="field">日付<input type="date" name="date" required bind:value={evDate} /></label>
+					<div class="all-day">
+						<span id="all-day-label">終日</span>
+						<Switch bind:checked={allDay} name="allDay" labelledby="all-day-label" onchange={() => (evClass = false)} />
+					</div>
+					{#if !allDay}
+						<div class="all-day">
+							<span id="class-time-label">
+								授業の時間にする
+								{#if !classTime}<span class="sub">この日は授業がありません</span>{/if}
+							</span>
+							<Switch
+								bind:checked={evClass}
+								labelledby="class-time-label"
+								disabled={!classTime}
+							/>
+						</div>
+						<div class="times">
+							<label class="field">はじまり<input type="time" name="start" bind:value={evStart} /></label>
+							<label class="field">終わり<input type="time" name="end" bind:value={evEnd} /></label>
+						</div>
+					{/if}
+					<label class="field">場所<input name="place" maxlength="50" autocomplete="off" /></label>
+					<label class="field">メモ（任意）<textarea name="memo" rows="3" maxlength="500"></textarea></label>
+				{:else}
+					{@render noteFields(adding)}
+				{/if}
 				{#if form?.message && !form.editing}<p class="error" role="alert">{form.message}</p>{/if}
 				<div class="form-actions">
 					<button class="btn" type="button" onclick={() => (adding = null)}>やめる</button>
@@ -315,6 +391,31 @@
 		{/if}
 
 		<div class="lists">
+			<section>
+				<h2>欠席</h2>
+				<div class="item">
+					<span class="text">
+						<span class="main">{data.absences.length}回{absenceLimit ? `（${absenceLimit}回まで）` : ''}</span>
+						{#if absenceLeft !== null && absenceLeft < 0}
+							<span class="sub warn">上限を超えています</span>
+						{:else if absenceLeft === 0}
+							<span class="sub warn">上限に達しています</span>
+						{:else if absenceLeft === 1}
+							<span class="sub warn">あと1回で上限です</span>
+						{/if}
+					</span>
+					<form method="POST" action={actionHref('absent', data.termParam)} use:enhance>
+						<button class="absent" type="submit" disabled={absentToday}>{absentToday ? '今日は記録ずみ' : '欠席した'}</button>
+					</form>
+				</div>
+				{#each data.absences as a (a.id)}
+					<div transition:slide={motion()} class="item">
+						<span class="text"><span class="main">{withDay(a.date)}</span></span>
+						{@render removeButton(a.id, `${withDay(a.date)}の欠席`, 'removeAbsence')}
+					</div>
+				{/each}
+			</section>
+
 			{#if tasks.length}
 				<section>
 					<h2>課題</h2>
@@ -350,6 +451,50 @@
 							{@render removeButton(task.id, `課題「${task.body}」`)}
 						</div>
 						{/if}
+					{/each}
+				</section>
+			{/if}
+
+			{#if data.events.length}
+				<section>
+					<h2>イベント</h2>
+					{#each data.events as e (e.id)}
+						<div transition:slide={motion()} class="item" class:done={e.date < data.today}>
+							<span class="text">
+								<span class="main">{e.title}</span>
+								<span class="sub">{[whenLabel(e), e.place].filter(Boolean).join(' · ')}</span>
+								{#if e.memo}<span class="sub memo-line">{e.memo}</span>{/if}
+							</span>
+							{@render removeButton(e.id, `イベント「${e.title}」`, 'removeEvent')}
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			{#if data.sharedCancels.length}
+				<section>
+					<h2>みんなの休講</h2>
+					{#each data.sharedCancels as c (c.date)}
+						<div transition:slide={motion()} class="item">
+							<span class="text">
+								<span class="main">{withDay(c.date)}</span>
+								<span class="sub">{votesLabel(c.n)}</span>
+							</span>
+							<form method="POST" action={actionHref('adoptCancel', data.termParam)} use:enhance>
+								<input type="hidden" name="date" value={c.date} />
+								<button class="absent" type="submit">休講にする</button>
+							</form>
+							<form
+								method="POST"
+								action={actionHref('reportCancel', data.termParam)}
+								use:enhance={({ cancel }) => {
+									if (!confirm(`${withDay(c.date)}の休講は、まちがいかいたずらだと運営に伝えます`)) cancel();
+								}}
+							>
+								<input type="hidden" name="date" value={c.date} />
+								<button class="absent quiet" type="submit" disabled={c.reported}>{c.reported ? '報告ずみ' : 'まちがい'}</button>
+							</form>
+						</div>
 					{/each}
 				</section>
 			{/if}
@@ -650,8 +795,8 @@
 
 	.add-buttons {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 8px;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		gap: 6px;
 		padding: 0 16px;
 	}
 
@@ -773,6 +918,38 @@
 		background: var(--bg);
 	}
 
+	.all-day {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 44px;
+		padding: 0 4px;
+		font-size: 14px;
+	}
+
+	.all-day .sub {
+		display: block;
+	}
+
+	.times {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+
+	.times :global(input) {
+		min-width: 0;
+	}
+
+	.add-form :global(textarea) {
+		width: 100%;
+	}
+
+	.memo-line {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
 	.form-actions {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -847,6 +1024,37 @@
 	.sub {
 		font-size: 12px;
 		color: var(--ink-sub);
+	}
+
+	.sub.warn {
+		color: var(--accent-text);
+		font-weight: 700;
+	}
+
+	.absent {
+		flex-shrink: 0;
+		height: 36px;
+		padding: 0 12px;
+		border: 1px solid var(--line-strong);
+		border-radius: 10px;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 13px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.absent.quiet {
+		border-color: transparent;
+		background: transparent;
+		color: var(--ink-sub);
+		font-weight: 400;
+	}
+
+	.absent:disabled {
+		color: var(--ink-sub);
+		cursor: default;
 	}
 
 	.body {

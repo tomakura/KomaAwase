@@ -16,5 +16,6 @@
 	terms={data.terms}
 	periods={data.periods}
 	others={data.others}
+	universityId={data.universityId}
 	message={form?.message}
 />

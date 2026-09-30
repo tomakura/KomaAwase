@@ -1,8 +1,9 @@
-import { and, count, eq, inArray, or } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { compareJa } from '$lib/sort';
 import type { Db } from './db';
 import { blocks, courses, friendships, groupMembers, timetables, universities, users } from './db/schema';
+import { suspendedIds } from './moderation';
 import { verifiedColumn } from './verify';
 
 // No 0/O or 1/I, so a code read aloud or off a screen is typed right. 256 is a multiple
@@ -176,7 +177,8 @@ export async function listFriendships(db: Db, meId: string) {
 			)
 		)
 		.leftJoin(universities, eq(universities.id, users.universityId))
-		.where(or(eq(friendships.requesterId, meId), eq(friendships.addresseeId, meId)));
+		// Someone an admin has suspended isn't shown
+		.where(and(or(eq(friendships.requesterId, meId), eq(friendships.addresseeId, meId)), isNull(users.suspendedAt)));
 	const people = (list: typeof rows) =>
 		list
 			.map(({ requesterId: _, status: __, createdAt: ___, ...p }) => p)
@@ -225,6 +227,7 @@ export async function visibleUserIds(db: Db, meId: string): Promise<Set<string>>
 	for (const g of groupRows) ids.add(g.userId);
 	for (const b of blockRows) ids.delete(b.blockerId === meId ? b.blockedId : b.blockerId);
 	ids.delete(meId);
+	for (const id of await suspendedIds(db, [...ids])) ids.delete(id);
 	return ids;
 }
 

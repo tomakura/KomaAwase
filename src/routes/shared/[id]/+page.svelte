@@ -17,6 +17,7 @@
 		delivery: Delivery | null;
 		intensiveFrom: string | null;
 		intensiveTo: string | null;
+		credits?: number | null; // edits from before credits were kept have none
 	};
 
 	const slotText = (s: Values['slots'][number]) =>
@@ -24,7 +25,8 @@
 	const fields = (v: Values) => ({
 		授業名: v.title,
 		先生: v.teachers.join('・') || 'なし',
-		'曜日・時限': v.slots.map(slotText).join('、') || deliveryLabel(v.delivery, v.intensiveFrom, v.intensiveTo) || 'なし'
+		'曜日・時限': v.slots.map(slotText).join('、') || deliveryLabel(v.delivery, v.intensiveFrom, v.intensiveTo) || 'なし',
+		単位数: v.credits ? `${v.credits}単位` : 'なし'
 	});
 
 	// What an edit changed, field by field

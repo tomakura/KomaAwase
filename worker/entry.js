@@ -2,6 +2,7 @@
 // daily sweep reuse its routes by calling them in-process, with a flag on env that a request
 // from outside can never carry (see src/lib/server/internal.ts).
 import sveltekit from '../.svelte-kit/cloudflare/_worker.js';
+import { sendPlanEve } from '../src/lib/server/plan-eve.ts';
 import { sendDueReminders } from '../src/lib/server/reminders.ts';
 
 // The cron in wrangler.jsonc that runs every minute; the other one is the daily sweep
@@ -57,6 +58,8 @@ export default {
 	async scheduled(controller, env, ctx) {
 		if (controller.cron === REMINDER_CRON) {
 			ctx.waitUntil(sendDueReminders(env, controller.scheduledTime));
+			// 20:00 to 20:09 in Japan (11:00 UTC), when it has anything to do
+			ctx.waitUntil(sendPlanEve(env, controller.scheduledTime));
 		} else {
 			ctx.waitUntil(internal(env, ctx, '/internal/daily', {}));
 		}

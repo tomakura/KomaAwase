@@ -1,4 +1,5 @@
 import { pendingRequestCount } from '$lib/server/friends';
+import { pendingWarning } from '$lib/server/moderation';
 import { pushEnabled } from '$lib/server/notify';
 import { verifyPromptFor } from '$lib/server/verify';
 import type { LayoutServerLoad } from './$types';
@@ -12,6 +13,8 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 		pushKey: locals.user && pushEnabled(platform?.env) ? (platform?.env.VAPID_PUBLIC_KEY ?? null) : null,
 		pendingRequests: locals.user ? await pendingRequestCount(locals.db, locals.user.id) : 0,
 		// The screen that suggests confirming enrollment (VerifyPrompt)
-		verifyPrompt: locals.user ? await verifyPromptFor(locals.db, locals.user) : null
+		verifyPrompt: locals.user ? await verifyPromptFor(locals.db, locals.user) : null,
+		// A warning from an admin, shown over everything until it is answered (WarningScreen)
+		warning: (locals.user && (await pendingWarning(locals.db, locals.user.id))) || null
 	};
 };

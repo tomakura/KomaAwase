@@ -1,6 +1,6 @@
 // Tables follow docs/data-model.md. Friends and groups come with their features.
 import { sql } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 const id = () =>
 	text('id')
@@ -15,7 +15,7 @@ const createdAt = () =>
 
 // Which notifications to send; a missing key means on
 export type NotifySettings = Partial<
-	Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'groupRequest' | 'groupApproved', boolean>
+	Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'groupRequest' | 'groupApproved' | 'planEve', boolean>
 >;
 
 // `photo` is when the user's photo (user_photos) was last set, which also busts caches
@@ -48,6 +48,10 @@ export const users = sqliteTable('users', {
 	// How far the enrollment check prompts have gone (see verify-prompt.ts): null = none shown yet.
 	// Reset to null when the person verifies.
 	verifyPromptStage: integer('verify_prompt_stage'),
+	// Set by an admin: signed out everywhere, the login refuses the account, others don't see it
+	suspendedAt: integer('suspended_at', { mode: 'timestamp_ms' }),
+	// Whether the cancellations this person marks on a synced course count for others
+	shareCancellations: integer('share_cancellations', { mode: 'boolean' }).notNull().default(true),
 	// When they agreed to send screenshots to the AI services abroad, the first time they import
 	importConsentAt: integer('import_consent_at', { mode: 'timestamp_ms' }),
 	createdAt: createdAt()
@@ -251,6 +255,10 @@ export const courses = sqliteTable(
 		delivery: text('delivery', { enum: ['ondemand', 'intensive'] }),
 		intensiveFrom: text('intensive_from'), // YYYY-MM-DD
 		intensiveTo: text('intensive_to'),
+		// Credits (単位数); a synced course reads the shared course's instead
+		credits: real('credits'),
+		// How many absences the class allows, for the warning; personal
+		absenceLimit: integer('absence_limit'),
 		createdAt: createdAt()
 	},
 	(t) => [
@@ -325,6 +333,66 @@ export const courseNotes = sqliteTable(
 	(t) => [index('course_notes_course_idx').on(t.courseId)]
 );
 
+// The days a class was missed, by date, so a mistake can be taken back. Personal: never shared.
+export const courseAbsences = sqliteTable(
+	'course_absences',
+	{
+		id: id(),
+		courseId: text('course_id')
+			.notNull()
+			.references(() => courses.id, { onDelete: 'cascade' }),
+		date: text('date').notNull(), // YYYY-MM-DD
+		createdAt: createdAt()
+	},
+	(t) => [uniqueIndex('course_absences_course_date_idx').on(t.courseId, t.date)]
+);
+
+// One row a day, written by the daily cron: what the graphs in 運営 → 数字 can't work out
+// afterwards, since who opened the app lasts only as "last seen".
+export const dailyStats = sqliteTable('daily_stats', {
+	date: text('date').primaryKey(), // YYYY-MM-DD, Japan time
+	users: integer('users').notNull(),
+	activeDay: integer('active_day').notNull(), // opened the app in the 24 hours before
+	activeWeek: integer('active_week').notNull(),
+	verified: integer('verified').notNull()
+});
+
+// A day whose shared cancellation the admin has taken down (a prank, a mistake): nobody sees
+// it as a cancellation for that class on that date.
+export const cancellationHides = sqliteTable(
+	'cancellation_hides',
+	{
+		sharedCourseId: text('shared_course_id')
+			.notNull()
+			.references(() => sharedCourses.id, { onDelete: 'cascade' }),
+		date: text('date').notNull(), // YYYY-MM-DD
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.sharedCourseId, t.date] })]
+);
+
+// Things to remember that belong to the person, not to a class: a test, a circle meeting, an
+// interview. A class's homework stays in course_notes; the 予定 tab shows both.
+export const events = sqliteTable(
+	'events',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		date: text('date').notNull(), // YYYY-MM-DD
+		startTime: text('start_time'), // HH:MM, or null for all day
+		endTime: text('end_time'),
+		place: text('place'),
+		memo: text('memo'),
+		// A class it belongs to, such as its test; it stays when the class is deleted
+		courseId: text('course_id').references(() => courses.id, { onDelete: 'set null' }),
+		createdAt: createdAt()
+	},
+	(t) => [index('events_user_date_idx').on(t.userId, t.date)]
+);
+
 // Files kept with a course. The bytes are on the rental server (relay/files.php) under
 // storage_key; only the Worker can reach them.
 export const courseFiles = sqliteTable(
@@ -360,6 +428,7 @@ export const sharedCourses = sqliteTable(
 		delivery: text('delivery', { enum: ['ondemand', 'intensive'] }),
 		intensiveFrom: text('intensive_from'),
 		intensiveTo: text('intensive_to'),
+		credits: real('credits'),
 		source: text('source', { enum: ['syllabus', 'user'] }).notNull(),
 		version: integer('version').notNull().default(1),
 		createdAt: createdAt(),
@@ -524,6 +593,24 @@ export const groupBans = sqliteTable(
 
 // --- operations ---
 
+// A warning from an admin. It fills the screen on every device of the person until they press
+// 理解しました, which sets acknowledgedAt. The admin is cleared, not the warning, when their
+// account is deleted.
+export const warnings = sqliteTable(
+	'warnings',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		body: text('body').notNull(),
+		sentBy: text('sent_by').references(() => users.id, { onDelete: 'set null' }),
+		createdAt: createdAt(),
+		acknowledgedAt: integer('acknowledged_at', { mode: 'timestamp_ms' })
+	},
+	(t) => [index('warnings_user_idx').on(t.userId)]
+);
+
 // Reports about people, groups and shared course data. The reporter is cleared, not the
 // report, when their account is deleted.
 export const reports = sqliteTable(
@@ -531,7 +618,7 @@ export const reports = sqliteTable(
 	{
 		id: id(),
 		reporterId: text('reporter_id').references(() => users.id, { onDelete: 'set null' }),
-		targetType: text('target_type', { enum: ['user', 'group', 'shared_course'] }).notNull(),
+		targetType: text('target_type', { enum: ['user', 'group', 'shared_course', 'shared_cancel'] }).notNull(),
 		targetId: text('target_id').notNull(),
 		reason: text('reason').notNull(),
 		detail: text('detail'),

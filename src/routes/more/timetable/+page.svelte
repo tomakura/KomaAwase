@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { DAY_NAMES, courseColor, deliveryLabel, periodLabel, weekLabel } from '$lib/courses';
+	import { DAY_NAMES, courseColor, creditsOf, deliveryLabel, periodLabel, weekLabel } from '$lib/courses';
 	import { compareJa } from '$lib/sort';
 
 	let { data } = $props();
@@ -19,6 +19,20 @@
 			return ta - tb || sa - sb || compareJa(a.title, b.title);
 		})
 	);
+
+	// Credits by term, for the courses that have them. A course in several terms is counted apart,
+	// so a year-long class isn't counted twice; the total counts every course once.
+	const credited = $derived(
+		data.courses.map((c) => ({ ...c, credits: creditsOf(c, data.universityId) })).filter((c) => c.credits)
+	);
+	const creditRows = $derived([
+		...data.terms.map((t) => ({
+			label: t.name,
+			credits: credited.filter((c) => c.termIds.length === 1 && c.termIds[0] === t.id).reduce((n, c) => n + (c.credits ?? 0), 0)
+		})),
+		{ label: '複数の学期', credits: credited.filter((c) => c.termIds.length > 1).reduce((n, c) => n + (c.credits ?? 0), 0) }
+	]);
+	const creditTotal = $derived(credited.reduce((n, c) => n + (c.credits ?? 0), 0));
 
 	function detail(course: (typeof data.courses)[number]) {
 		const terms = data.terms.filter((t) => course.termIds.includes(t.id)).map((t) => t.name).join('・');
@@ -51,6 +65,21 @@
 			{@render link('/more/periods', '時限と時刻', data.periodsLabel)}
 		</div>
 	</section>
+
+	{#if credited.length}
+		<section class="ui-section">
+			<h2 class="ui-section-title">単位数</h2>
+			<div class="ui-list">
+				{#each creditRows.filter((r) => r.credits) as r (r.label)}
+					<div class="ui-row"><span>{r.label}</span><span class="ui-row-value">{r.credits}単位</span></div>
+				{/each}
+				<div class="ui-row total"><span>{data.year}年度の合計</span><span class="ui-row-value">{creditTotal}単位</span></div>
+			</div>
+			{#if credited.length < data.courses.length}
+				<p class="ui-note">単位数を入れていない授業は、含まれていません。</p>
+			{/if}
+		</section>
+	{/if}
 
 	<section class="ui-section">
 		<h2 class="ui-section-title">授業（{courses.length}件）</h2>
@@ -125,5 +154,8 @@
 		font-size: 13px;
 		line-height: 1.6;
 		color: var(--ink-sub);
+	}
+.total {
+		font-weight: 700;
 	}
 </style>

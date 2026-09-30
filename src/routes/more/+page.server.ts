@@ -52,6 +52,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 
 	return {
 		user: { id: user.id, nickname: user.nickname, icon: user.icon, theme: user.theme, days: user.daysShown },
+		shareCancellations: user.shareCancellations,
 		timetableLabel: `${timetable.year}年度${term ? ` ${term.groupName ?? term.name}` : ''}`,
 		termsLabel: TERM_SYSTEMS.find((s) => s.id === system)?.label ?? `${shape.terms.length}学期`,
 		periodsLabel: periodsRange(shape.periods),
@@ -74,6 +75,11 @@ export const actions: Actions = {
 		const theme = readTheme(await request.formData());
 		if (!theme) return fail(400, { message: 'テーマを選んでください' });
 		await locals.db.update(users).set({ theme }).where(eq(users.id, locals.user.id));
+	},
+	shareCancellations: async ({ request, locals }) => {
+		if (!locals.user) redirect(303, '/login');
+		const on = (await request.formData()).get('share') === 'on';
+		await locals.db.update(users).set({ shareCancellations: on }).where(eq(users.id, locals.user.id));
 	},
 	days: async ({ request, locals }) => {
 		if (!locals.user) redirect(303, '/login');

@@ -19,6 +19,7 @@ export const GET: RequestHandler = async ({ platform, url, cookies, locals, requ
 	const user = await userForGoogle(locals.db, account);
 	if (user === 'use-mail') redirect(303, '/login?error=google-mail');
 	if (!user) redirect(303, '/login?error=google');
+	if (user.suspendedAt) redirect(303, '/login?error=suspended');
 	await signIn(locals.db, cookies, request, user.id);
 
 	const hasPasskey = await locals.db.select({ id: passkeys.id }).from(passkeys).where(eq(passkeys.userId, user.id)).get();

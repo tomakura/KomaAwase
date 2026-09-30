@@ -7,9 +7,11 @@
 	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
 	import { beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
+	import { SvelteSet } from 'svelte/reactivity';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
 	import VerifyPrompt from '$lib/components/VerifyPrompt.svelte';
+	import WarningScreen from '$lib/components/WarningScreen.svelte';
 	import { version } from '$app/environment';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
@@ -19,6 +21,18 @@
 	let { data, children } = $props();
 	// The enrollment prompt's stage once closed; until then it holds back the notification prompt
 	let verifyDismissed = $state(-1);
+
+	// A warning is shown over everything until 理解しました is pressed. Ones answered here are kept,
+	// so a copy of a page from before it was answered (going back) doesn't bring it back.
+	const answered = new SvelteSet<string>();
+	const warning = $derived(data.warning && !answered.has(data.warning.id) ? data.warning : null);
+
+	async function acknowledge(id: string) {
+		const res = await fetch('/api/warning', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) });
+		if (!res.ok) return;
+		answered.add(id);
+		await refreshAll();
+	}
 
 	// Back in the app after a while (it stays open in the background on a phone): show what
 	// changed meanwhile, such as a friend's timetable or a finished screenshot. (refreshAll, not
@@ -95,7 +109,7 @@
 
 	// How a navigation moves: between the tabs it slides, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
-	const TABS = ['/', '/overlay', '/friends', '/more'];
+	const TABS = ['/', '/plans', '/friends', '/more'];
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
 	const depth = (path: string) => path.split('/').filter(Boolean).length;
 
@@ -134,7 +148,11 @@
 
 <ConnectionBar />
 <NavigationWait />
-{@render children()}
+<!-- Behind a warning nothing can be reached -->
+<div style="display: contents" inert={!!warning}>{@render children()}</div>
+{#if warning}
+	<WarningScreen id={warning.id} body={warning.body} onack={() => acknowledge(warning.id)} />
+{/if}
 
 <VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
 <!-- One screen at a time: the notification one waits while the enrollment one is due -->

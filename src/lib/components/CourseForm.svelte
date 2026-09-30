@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import Sheet from '$lib/components/Sheet.svelte';
-	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, courseColor, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
+	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, absenceLimitOf, courseColor, creditsOf, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
 
 	type Slot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
 	type SharedValues = {
@@ -12,9 +12,11 @@
 		delivery: Delivery | null;
 		intensiveFrom: string | null;
 		intensiveTo: string | null;
+		credits: number | null;
 	};
 	type CourseValues = SharedValues & {
 		color: string;
+		absenceLimit?: number | null;
 		termIds: string[];
 		syncMode: 'synced' | 'personal';
 	};
@@ -38,6 +40,7 @@
 		terms,
 		periods,
 		others = [],
+		universityId = null,
 		message
 	}: {
 		heading: string;
@@ -49,6 +52,7 @@
 		periods: { number: number }[];
 		// The timetable's other courses, which a slot's length stops short of
 		others?: { weekday: number; period: number; span: number; week: WeekPattern; termIds: string[] }[];
+		universityId?: string | null;
 		message?: string;
 	} = $props();
 
@@ -60,10 +64,21 @@
 		unscheduled: initial.slots.length === 0 && initial.delivery !== null,
 		delivery: initial.delivery ?? 'ondemand',
 		intensiveFrom: initial.intensiveFrom ?? '',
-		intensiveTo: initial.intensiveTo ?? ''
+		intensiveTo: initial.intensiveTo ?? '',
+		credits: initial.credits ?? ('' as number | ''),
+		absenceLimit: initial.absenceLimit ?? ('' as number | '')
 	});
 
 	const periodNumbers = $derived(periods.map((p) => p.number));
+
+	// What each blank stands for, where the university has a rule for it
+	const ruleCourse = $derived({
+		slots: v.unscheduled ? [] : v.slots,
+		credits: v.credits === '' ? null : Number(v.credits),
+		absenceLimit: null
+	});
+	const creditsHint = $derived(creditsOf({ ...ruleCourse, credits: null }, universityId));
+	const absenceHint = $derived(absenceLimitOf(ruleCourse, universityId));
 	let saving = $state(false);
 
 	// Leaving with edits that weren't saved asks first. Saving itself is let through, and so is
@@ -101,6 +116,7 @@
 		v.delivery = shared.delivery ?? 'ondemand';
 		v.intensiveFrom = shared.intensiveFrom ?? '';
 		v.intensiveTo = shared.intensiveTo ?? '';
+		v.credits = shared.credits ?? '';
 	}
 
 	const syncHeading = $derived(
@@ -297,6 +313,17 @@
 					</label>
 				{/each}
 			</div>
+		</div>
+
+		<div class="numbers">
+			<label class="field">
+				単位数（任意）
+				<input name="credits" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder={creditsHint ? `${creditsHint}` : ""} bind:value={v.credits} />
+			</label>
+			<label class="field">
+				欠席できる回数（任意）
+				<input name="absence_limit" type="number" inputmode="numeric" min="1" max="99" step="1" placeholder={absenceHint ? `${absenceHint}` : ""} bind:value={v.absenceLimit} />
+			</label>
 		</div>
 
 		<div class="group">
@@ -640,6 +667,16 @@
 		position: absolute;
 		opacity: 0;
 		pointer-events: none;
+	}
+
+	.numbers {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+
+	.numbers :global(input) {
+		min-width: 0;
 	}
 
 	.terms {

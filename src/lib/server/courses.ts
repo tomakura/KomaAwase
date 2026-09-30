@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { COURSE_COLORS, isCourseColor, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
+import { ABSENCE_LIMIT_MAX, COURSE_COLORS, CREDITS_MAX, isCourseColor, readNumber, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
-import { courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
+import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
 import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, writeShared, type SharedCourse } from './shared-courses';
@@ -28,6 +28,8 @@ export type CourseInput = {
 	delivery: Delivery | null;
 	intensiveFrom: string | null;
 	intensiveTo: string | null;
+	credits: number | null; // shared by everyone syncing the course
+	absenceLimit: number | null; // personal
 	syncMode: 'synced' | 'personal';
 	sharedCourseId: string | null; // the shared course it came from, if any
 	sharedVersion: number | null; // the version of it the form showed
@@ -59,6 +61,11 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		return { message: '開講する学期を選んでください' };
 	}
 
+	const credits = readNumber(form.get('credits'), CREDITS_MAX, 0.5);
+	const absenceLimit = readNumber(form.get('absence_limit'), ABSENCE_LIMIT_MAX, 1);
+	if (credits === 'invalid') return { message: `単位数は0〜${CREDITS_MAX}で、0.5単位きざみで入れてください` };
+	if (absenceLimit === 'invalid') return { message: `欠席の上限は1〜${ABSENCE_LIMIT_MAX}回で入れてください` };
+
 	const version = Number(form.get('shared_version'));
 	const sync = {
 		syncMode: form.get('sync') === 'synced' ? ('synced' as const) : ('personal' as const),
@@ -74,7 +81,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 			return { message: '集中講義の期間を確かめてください' };
 		}
 		return {
-			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to, ...sync }
+			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to, credits, absenceLimit, ...sync }
 		};
 	}
 
@@ -84,7 +91,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		return { message: '曜日・時限を1つ以上入れるか、「曜日・時限がない」にチェックしてください' };
 	}
 	return {
-		input: { title, teachers, color, termIds, slots, delivery: null, intensiveFrom: null, intensiveTo: null, ...sync }
+		input: { title, teachers, color, termIds, slots, delivery: null, intensiveFrom: null, intensiveTo: null, credits, absenceLimit, ...sync }
 	};
 }
 
@@ -215,6 +222,8 @@ export async function prepareCourse(
 		delivery: input.delivery,
 		intensiveFrom: input.intensiveFrom,
 		intensiveTo: input.intensiveTo,
+		credits: input.credits,
+		absenceLimit: input.absenceLimit,
 		syncMode,
 		sharedCourseId
 	};
@@ -324,7 +333,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	// in a batch, drizzle mixes up columns of the same name from a join.)
 	const ofCourse = (column: typeof courses.timetableId | typeof courses.sharedCourseId) =>
 		db.select({ id: column }).from(courses).where(eq(courses.id, courseId));
-	const [[course], [timetable], termRows, periodRows, sharedRows, sharedSlots, sharedTeachers, notes, termLinks, slotRows, teacherRows] =
+	const [[course], [timetable], termRows, periodRows, sharedRows, sharedSlots, sharedTeachers, notes, termLinks, slotRows, teacherRows, absences] =
 		await db.batch([
 			db.select().from(courses).where(eq(courses.id, courseId)),
 			db
@@ -350,7 +359,12 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 				.select({ name: courseTeachers.name })
 				.from(courseTeachers)
 				.where(eq(courseTeachers.courseId, courseId))
-				.orderBy(asc(courseTeachers.sortOrder))
+				.orderBy(asc(courseTeachers.sortOrder)),
+			db
+				.select({ id: courseAbsences.id, date: courseAbsences.date })
+				.from(courseAbsences)
+				.where(eq(courseAbsences.courseId, courseId))
+				.orderBy(desc(courseAbsences.date))
 		]);
 	if (!course || !timetable) return null;
 	const shape = { terms: termRows, periods: periodRows };
@@ -361,7 +375,8 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 		slots: slotRows,
 		delivery: course.delivery,
 		intensiveFrom: course.intensiveFrom,
-		intensiveTo: course.intensiveTo
+		intensiveTo: course.intensiveTo,
+		credits: course.credits
 	};
 	const values = course.syncMode === 'synced' && shared ? shared.values : local;
 	return {
@@ -371,9 +386,11 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 			id: course.id,
 			...values,
 			color: course.color,
+			absenceLimit: course.absenceLimit,
 			termIds: termLinks.map((l) => l.termId),
 			syncMode: course.syncMode
 		},
+		absences,
 		shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values },
 		notes
 	};
