@@ -1,4 +1,4 @@
-import { addDays, daysBetween, monthDay, weekdayOf } from './time';
+import { addDays, daysBetween, isDate, monthDay, weekdayOf } from './time';
 
 // Ids match the --course-* variables in app.css.
 export const COURSE_COLORS = [
@@ -94,6 +94,24 @@ export function meetsInWeek(week: WeekPattern | undefined, termStart: string | n
 	const monday = (d: string) => addDays(d, 1 - weekdayOf(d));
 	const index = Math.floor(daysBetween(monday(termStart), monday(date)) / 7) + 1;
 	return (index % 2 === 1) === (week === 'odd');
+}
+
+/**
+ * When the class meets on `date`: from the start of its first period to the end of its last,
+ * for the first slot that falls on that weekday. Null if it doesn't meet then.
+ */
+export function classTimeOn(
+	date: string,
+	slots: { weekday: number; period: number; span: number }[],
+	periods: { number: number; start: string; end: string }[]
+): { start: string; end: string } | null {
+	if (!isDate(date)) return null;
+	const weekday = weekdayOf(date);
+	const slot = slots.filter((s) => s.weekday === weekday).toSorted((a, b) => a.period - b.period)[0];
+	if (!slot) return null;
+	const first = periods.find((p) => p.number === slot.period);
+	const last = periods.find((p) => p.number === slot.period + slot.span - 1);
+	return first && last ? { start: first.start, end: last.end } : null;
 }
 
 export const CREDITS_MAX = 20;

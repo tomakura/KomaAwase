@@ -10,6 +10,7 @@
 		DAY_NAMES,
 		absenceLimitOf,
 		actionHref,
+		classTimeOn,
 		courseColor,
 		courseHref,
 		creditsOf,
@@ -41,6 +42,33 @@
 
 	let adding = $state<'memo' | 'task' | 'cancel' | 'event' | null>(null);
 	let allDay = $state(false);
+	// The event's own date and times, which "授業の時間にする" fills in
+	let evDate = $state('');
+	let evStart = $state('');
+	let evEnd = $state('');
+	let evClass = $state(false);
+	const classTime = $derived(classTimeOn(evDate, course.slots, data.periods));
+
+	function openEvent() {
+		if (adding === 'event') return (adding = null);
+		allDay = false;
+		evClass = false;
+		evDate = data.today;
+		evStart = '';
+		evEnd = '';
+		adding = 'event';
+	}
+
+	// While it is on, the times follow the class on that day; editing them by hand is still fine
+	$effect(() => {
+		if (!evClass) return;
+		if (classTime) {
+			evStart = classTime.start;
+			evEnd = classTime.end;
+		} else {
+			evClass = false;
+		}
+	});
 
 	// 10/2（金）
 	const withDay = (date: string) => `${monthDay(date)}（${DAY_NAMES[weekdayOf(date)]}）`;
@@ -201,7 +229,7 @@
 				</svg>
 				休講
 			</button>
-			<button type="button" aria-pressed={adding === 'event'} onclick={() => ((allDay = false), (adding = adding === 'event' ? null : 'event'))}>
+			<button type="button" aria-pressed={adding === 'event'} onclick={openEvent}>
 				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
 					<rect x="3.5" y="5" width="17" height="15" rx="2.5" />
 					<path d="M3.5 9.5h17M8 3v4M16 3v4M8.5 14.5h7" />
@@ -241,15 +269,26 @@
 					<label class="field">締切（任意）<input type="date" name="due" /></label>
 				{:else if adding === 'event'}
 					<label class="field">名前<input name="title" maxlength="100" required autocomplete="off" placeholder="期末試験" /></label>
-					<label class="field">日付<input type="date" name="date" required value={data.today} /></label>
+					<label class="field">日付<input type="date" name="date" required bind:value={evDate} /></label>
 					<div class="all-day">
 						<span id="all-day-label">終日</span>
-						<Switch bind:checked={allDay} name="allDay" labelledby="all-day-label" />
+						<Switch bind:checked={allDay} name="allDay" labelledby="all-day-label" onchange={() => (evClass = false)} />
 					</div>
 					{#if !allDay}
+						<div class="all-day">
+							<span id="class-time-label">
+								授業の時間にする
+								{#if !classTime}<span class="sub">この日は授業がありません</span>{/if}
+							</span>
+							<Switch
+								bind:checked={evClass}
+								labelledby="class-time-label"
+								disabled={!classTime}
+							/>
+						</div>
 						<div class="times">
-							<label class="field">はじまり<input type="time" name="start" /></label>
-							<label class="field">終わり<input type="time" name="end" /></label>
+							<label class="field">はじまり<input type="time" name="start" bind:value={evStart} /></label>
+							<label class="field">終わり<input type="time" name="end" bind:value={evEnd} /></label>
 						</div>
 					{/if}
 					<label class="field">場所<input name="place" maxlength="50" autocomplete="off" /></label>
@@ -701,6 +740,10 @@
 		min-height: 44px;
 		padding: 0 4px;
 		font-size: 14px;
+	}
+
+	.all-day .sub {
+		display: block;
 	}
 
 	.times {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absenceLimitOf, creditsOf, daysLabel, meetsInWeek, periodLabel, readNumber } from './courses';
+import { absenceLimitOf, classTimeOn, creditsOf, daysLabel, meetsInWeek, periodLabel, readNumber } from './courses';
 
 describe('meetsInWeek', () => {
 	// Q3 starts on Thursday 2026-09-24: its first week is Monday 9/21 to Sunday 9/27.
@@ -72,5 +72,25 @@ describe('credits and absences by the university rule', () => {
 		expect(absenceLimitOf({ credits: 3, absenceLimit: null, slots: [slot(1)] }, 'dhw')).toBe(6);
 		expect(absenceLimitOf({ credits: null, absenceLimit: 5, slots: [slot(1)] }, 'dhw')).toBe(5);
 		expect(absenceLimitOf({ credits: null, absenceLimit: null, slots: [slot(1)] }, 'other')).toBeNull();
+	});
+});
+
+describe('classTimeOn', () => {
+	const periods = [
+		{ number: 1, start: '08:40', end: '10:10' },
+		{ number: 2, start: '10:20', end: '11:50' },
+		{ number: 3, start: '12:40', end: '14:10' }
+	];
+
+	it('runs from the first period of the slot to the last', () => {
+		// 2026-09-30 is a Wednesday (3)
+		expect(classTimeOn('2026-09-30', [{ weekday: 3, period: 1, span: 2 }], periods)).toEqual({ start: '08:40', end: '11:50' });
+		expect(classTimeOn('2026-09-30', [{ weekday: 3, period: 3, span: 1 }], periods)).toEqual({ start: '12:40', end: '14:10' });
+	});
+
+	it('is null on a day the class does not meet, or when the periods are not known', () => {
+		expect(classTimeOn('2026-10-01', [{ weekday: 3, period: 1, span: 1 }], periods)).toBeNull();
+		expect(classTimeOn('2026-09-30', [{ weekday: 3, period: 5, span: 1 }], periods)).toBeNull();
+		expect(classTimeOn('', [{ weekday: 3, period: 1, span: 1 }], periods)).toBeNull();
 	});
 });
