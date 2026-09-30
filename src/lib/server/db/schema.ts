@@ -325,6 +325,16 @@ export const courseAbsences = sqliteTable(
 	(t) => [uniqueIndex('course_absences_course_date_idx').on(t.courseId, t.date)]
 );
 
+// One row a day, written by the daily cron: what the graphs in 運営 → 数字 can't work out
+// afterwards, since who opened the app lasts only as "last seen".
+export const dailyStats = sqliteTable('daily_stats', {
+	date: text('date').primaryKey(), // YYYY-MM-DD, Japan time
+	users: integer('users').notNull(),
+	activeDay: integer('active_day').notNull(), // opened the app in the 24 hours before
+	activeWeek: integer('active_week').notNull(),
+	verified: integer('verified').notNull()
+});
+
 // A day whose shared cancellation the admin has taken down (a prank, a mistake): nobody sees
 // it as a cancellation for that class on that date.
 export const cancellationHides = sqliteTable(

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "292e09e7-b23b-4723-bafe-965753f4dab8",
+  "id": "1d980d75-0299-4fbf-bba6-85e49d3db167",
   "prevId": "1ca30d95-8c5e-48a0-9cb8-85fcbd4bae64",
   "tables": {
     "auth_challenges": {
@@ -126,6 +126,60 @@
             "blocked_id"
           ],
           "name": "blocks_blocker_id_blocked_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "cancellation_hides": {
+      "name": "cancellation_hides",
+      "columns": {
+        "shared_course_id": {
+          "name": "shared_course_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch() * 1000)"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cancellation_hides_shared_course_id_shared_courses_id_fk": {
+          "name": "cancellation_hides_shared_course_id_shared_courses_id_fk",
+          "tableFrom": "cancellation_hides",
+          "tableTo": "shared_courses",
+          "columnsFrom": [
+            "shared_course_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "cancellation_hides_shared_course_id_date_pk": {
+          "columns": [
+            "shared_course_id",
+            "date"
+          ],
+          "name": "cancellation_hides_shared_course_id_date_pk"
         }
       },
       "uniqueConstraints": {},
@@ -743,6 +797,51 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "daily_stats": {
+      "name": "daily_stats",
+      "columns": {
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "users": {
+          "name": "users",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active_day": {
+          "name": "active_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active_week": {
+          "name": "active_week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "verified": {
+          "name": "verified",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -2640,6 +2739,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "share_cancellations": {
+          "name": "share_cancellations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         },
         "last_seen_at": {
           "name": "last_seen_at",
