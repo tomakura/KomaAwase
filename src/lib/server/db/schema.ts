@@ -14,7 +14,7 @@ const createdAt = () =>
 // --- accounts & auth ---
 
 // Which notifications to send; a missing key means on
-export type NotifySettings = Partial<Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin', boolean>>;
+export type NotifySettings = Partial<Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'planEve', boolean>>;
 
 // `photo` is when the user's photo (user_photos) was last set, which also busts caches
 export type UserIcon = { color: string; text: string; photo?: number };
@@ -299,6 +299,28 @@ export const courseNotes = sqliteTable(
 		createdAt: createdAt()
 	},
 	(t) => [index('course_notes_course_idx').on(t.courseId)]
+);
+
+// Things to remember that belong to the person, not to a class: a test, a circle meeting, an
+// interview. A class's homework stays in course_notes; the 予定 tab shows both.
+export const events = sqliteTable(
+	'events',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		date: text('date').notNull(), // YYYY-MM-DD
+		startTime: text('start_time'), // HH:MM, or null for all day
+		endTime: text('end_time'),
+		place: text('place'),
+		memo: text('memo'),
+		// A class it belongs to, such as its test; it stays when the class is deleted
+		courseId: text('course_id').references(() => courses.id, { onDelete: 'set null' }),
+		createdAt: createdAt()
+	},
+	(t) => [index('events_user_date_idx').on(t.userId, t.date)]
 );
 
 // Files kept with a course. The bytes are on the rental server (relay/files.php) under

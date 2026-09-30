@@ -31,7 +31,7 @@ export const SYNC_STEPS: SyncStep[] = [
 		every: 15 * MINUTE,
 		requests: [{ url: '/__data.json?x-sveltekit-trailing-slash=1' }, { url: '/', html: true }]
 	},
-	{ path: '/overlay', label: '重ねる', every: 3 * HOUR, requests: [{ url: '/overlay/__data.json' }] },
+	{ path: '/plans', label: '予定', every: 3 * HOUR, requests: [{ url: '/plans/__data.json' }] },
 	{ path: '/friends', label: '友だち', every: 3 * HOUR, requests: [{ url: '/friends/__data.json' }] },
 	{ path: '/more', label: 'その他', every: 3 * HOUR, requests: [{ url: '/more/__data.json' }] }
 ];

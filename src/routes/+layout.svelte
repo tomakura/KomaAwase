@@ -88,7 +88,7 @@
 
 	// How a navigation moves: between the tabs it fades, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
-	const TABS = ['/', '/overlay', '/friends', '/more'];
+	const TABS = ['/', '/plans', '/friends', '/more'];
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
 	const depth = (path: string) => path.split('/').filter(Boolean).length;
 

@@ -52,7 +52,7 @@ const RECOVERED_MS = 2_500;
 const TOAST_MS = 4_000;
 // After a change, the copy of the timetable is out of date; it is refreshed once things settle
 const CHANGE_DELAY = 6_000;
-const STALE_AFTER_CHANGE = ['/overlay/__data.json', '/more/__data.json'];
+const STALE_AFTER_CHANGE = ['/overlay/__data.json', '/plans/__data.json', '/more/__data.json'];
 
 // The attribute on <body> that has links prepare their page when the pointer nears (src/app.html)
 const PRELOAD = 'data-sveltekit-preload-data';

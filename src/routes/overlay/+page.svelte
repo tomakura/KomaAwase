@@ -2,6 +2,7 @@
 	import { goto, replaceState } from '$app/navigation';
 	import { fade, slide } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { connection } from '$lib/connection.svelte';
@@ -127,9 +128,7 @@
 </svelte:head>
 
 <div class="screen">
-	<header>
-		<h1>コマを重ねる</h1>
-	</header>
+	<PageHeader title="コマを重ねる" back="/friends" />
 
 	<TermBar year={data.year} terms={data.mine.terms} bind:termId onchange={() => replaceState(query(selected), {})} />
 
@@ -228,7 +227,7 @@
 	</section>
 
 	<div class="spacer"></div>
-	<BottomNav current="overlay" />
+	<BottomNav current="friends" />
 </div>
 
 <Sheet
@@ -259,17 +258,6 @@
 </Sheet>
 
 <style>
-	header {
-		padding: 18px 16px 4px;
-	}
-
-	h1 {
-		margin: 0;
-		font-family: var(--font-display);
-		font-weight: 700;
-		font-size: 22px;
-	}
-
 	.chips {
 		display: flex;
 		flex-wrap: wrap;

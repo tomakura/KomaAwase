@@ -54,7 +54,7 @@ function setup(
 		removeItem: (k: string) => void stored.delete(k)
 	});
 	vi.stubGlobal('HTMLFormElement', FakeForm);
-	if (opts.synced) opts.cached ??= ['/', '/overlay', '/friends', '/more'];
+	if (opts.synced) opts.cached ??= ['/', '/plans', '/friends', '/more'];
 	if (opts.cached) {
 		// Read when asked, as the service worker keeps adding to it
 		const list = opts.cached;
@@ -109,39 +109,39 @@ describe('starting', () => {
 	it('fetches only the tab whose copy is gone, even if the last sync was recent (a new version clears them)', async () => {
 		const { asked } = setup({ synced: true, cached: ['/', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
-		expect(asked).toEqual(['/overlay/__data.json']);
+		expect(asked).toEqual(['/plans/__data.json']);
 	});
 
 	it('fetches only what is out of date: the timetable after 15 minutes, the other tabs after 3 hours', async () => {
 		const ago = (minutes: number) => allFresh(minutes * 60_000);
-		const quarter = setup({ synced: ago(16), cached: ['/', '/overlay', '/friends', '/more'] });
+		const quarter = setup({ synced: ago(16), cached: ['/', '/plans', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(quarter.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/']);
 		quarter.stop();
 
-		const hours = setup({ synced: ago(181), cached: ['/', '/overlay', '/friends', '/more'] });
+		const hours = setup({ synced: ago(181), cached: ['/', '/plans', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(hours.asked).toHaveLength(5);
 		hours.stop();
 
-		const recent = setup({ synced: ago(14), cached: ['/', '/overlay', '/friends', '/more'] });
+		const recent = setup({ synced: ago(14), cached: ['/', '/plans', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(recent.asked).toEqual([]);
 	});
 
 	it('does not fetch a page that was just opened: its answer counts, and so does a page loaded from the server', async () => {
-		const opened = setup({ path: '/', synced: false, cached: ['/', '/overlay', '/friends', '/more'] });
+		const opened = setup({ path: '/', synced: false, cached: ['/', '/plans', '/friends', '/more'] });
 		// The top page came with the app: its HTML is fresh, its data is not yet
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(opened.asked).toContain('/__data.json?x-sveltekit-trailing-slash=1');
 		expect(opened.asked).not.toContain('/');
 		opened.stop();
 
-		const s = setup({ synced: ago(200), cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ synced: ago(200), cached: ['/', '/plans', '/friends', '/more'] });
 		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
 		// Opened by a link: SvelteKit asks with the parts to reload, which is the same page
 		await fetch('/friends/__data.json?x-sveltekit-invalidated=01');
-		await fetch('/overlay/__data.json?x-sveltekit-invalidated=11');
+		await fetch('/plans/__data.json?x-sveltekit-invalidated=11');
 		await vi.advanceTimersByTimeAsync(5_000);
 		// The timetable and 'その他' are out of date; the two tabs just opened are not fetched again
 		expect(s.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/', '/more/__data.json']);
@@ -150,13 +150,13 @@ describe('starting', () => {
 		}
 	});
 
-	it('makes the overlay and その他 out of date after a change, whatever their age, for the next sync', async () => {
+	it('makes 予定 and その他 out of date after a change, whatever their age, for the next sync', async () => {
 		const s = setup({ synced: true });
 		await flush(); // the decision made when the app opens comes first
 		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
 		await fetch('/courses/abc/edit', { method: 'POST' });
 		const recorded = JSON.parse(s.stored.get(FRESH_KEY)!).at;
-		expect(Object.keys(recorded)).not.toContain('/overlay/__data.json');
+		expect(Object.keys(recorded)).not.toContain('/plans/__data.json');
 		expect(Object.keys(recorded)).not.toContain('/more/__data.json');
 		expect(Object.keys(recorded)).toContain('/friends/__data.json');
 
@@ -166,7 +166,7 @@ describe('starting', () => {
 		s.asked.length = 0;
 		s.page.get('visibilitychange')!();
 		await vi.advanceTimersByTimeAsync(1_000);
-		expect(s.asked).toEqual(['/overlay/__data.json', '/more/__data.json']);
+		expect(s.asked).toEqual(['/plans/__data.json', '/more/__data.json']);
 	});
 
 	it('does not take a page as saved before the service worker handles the app (the first visit)', async () => {
@@ -185,7 +185,7 @@ describe('starting', () => {
 	});
 
 	it('fetches the HTML of the top page too on a first visit, and stops asking for it once it is kept', async () => {
-		const s = setup({ path: '/', synced: false, controlled: true, cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ path: '/', synced: false, controlled: true, cached: ['/', '/plans', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
 		// Loaded with the app under the service worker: its HTML is kept
 		expect(s.asked).not.toContain('/');
@@ -197,7 +197,7 @@ describe('starting', () => {
 	});
 
 	it('does not count an answer from a saved copy as fresh', async () => {
-		const s = setup({ synced: allFresh(200 * 60_000), cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ synced: allFresh(200 * 60_000), cached: ['/', '/plans', '/friends', '/more'] });
 		const fetch = s.connection.observe(
 			(async () => new Response('{}', { headers: { [SAVED_AT_HEADER]: String(Date.now() - 1000) } })) as typeof globalThis.fetch,
 			ORIGIN
@@ -209,13 +209,13 @@ describe('starting', () => {
 	});
 
 	it('remembers the pages by the version of the app: a new one starts again', async () => {
-		const s = setup({ synced: JSON.stringify({ version: 'v0', at: JSON.parse(allFresh()).at }), cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ synced: JSON.stringify({ version: 'v0', at: JSON.parse(allFresh()).at }), cached: ['/', '/plans', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(s.asked).toHaveLength(5);
 	});
 
 	it('syncs only the timetable when the browser asks to spare data, but everything when the button is pressed', async () => {
-		const s = setup({ saveData: true, synced: false, cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ saveData: true, synced: false, cached: ['/', '/plans', '/friends', '/more'] });
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(s.asked).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/']);
 
@@ -271,7 +271,7 @@ describe('when the connection is down', () => {
 		expect(s.asked.filter((u) => !u.startsWith('/api/ping'))).toEqual([
 			'/__data.json?x-sveltekit-trailing-slash=1',
 			'/',
-			'/overlay/__data.json',
+			'/plans/__data.json',
 			'/friends/__data.json',
 			'/more/__data.json'
 		]);
@@ -350,7 +350,7 @@ describe('when the connection is down', () => {
 		expect(s.invalidate).not.toHaveBeenCalled();
 		// What was fetched before the failure is kept, so the next try starts where this one stopped
 		const fresh = Object.keys(JSON.parse(s.stored.get(FRESH_KEY)!).at);
-		expect(fresh).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/', '/overlay/__data.json']);
+		expect(fresh).toEqual(['/__data.json?x-sveltekit-trailing-slash=1', '/', '/plans/__data.json']);
 	});
 
 	it('turns the refresh button around at least a moment, then says if it is still down', async () => {
@@ -382,7 +382,7 @@ describe('showing progress', () => {
 
 		await vi.advanceTimersByTimeAsync(1_300);
 		expect(s.connection.visible).toBe(true);
-		expect(s.connection.progress).toEqual({ done: 1, total: 4, label: '重ねる' });
+		expect(s.connection.progress).toEqual({ done: 1, total: 4, label: '予定' });
 
 		await vi.advanceTimersByTimeAsync(2_000);
 		expect(s.connection.phase).toBe('idle');
@@ -480,7 +480,7 @@ describe('while the connection is down, what needs the server is off', () => {
 	});
 
 	it('counts a page opened since the copies were listed as on the device', async () => {
-		const s = setup({ synced: true, cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ synced: true, cached: ['/', '/plans', '/friends', '/more'] });
 		await flush();
 		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
 		await fetch('/courses/abc/__data.json?x-sveltekit-invalidated=01');
@@ -526,7 +526,7 @@ describe('while the connection is down, what needs the server is off', () => {
 	});
 
 	it('counts a view opened while online as kept, so it opens again offline', async () => {
-		const s = setup({ synced: true, cached: ['/', '/overlay', '/friends', '/more'] });
+		const s = setup({ synced: true, cached: ['/', '/plans', '/friends', '/more'] });
 		await flush();
 		const fetch = s.connection.observe((async () => new Response('{}')) as typeof globalThis.fetch, ORIGIN);
 		await fetch('/overlay/__data.json?with=u3&term=T&x-sveltekit-invalidated=01');

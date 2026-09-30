@@ -21,7 +21,7 @@ const page = (body = '{"type":"data","nodes":[]}') => new Response(body, { heade
 const allPages = () => ({
 	'/__data.json?x-sveltekit-trailing-slash=1': page(),
 	'/': new Response('<html></html>'),
-	'/overlay/__data.json': page(),
+	'/plans/__data.json': page(),
 	'/friends/__data.json': page(),
 	'/more/__data.json': page()
 });
@@ -35,13 +35,13 @@ describe('runSync', () => {
 		expect(asked.map((a) => a.url)).toEqual([
 			'/__data.json?x-sveltekit-trailing-slash=1',
 			'/',
-			'/overlay/__data.json',
+			'/plans/__data.json',
 			'/friends/__data.json',
 			'/more/__data.json'
 		]);
 		expect(seen.map((p) => `${p.done}/${p.total} ${p.label}`)).toEqual([
 			'0/4 時間割',
-			'1/4 重ねる',
+			'1/4 予定',
 			'2/4 友だち',
 			'3/4 その他',
 			'4/4 '
@@ -58,7 +58,7 @@ describe('runSync', () => {
 	});
 
 	it('stops at the first failure instead of trying the rest', async () => {
-		const { fetcher, asked } = server({ ...allPages(), '/overlay/__data.json': () => new Response('x', { status: 500 }) });
+		const { fetcher, asked } = server({ ...allPages(), '/plans/__data.json': () => new Response('x', { status: 500 }) });
 		expect(await runSync(SYNC_STEPS, { fetch: fetcher, timeout: 1000 })).toEqual({ ok: false, reason: 'error' });
 		expect(asked.map((a) => a.url)).not.toContain('/friends/__data.json');
 	});
@@ -261,7 +261,7 @@ describe('syncKey', () => {
 describe('dueSteps', () => {
 	const NOW = 10_000_000_000;
 	const MIN = 60_000;
-	const all = new Set(['/', '/overlay', '/friends', '/more']);
+	const all = new Set(['/', '/plans', '/friends', '/more']);
 	const fresh = (ago: Record<string, number>) => Object.fromEntries(Object.entries(ago).map(([k, v]) => [k, NOW - v]));
 	const urls = (steps: ReturnType<typeof dueSteps>) => steps.flatMap((s) => s.requests.map((r) => r.url));
 	const TOP = '/__data.json?x-sveltekit-trailing-slash=1';
@@ -271,23 +271,23 @@ describe('dueSteps', () => {
 	});
 
 	it('is nothing when everything is fresh', () => {
-		const f = fresh({ [TOP]: MIN, '/': MIN, '/overlay/__data.json': MIN, '/friends/__data.json': MIN, '/more/__data.json': MIN });
+		const f = fresh({ [TOP]: MIN, '/': MIN, '/plans/__data.json': MIN, '/friends/__data.json': MIN, '/more/__data.json': MIN });
 		expect(dueSteps(SYNC_STEPS, { now: NOW, fresh: f, cached: all })).toEqual([]);
 	});
 
 	it('keeps the timetable for 15 minutes and the other tabs for 3 hours', () => {
-		const f = fresh({ [TOP]: 16 * MIN, '/': 16 * MIN, '/overlay/__data.json': 2 * 60 * MIN, '/friends/__data.json': 181 * MIN, '/more/__data.json': 179 * MIN });
+		const f = fresh({ [TOP]: 16 * MIN, '/': 16 * MIN, '/plans/__data.json': 2 * 60 * MIN, '/friends/__data.json': 181 * MIN, '/more/__data.json': 179 * MIN });
 		expect(urls(dueSteps(SYNC_STEPS, { now: NOW, fresh: f, cached: all }))).toEqual([TOP, '/', '/friends/__data.json']);
 	});
 
 	it('fetches only the request that is out of date in a step', () => {
-		const f = fresh({ [TOP]: MIN, '/': 20 * MIN, '/overlay/__data.json': MIN, '/friends/__data.json': MIN, '/more/__data.json': MIN });
+		const f = fresh({ [TOP]: MIN, '/': 20 * MIN, '/plans/__data.json': MIN, '/friends/__data.json': MIN, '/more/__data.json': MIN });
 		expect(urls(dueSteps(SYNC_STEPS, { now: NOW, fresh: f, cached: all }))).toEqual(['/']);
 	});
 
 	it('fetches a page whose copy is gone, whatever the record says', () => {
-		const f = fresh({ [TOP]: MIN, '/': MIN, '/overlay/__data.json': MIN, '/friends/__data.json': MIN, '/more/__data.json': MIN });
-		expect(urls(dueSteps(SYNC_STEPS, { now: NOW, fresh: f, cached: new Set(['/', '/more']) }))).toEqual(['/overlay/__data.json', '/friends/__data.json']);
+		const f = fresh({ [TOP]: MIN, '/': MIN, '/plans/__data.json': MIN, '/friends/__data.json': MIN, '/more/__data.json': MIN });
+		expect(urls(dueSteps(SYNC_STEPS, { now: NOW, fresh: f, cached: new Set(['/', '/more']) }))).toEqual(['/plans/__data.json', '/friends/__data.json']);
 	});
 
 	it('takes a shorter or longer age when asked', () => {

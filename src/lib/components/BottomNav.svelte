@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
-	let { current }: { current: 'timetable' | 'overlay' | 'friends' | 'more' } = $props();
+	let { current }: { current: 'timetable' | 'plans' | 'friends' | 'more' } = $props();
 
 	// Friend requests waiting for an answer, from the root layout
 	const pending = $derived(Number(page.data.pendingRequests ?? 0));
@@ -15,12 +15,12 @@
 		</svg>
 		時間割
 	</a>
-	<a href="/overlay" aria-current={current === 'overlay' ? 'page' : undefined}>
+	<a href="/plans" aria-current={current === 'plans' ? 'page' : undefined}>
 		<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-			<rect x="3.5" y="3.5" width="11" height="11" rx="2.5" />
-			<rect x="9.5" y="9.5" width="11" height="11" rx="2.5" />
+			<rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+			<path d="M3.5 10h17M8 3v4M16 3v4M8.5 15l2.5 2.5 4.5-5" />
 		</svg>
-		重ねる
+		予定
 	</a>
 	<a href="/friends" aria-current={current === 'friends' ? 'page' : undefined}>
 		<span class="icon">
