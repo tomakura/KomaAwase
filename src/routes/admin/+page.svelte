@@ -7,7 +7,7 @@
 
 	let { data } = $props();
 
-	const TARGETS = { user: '利用者', group: 'グループ', shared_course: '共有授業' } as const;
+	const TARGETS = { user: '利用者', group: 'グループ', shared_course: '共有授業', shared_cancel: '休講の共有' } as const;
 	const KINDS = { bug: '不具合', request: '要望', other: 'そのほか' } as const;
 	// This page with another page of one list, the other list left where it is
 	function pageHref(key: 'reports' | 'feedback', n: number) {
@@ -58,6 +58,12 @@
 				<div class="foot">
 					<span class="from">{r.reporter ?? '（退会した人）'}{#if r.reporterEmail}（{r.reporterEmail}）{/if}から</span>
 					{#if r.targetType === 'shared_course'}<a href="/shared/{r.targetId}?back=/admin">変更の履歴</a>{/if}
+					{#if r.targetType === 'shared_cancel'}
+						<form method="POST" action="?/hideCancel" use:enhance>
+							<input type="hidden" name="targetId" value={r.targetId} />
+							<button class="small" type="submit">その日の共有を消す</button>
+						</form>
+					{/if}
 					<form method="POST" action="?/closeReport" use:enhance>
 						<input type="hidden" name="id" value={r.id} />
 						<button class="small" type="submit">対応済み</button>
@@ -195,6 +201,10 @@
 
 	.foot form {
 		margin-left: auto;
+	}
+
+	.foot form + form {
+		margin-left: 0;
 	}
 
 	.small {

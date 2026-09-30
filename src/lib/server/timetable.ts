@@ -1,11 +1,13 @@
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, desc, eq, inArray, lt, type SQLWrapper } from 'drizzle-orm';
+import { MAYBE_MIN } from '$lib/cancellations';
 import { DEFAULT_PERIODS, termTemplate, type PeriodInput, type TermInput } from '$lib/presets';
 import { remapTerm } from '$lib/terms';
 import { academicYear, isDate, tokyoTime } from '$lib/time';
 import type { KnownTimetable } from './auth/session';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
+import { sharedCancellations } from './cancellations';
 import { upcomingCancellations } from './notes';
 import { sharedCourseQueries, sharedCoursesFrom } from './shared-courses';
 import { getUniversity } from './universities';
@@ -231,7 +233,8 @@ export async function loadShape(db: Db, timetableId: string) {
 
 
 // `today` (YYYY-MM-DD) picks the cancellations still to come.
-export async function loadTimetable(db: Db, timetableId: string, today: string) {
+// `viewerId` adds `maybeCancels`: days other people syncing the class have marked as 休講.
+export async function loadTimetable(db: Db, timetableId: string, today: string, viewerId?: string) {
 	// Synced courses show the shared title, slots and rooms, read in the same batch.
 	const syncedIds = db
 		.select({ id: courses.sharedCourseId })
@@ -276,6 +279,14 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 		...sharedCourseQueries(db, syncedIds)
 	]);
 	const shared = sharedCoursesFrom(sharedRows, sharedSlots, sharedTeachers);
+	const votes = viewerId
+		? await sharedCancellations(
+				db,
+				viewerId,
+				courseRows.flatMap((c) => (c.syncMode === 'synced' && c.sharedCourseId ? [c.sharedCourseId] : [])),
+				today
+			)
+		: [];
 
 	return {
 		terms: termRows,
@@ -295,7 +306,12 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 				intensiveTo: values.intensiveTo,
 				credits: values.credits,
 				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
-				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : []))
+				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : [])),
+				// Not the ones this person already marked themselves
+				maybeCancels: votes
+					.filter((v) => syncMode === 'synced' && v.sharedCourseId === sharedCourseId && v.n >= MAYBE_MIN)
+					.map((v) => v.date)
+					.filter((d) => !cancelRows.some((r) => r.courseId === c.id && r.date === d))
 			};
 		})
 	};

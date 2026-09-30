@@ -4,6 +4,7 @@
 	import DayPicker from '$lib/components/DayPicker.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Segmented from '$lib/components/Segmented.svelte';
+	import Switch from '$lib/components/Switch.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { daysLabel } from '$lib/courses';
 	import { THEMES, applyTheme, type Theme } from '$lib/theme';
@@ -17,6 +18,9 @@
 	let daysForm = $state<HTMLFormElement>();
 	let themeForm = $state<HTMLFormElement>();
 	let editingDays = $state(false);
+	// svelte-ignore state_referenced_locally
+	let shareCancel = $state(data.shareCancellations);
+	let shareForm = $state<HTMLFormElement>();
 </script>
 
 <svelte:head>
@@ -91,6 +95,24 @@
 			<div class="ui-list">
 				{@render link('/more/notifications', '通知')}
 				{@render link('/install', 'ホーム画面に追加')}
+				<form
+					class="block share"
+					method="POST"
+					action="?/shareCancellations"
+					bind:this={shareForm}
+					use:enhance={() => async ({ update }) => update({ reset: false })}
+				>
+					<span id="share-cancel-label" class="share-text">
+						休講を同じ授業の人に知らせる
+						<span class="share-sub">名前は出ません。人数だけが見えます。</span>
+					</span>
+					<Switch
+						bind:checked={shareCancel}
+						name="share"
+						labelledby="share-cancel-label"
+						onchange={() => queueMicrotask(() => shareForm?.requestSubmit())}
+					/>
+				</form>
 			</div>
 		</section>
 
@@ -215,6 +237,26 @@
 
 	.label {
 		font-size: 14px;
+	}
+
+	.share {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 14px;
+		font-size: 14px;
+	}
+
+	.share-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.share-sub {
+		font-size: 12px;
+		color: var(--ink-sub);
 	}
 
 	.account-actions {

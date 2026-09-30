@@ -9,6 +9,8 @@
 		slots: GridSlot[];
 		// Cancelled days (YYYY-MM-DD); only the owner's own timetable has them
 		cancels?: string[];
+		// Days other people syncing the class have marked as cancelled (a guess, not the owner's own)
+		maybeCancels?: string[];
 	};
 </script>
 
@@ -71,6 +73,7 @@
 		span: number;
 		live: { progress: number; left: number } | null;
 		cancel: string | null;
+		maybe: string | null;
 		// False for a slot on alternate weeks that doesn't meet this week
 		meets: boolean;
 	};
@@ -87,9 +90,14 @@
 					(course.cancels ?? [])
 						.filter((d) => weekdayOf(d) === slot.weekday && d >= clock.date && d <= addDays(clock.date, 6))
 						.sort()[0] ?? null;
+				const maybe = cancel
+					? null
+					: ((course.maybeCancels ?? [])
+							.filter((d) => weekdayOf(d) === slot.weekday && d >= clock.date && d <= addDays(clock.date, 6))
+							.sort()[0] ?? null);
 				const meets = meetsInWeek(slot.week, termStart, clock.date);
 				const live = cancel === clock.date || !meets ? null : session(slot.weekday, row, span);
-				return [{ course, slot, row, col, span, live, cancel, meets }];
+				return [{ course, slot, row, col, span, live, cancel, maybe, meets }];
 			})
 		)
 	);
@@ -115,7 +123,7 @@
 	const time = (hhmm: string) => hhmm.replace(/^0/, '');
 </script>
 
-{#snippet course({ course, slot, live, cancel, meets }: Cell)}
+{#snippet course({ course, slot, live, cancel, maybe, meets }: Cell)}
 	{@const week = slot.week === 'odd' ? '奇' : slot.week === 'even' ? '偶' : null}
 	<svelte:element
 		this={courseHref ? 'a' : 'div'}
@@ -132,7 +140,7 @@
 			<span class="title" use:wrapTitle={course.title}>{course.title}</span>
 		{/key}
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
-		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{/if}
+		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{:else if maybe}<span class="cancel maybe" title="{monthDay(maybe)}に休講と入れている人がいます">休講かも</span>{/if}
 		{#if slot.room && week}
 			<span class="room"><b class="week" aria-label="{week}数週">{week}</b>{slot.room}</span>
 		{:else if slot.room || week}
@@ -352,6 +360,12 @@
 		font-size: 10px;
 		font-weight: 700;
 		white-space: nowrap;
+	}
+
+	.cancel.maybe {
+		background: var(--surface);
+		color: var(--ink);
+		box-shadow: inset 0 0 0 1px var(--ink);
 	}
 
 	.room {

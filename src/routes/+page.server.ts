@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const today = tokyoTime(now).date;
 	const timetable = await getOrCreateTimetable(locals.db, locals.user, academicYear(today), locals.timetable);
 	const [loaded, imported] = await Promise.all([
-		loadTimetable(locals.db, timetable.id, today),
+		loadTimetable(locals.db, timetable.id, today, locals.user.id),
 		unreviewedImport(locals.db, locals.user.id)
 	]);
 	return {

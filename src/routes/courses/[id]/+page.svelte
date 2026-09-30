@@ -20,6 +20,7 @@
 		weekLabel
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
+	import { votesLabel } from '$lib/cancellations';
 	import { whenLabel } from '$lib/plans';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
 
@@ -375,6 +376,34 @@
 								{#if e.memo}<span class="sub memo-line">{e.memo}</span>{/if}
 							</span>
 							{@render removeButton(e.id, `イベント「${e.title}」`, 'removeEvent')}
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			{#if data.sharedCancels.length}
+				<section>
+					<h2>みんなの休講</h2>
+					{#each data.sharedCancels as c (c.date)}
+						<div transition:slide={motion()} class="item">
+							<span class="text">
+								<span class="main">{withDay(c.date)}</span>
+								<span class="sub">{votesLabel(c.n)}</span>
+							</span>
+							<form method="POST" action={actionHref('adoptCancel', data.termParam)} use:enhance>
+								<input type="hidden" name="date" value={c.date} />
+								<button class="absent" type="submit">休講にする</button>
+							</form>
+							<form
+								method="POST"
+								action={actionHref('reportCancel', data.termParam)}
+								use:enhance={({ cancel }) => {
+									if (!confirm(`${withDay(c.date)}の休講は、まちがいかいたずらだと運営に伝えます`)) cancel();
+								}}
+							>
+								<input type="hidden" name="date" value={c.date} />
+								<button class="absent quiet" type="submit" disabled={c.reported}>{c.reported ? '報告ずみ' : 'まちがい'}</button>
+							</form>
 						</div>
 					{/each}
 				</section>
@@ -858,6 +887,13 @@
 		font-size: 13px;
 		font-weight: 700;
 		cursor: pointer;
+	}
+
+	.absent.quiet {
+		border-color: transparent;
+		background: transparent;
+		color: var(--ink-sub);
+		font-weight: 400;
 	}
 
 	.absent:disabled {

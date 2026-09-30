@@ -1,11 +1,12 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import { courseAbsences } from '$lib/server/db/schema';
+import { courseAbsences, courseNotes } from '$lib/server/db/schema';
 import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
+import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
 import { addEvent, deleteEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
 import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
-import { tokyoTime } from '$lib/time';
+import { isDate, tokyoTime } from '$lib/time';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -20,15 +21,29 @@ export const load: PageServerLoad = async ({ locals, params, url, platform }) =>
 	if (!loaded) error(404, '授業が見つかりません');
 	// The みんなの授業データ page is for people with an enrollment check
 	const shareable = loaded.shared ? (await sharedAccess(locals.db, locals.user.id, loaded.timetable.universityId)) === 'ok' : false;
+	const today = tokyoTime(Date.now()).date;
+	// What others syncing this class have marked as cancelled, apart from days already marked here
+	const synced = loaded.course.syncMode === 'synced' ? loaded.shared : null;
+	const [votes, reported] = synced
+		? await Promise.all([
+				sharedCancellations(locals.db, locals.user.id, [synced.id], today),
+				reportedDates(locals.db, locals.user.id, synced.id)
+			])
+		: [[], []];
+	const own = new Set(loaded.notes.filter((n) => n.kind === 'cancel').map((n) => n.date));
 	return {
 		...loaded,
+		sharedCancels: votes
+			.filter((v) => !own.has(v.date))
+			.map((v) => ({ date: v.date, n: v.n, reported: reported.includes(v.date) }))
+			.sort((a, b) => a.date.localeCompare(b.date)),
 		shareable,
 		files,
 		events: courseEvents,
 		usedBytes: used,
 		quotaBytes: USER_QUOTA_BYTES,
 		filesEnabled: !!platform && filesEnabled(platform.env),
-		today: tokyoTime(Date.now()).date,
+		today,
 		termParam: url.searchParams.get('term')
 	};
 };
@@ -46,6 +61,26 @@ export const actions: Actions = {
 		if ('message' in parsed) return fail(400, { message: parsed.message });
 		await addNote(event.locals.db, courseId, parsed.note);
 		return { added: true };
+	},
+	// Marks the day as cancelled here too, as others syncing the class have
+	adoptCancel: async (event) => {
+		const courseId = await ownCourse(event);
+		const date = String((await event.request.formData()).get('date') ?? '');
+		if (!isDate(date)) return fail(400, { message: '日付を確かめてください' });
+		const has = await event.locals.db
+			.select({ id: courseNotes.id })
+			.from(courseNotes)
+			.where(and(eq(courseNotes.courseId, courseId), eq(courseNotes.kind, 'cancel'), eq(courseNotes.date, date)))
+			.get();
+		if (!has) await addNote(event.locals.db, courseId, { kind: 'cancel', date, body: '' });
+	},
+	reportCancel: async (event) => {
+		const courseId = await ownCourse(event);
+		const date = String((await event.request.formData()).get('date') ?? '');
+		if (!isDate(date)) return fail(400, { message: '日付を確かめてください' });
+		const loaded = await loadCourse(event.locals.db, event.locals.user!.id, courseId);
+		if (loaded?.course.syncMode !== 'synced' || !loaded.shared) error(404, '授業が見つかりません');
+		await reportCancellation(event.locals.db, event.locals.user!.id, loaded.shared.id, date);
 	},
 	// An event of this class (an exam, say); it also shows in the 予定 tab
 	event: async (event) => {

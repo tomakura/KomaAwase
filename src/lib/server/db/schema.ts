@@ -48,6 +48,8 @@ export const users = sqliteTable('users', {
 	verifyPromptStage: integer('verify_prompt_stage'),
 	// Set by an admin: signed out everywhere, the login refuses the account, others don't see it
 	suspendedAt: integer('suspended_at', { mode: 'timestamp_ms' }),
+	// Whether the cancellations this person marks on a synced course count for others
+	shareCancellations: integer('share_cancellations', { mode: 'boolean' }).notNull().default(true),
 	// The last day the app was opened (written at most every few hours), for the admin's list
 	lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' }),
 	createdAt: createdAt()
@@ -323,6 +325,20 @@ export const courseAbsences = sqliteTable(
 	(t) => [uniqueIndex('course_absences_course_date_idx').on(t.courseId, t.date)]
 );
 
+// A day whose shared cancellation the admin has taken down (a prank, a mistake): nobody sees
+// it as a cancellation for that class on that date.
+export const cancellationHides = sqliteTable(
+	'cancellation_hides',
+	{
+		sharedCourseId: text('shared_course_id')
+			.notNull()
+			.references(() => sharedCourses.id, { onDelete: 'cascade' }),
+		date: text('date').notNull(), // YYYY-MM-DD
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.sharedCourseId, t.date] })]
+);
+
 // Things to remember that belong to the person, not to a class: a test, a circle meeting, an
 // interview. A class's homework stays in course_notes; the 予定 tab shows both.
 export const events = sqliteTable(
@@ -537,7 +553,7 @@ export const reports = sqliteTable(
 	{
 		id: id(),
 		reporterId: text('reporter_id').references(() => users.id, { onDelete: 'set null' }),
-		targetType: text('target_type', { enum: ['user', 'group', 'shared_course'] }).notNull(),
+		targetType: text('target_type', { enum: ['user', 'group', 'shared_course', 'shared_cancel'] }).notNull(),
 		targetId: text('target_id').notNull(),
 		reason: text('reason').notNull(),
 		detail: text('detail'),
