@@ -108,7 +108,9 @@
 					<span>在籍確認</span>
 					<span class="ui-row-value">
 						{#if data.verifyDays !== null}
-							<span class="value" class:soon={data.verifyDays <= 30}>確認済み · あと{data.verifyDays}日</span>
+							<span class="value" class:soon={data.verifyDays <= 30}>
+								確認済み{data.verifyDays <= 30 ? ` · あと${data.verifyDays}日` : ''}
+							</span>
 						{:else}
 							<span class="value">まだ</span>
 						{/if}
