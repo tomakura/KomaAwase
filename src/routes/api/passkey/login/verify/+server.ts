@@ -2,7 +2,8 @@ import { error, json } from '@sveltejs/kit';
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { eq } from 'drizzle-orm';
-import { passkeys } from '$lib/server/db/schema';
+import { SUSPENDED_MESSAGE } from '$lib/moderation';
+import { passkeys, users } from '$lib/server/db/schema';
 import { createSession, setSessionCookie } from '$lib/server/auth/session';
 import { relyingParty, takeChallenge } from '$lib/server/auth/webauthn';
 import type { RequestHandler } from './$types';
@@ -36,6 +37,9 @@ export const POST: RequestHandler = async ({ locals, cookies, url, request }) =>
 		error(400, FAILED);
 	}
 	if (!verification.verified) error(400, FAILED);
+
+	const owner = await locals.db.select({ suspendedAt: users.suspendedAt }).from(users).where(eq(users.id, passkey.userId)).get();
+	if (owner?.suspendedAt) error(403, SUSPENDED_MESSAGE);
 
 	await locals.db
 		.update(passkeys)

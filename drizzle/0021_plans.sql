@@ -23,6 +23,20 @@ CREATE TABLE `events` (
 );
 --> statement-breakpoint
 CREATE INDEX `events_user_date_idx` ON `events` (`user_id`,`date`);--> statement-breakpoint
+CREATE TABLE `warnings` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`body` text NOT NULL,
+	`sent_by` text,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	`acknowledged_at` integer,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`sent_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
+);
+--> statement-breakpoint
+CREATE INDEX `warnings_user_idx` ON `warnings` (`user_id`);--> statement-breakpoint
 ALTER TABLE `courses` ADD `credits` real;--> statement-breakpoint
 ALTER TABLE `courses` ADD `absence_limit` integer;--> statement-breakpoint
-ALTER TABLE `shared_courses` ADD `credits` real;
+ALTER TABLE `shared_courses` ADD `credits` real;--> statement-breakpoint
+ALTER TABLE `users` ADD `suspended_at` integer;--> statement-breakpoint
+ALTER TABLE `users` ADD `last_seen_at` integer;

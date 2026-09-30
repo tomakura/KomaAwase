@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import { SUSPENDED_MESSAGE } from '$lib/moderation';
 	import { loginWithPasskey } from '$lib/passkey';
 	import logo from '$lib/assets/favicon.svg';
 	import Icon from '$lib/components/Icon.svelte';
@@ -67,6 +68,7 @@
 				</svg>
 				Googleで続ける
 			</a>
+			{#if data.suspended}<p class="error" role="alert">{SUSPENDED_MESSAGE}</p>{/if}
 			{#if data.googleFailed}<p class="error" role="alert">Googleでログインできませんでした。もう一度やり直してください</p>{/if}
 			{#if data.googleUseMail}
 				<p class="error" role="alert">このGoogleアカウントのメールアドレスでは続けられません。下からメールアドレスでログインしてください</p>

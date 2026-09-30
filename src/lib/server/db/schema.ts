@@ -46,6 +46,10 @@ export const users = sqliteTable('users', {
 	// How far the enrollment check prompts have gone (see verify-prompt.ts): null = none shown yet.
 	// Reset to null when the person verifies.
 	verifyPromptStage: integer('verify_prompt_stage'),
+	// Set by an admin: signed out everywhere, the login refuses the account, others don't see it
+	suspendedAt: integer('suspended_at', { mode: 'timestamp_ms' }),
+	// The last day the app was opened (written at most every few hours), for the admin's list
+	lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' }),
 	createdAt: createdAt()
 });
 
@@ -507,6 +511,24 @@ export const groupMembers = sqliteTable(
 );
 
 // --- operations ---
+
+// A warning from an admin. It fills the screen on every device of the person until they press
+// 理解しました, which sets acknowledgedAt. The admin is cleared, not the warning, when their
+// account is deleted.
+export const warnings = sqliteTable(
+	'warnings',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		body: text('body').notNull(),
+		sentBy: text('sent_by').references(() => users.id, { onDelete: 'set null' }),
+		createdAt: createdAt(),
+		acknowledgedAt: integer('acknowledged_at', { mode: 'timestamp_ms' })
+	},
+	(t) => [index('warnings_user_idx').on(t.userId)]
+);
 
 // Reports about people, groups and shared course data. The reporter is cleared, not the
 // report, when their account is deleted.

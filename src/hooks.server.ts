@@ -1,8 +1,12 @@
 import type { Handle } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
+import { users } from '$lib/server/db/schema';
 import { SESSION_COOKIE, clearSessionCookie, setSessionCookie, validateSession } from '$lib/server/auth/session';
 import { themeColorTags } from '$lib/theme';
 import { academicYear, tokyoTime } from '$lib/time';
+
+const LAST_SEEN_EVERY = 6 * 60 * 60 * 1000;
 
 export const handle: Handle = async ({ event, resolve }) => {
 	// The app's check that the server answers (src/lib/connection.svelte.ts), while its
@@ -24,6 +28,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.locals.user = result.user;
 			event.locals.timetable = result.timetable;
 			setSessionCookie(event.cookies, token, result.expiresAt);
+			// When the app was last opened, for the admin's list: a page load at most every few hours
+			const seen = result.user.lastSeenAt?.getTime() ?? 0;
+			if (event.request.method === 'GET' && Date.now() - seen > LAST_SEEN_EVERY) {
+				const update = event.locals.db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, result.user.id));
+				if (event.platform) event.platform.ctx.waitUntil(update.then(() => {}, () => {}));
+			}
 		} else {
 			clearSessionCookie(event.cookies);
 		}

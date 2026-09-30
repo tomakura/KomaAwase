@@ -19,6 +19,7 @@ export const GET: RequestHandler = async ({ platform, url, cookies, locals }) =>
 	const user = await userForGoogle(locals.db, account);
 	if (user === 'use-mail') redirect(303, '/login?error=google-mail');
 	if (!user) redirect(303, '/login?error=google');
+	if (user.suspendedAt) redirect(303, '/login?error=suspended');
 	const { token, expiresAt } = await createSession(locals.db, user.id);
 	setSessionCookie(cookies, token, expiresAt);
 

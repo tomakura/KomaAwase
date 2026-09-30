@@ -34,6 +34,10 @@
 
 	<section class="ui-section">
 		<div class="ui-list">
+			<a class="ui-row" href="/admin/users">
+				<span>利用者の管理（警告・利用停止）</span>
+				<span class="ui-row-value"><Icon name="chevron" size={16} /></span>
+			</a>
 			<a class="ui-row" href="/admin/courses">
 				<span>授業の管理（直す・まとめる）</span>
 				<span class="ui-row-value"><Icon name="chevron" size={16} /></span>

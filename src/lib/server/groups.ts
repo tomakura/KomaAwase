@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
 import { groupMembers, groups, universities, users } from './db/schema';
@@ -44,7 +44,11 @@ export async function joinGroup(db: Db, groupId: string, userId: string, share: 
 
 /** Everyone in the group but this person, for telling them someone joined */
 export async function otherMembers(db: Db, groupId: string, userId: string) {
-	const rows = await db.select({ userId: groupMembers.userId }).from(groupMembers).where(eq(groupMembers.groupId, groupId));
+	const rows = await db
+		.select({ userId: groupMembers.userId })
+		.from(groupMembers)
+		.innerJoin(users, and(eq(users.id, groupMembers.userId), isNull(users.suspendedAt)))
+		.where(eq(groupMembers.groupId, groupId));
 	return rows.map((r) => r.userId).filter((id) => id !== userId);
 }
 
@@ -91,6 +95,7 @@ export function listMyGroups(db: Db, userId: string) {
 		.from(groups)
 		.innerJoin(mine, and(eq(mine.groupId, groups.id), eq(mine.userId, userId)))
 		.innerJoin(groupMembers, eq(groupMembers.groupId, groups.id))
+		.innerJoin(users, and(eq(users.id, groupMembers.userId), isNull(users.suspendedAt)))
 		.groupBy(groups.id)
 		.orderBy(asc(groups.name));
 }
@@ -109,7 +114,7 @@ export async function loadGroup(db: Db, groupId: string, viewerId: string) {
 			.from(groupMembers)
 			.innerJoin(users, eq(users.id, groupMembers.userId))
 			.leftJoin(universities, eq(universities.id, users.universityId))
-			.where(eq(groupMembers.groupId, groupId))
+			.where(and(eq(groupMembers.groupId, groupId), isNull(users.suspendedAt)))
 			.orderBy(asc(groupMembers.joinedAt))
 	]);
 	if (!group || !members.some((m) => m.id === viewerId)) return undefined;

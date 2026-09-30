@@ -42,6 +42,11 @@ export async function validateSession(db: Db, token: string, year: number | null
 		.where(eq(sessions.id, id))
 		.get();
 	if (!row) return null;
+	// A suspended account has no sessions (suspendUser ends them); this stops one made since
+	if (row.user.suspendedAt) {
+		await db.delete(sessions).where(eq(sessions.id, id));
+		return null;
+	}
 
 	const now = Date.now();
 	if (row.session.expiresAt.getTime() <= now) {
