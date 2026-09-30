@@ -47,6 +47,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
    - `GROQ_API_KEY`（任意。Groq のダッシュボードの Data Controls でゼロデータ保持を有効にしてから）
    - `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（任意。Google Cloud の OAuth クライアントで、リダイレクト先を `https://koma.tomakura.com/login/google/callback` にする）
    - `VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`（通知。`node scripts/make-vapid.mjs` で作って入れる。作り直すとみんなの通知の登録がやり直しになるので1回だけ）
+   - `TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET_KEY`（任意。お問い合わせのボット対策。Cloudflare の Turnstile でウィジェットを作って入れる。両方あるときだけ使う）
 5. 「開発を応援する」を出すなら、`wrangler.jsonc` の `vars` に `SUPPORT_URL` を足す
-6. `relay/send.php` を変えたときは、シンの `public_html/koma-relay/send.php` に上書きする
+6. `relay/send.php` か `relay/files.php` を変えたときは、アプリを公開するのと同じときに、シンの `public_html/koma-relay/send.php` と `public_html/koma-files/files.php` の両方を上書きする（片方だけ古いと、ログインのメールや資料の保存が失敗する。[relay/README.md](relay/README.md)）
 7. 運営の画面（`/admin`）を使う人は、D1 で `update users set role = 'admin' where email = '…'`
