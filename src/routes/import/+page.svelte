@@ -37,7 +37,7 @@
 			const res = await fetch('/import/upload', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ ...cropped, term: data.term })
+				body: JSON.stringify({ ...cropped, term: data.term, agreed })
 			});
 			const body = (await res.json().catch(() => null)) as { message?: string } | null;
 			if (!res.ok) {
@@ -210,7 +210,9 @@
 			<button class="btn btn-primary" type="button" disabled={!src || !agreed || sending} onclick={start}>
 				{sending ? '送っています…' : '読み込みをはじめる'}
 			</button>
-			<p class="ui-note">1日{data.dailyLimit}回まで読み込めます。見つからない授業は <a href="/courses/new">自分で入力</a> できます。</p>
+			<p class="ui-note">
+				1日{data.dailyLimit}回まで読み込めます。見つからない授業は <a href="/courses/new">自分で入力</a> できます。個人情報の扱いは、<a href="/privacy">プライバシーポリシー</a>をご覧ください。
+			</p>
 		{/if}
 	</div>
 </div>
@@ -304,6 +306,7 @@
 		font-size: 14px;
 		font-weight: 700;
 	}
+
 
 	.item {
 		display: flex;

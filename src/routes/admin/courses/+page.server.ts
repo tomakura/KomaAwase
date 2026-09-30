@@ -1,5 +1,5 @@
-import { error } from '@sveltejs/kit';
 import { count, desc, eq } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth/reauth';
 import { sharedCourses, universities } from '$lib/server/db/schema';
 import { adminSearchShared, sharedTermNames } from '$lib/server/shared-courses';
 import type { PageServerLoad } from './$types';
@@ -7,7 +7,7 @@ import type { PageServerLoad } from './$types';
 // The shared courses for whoever runs the app: find one by name, teacher or code to fix it
 // or fold it into another (/shared/[id]).
 export const load: PageServerLoad = async ({ locals, url }) => {
-	if (locals.user?.role !== 'admin') error(404, 'Not found');
+	await requireAdmin(locals, url);
 	const [list, years] = await Promise.all([
 		locals.db
 			.select({ id: universities.id, name: universities.name, n: count() })

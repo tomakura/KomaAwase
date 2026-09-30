@@ -1,16 +1,25 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
-	import { loginWithPasskey } from '$lib/passkey';
-	import logo from '$lib/assets/favicon.svg';
+	import { canAutofillPasskey, loginWithPasskey, stopPasskeyAutofill } from '$lib/passkey';
+	import Logo from '$lib/components/Logo.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import MailSent from '$lib/components/MailSent.svelte';
+	import SendButton from '$lib/components/SendButton.svelte';
+	import { pauseAfterSent } from '$lib/send';
 	import { clearPageCaches } from '$lib/offline';
 
 	let { data, form } = $props();
 	let busy = $state(false);
-	let sending = $state(false);
-	let passkeyError = $state<string | null>(null);
+	let phase = $state<'idle' | 'sending' | 'done'>('idle');
+	// 'none': cancelled, or no passkey on this device (browsers don't tell them apart)
+	let passkeyResult = $state<'none' | 'failed' | null>(null);
 	let blocked = $state(false);
+	// 「別のアドレスにする」 after a mail was sent
+	let other = $state(false);
+	$effect(() => {
+		if (form?.sentTo) other = false;
+	});
 
 	// Signed out: the pages kept for offline use hold the last person's timetable. Signing in
 	// waits for them to go, so the next person never sees one.
@@ -19,16 +28,34 @@
 		cleared = clearPageCaches().catch(() => {});
 	});
 
+	async function signedIn() {
+		await cleared;
+		await goto(data.next ?? '/', { invalidateAll: true });
+	}
+
+	// A passkey picked from the email field's suggestions signs in too
+	$effect(() => {
+		let stopped = false;
+		canAutofillPasskey().then(async (can) => {
+			if (!can || stopped || !document.querySelector('input[autocomplete~="webauthn"]')) return;
+			const result = await loginWithPasskey(true);
+			if (stopped) return;
+			if (result.ok) await signedIn();
+			else if (result.message) passkeyResult = 'failed';
+		});
+		return () => {
+			stopped = true;
+			stopPasskeyAutofill();
+		};
+	});
+
 	async function onPasskey() {
 		busy = true;
-		passkeyError = null;
+		passkeyResult = null;
 		try {
 			const result = await loginWithPasskey();
-			if (result.ok) {
-				await cleared;
-				await goto(data.next ?? '/', { invalidateAll: true });
-			}
-			else passkeyError = result.message;
+			if (result.ok) await signedIn();
+			else passkeyResult = result.message ? 'failed' : 'none';
 		} finally {
 			busy = false;
 		}
@@ -41,10 +68,14 @@
 
 <main>
 	<div class="brand">
-		<img src={logo} alt="" width="88" height="88" />
+		<Logo size={88} />
 		<h1>コマあわせ</h1>
-		<p>友だちと、時間割を共有しよう。</p>
-		<a class="intro" href="/intro">コマあわせとは<Icon name="chevron" size={14} /></a>
+		{#if data.reauth}
+			<p class="lead">{data.reauth.lead}</p>
+		{:else}
+			<p>友だちと、時間割を共有しよう。</p>
+			<a class="intro" href="/intro">コマあわせとは<Icon name="chevron" size={14} /></a>
+		{/if}
 	</div>
 
 	<div class="actions">
@@ -52,9 +83,13 @@
 		<button class="btn btn-primary" type="button" onclick={onPasskey} disabled={busy}>
 			パスキーでログイン
 		</button>
-		{#if passkeyError}<p class="error" role="alert">{passkeyError}</p>{/if}
+		{#if passkeyResult === 'failed'}
+			<p class="error" role="alert">パスキーでログインできませんでした。もう一度試すか、メールでログインしてください。</p>
+		{:else if passkeyResult === 'none'}
+			<p class="hint" role="status">パスキーがないときは、下のメールでログインしてください。</p>
+		{/if}
 
-		<div class="divider"><span>はじめての人・パスキーがない人</span></div>
+		<div class="divider"><span>{data.reauth ? 'パスキーがないとき' : 'はじめての人・パスキーがない人'}</span></div>
 
 		{#if data.google}
 			<!-- Google's branding rules: the colored G on a white (or, in dark mode, #131314) button -->
@@ -73,43 +108,56 @@
 			{/if}
 		{/if}
 
-		{#if form?.sentTo}
-			<p class="sent" role="status">
-				{form.sentTo} にログイン用のリンクを送りました。15分以内に開いてください。
-			</p>
+		{#if form?.sentTo && !other}
+			{#key form}
+				<MailSent email={form.sentTo} action="?/email" onother={() => (other = true)}>
+					{form.sentTo} にログイン用のリンクを送信しました。15分以内に開いてください。届かないときは、迷惑メールのフォルダも見てください。
+				</MailSent>
+			{/key}
 		{:else}
 			<form
 				method="POST"
 				action="?/email"
 				use:enhance={() => {
-					sending = true;
+					phase = 'sending';
 					blocked = false;
 					return async ({ result, update }) => {
 						// Cloudflare's rate limit answers with its own page, which isn't a form result;
 						// the form stays and says to wait instead of the whole screen being replaced.
 						if (result.type === 'error') blocked = true;
-						else await update();
-						sending = false;
+						else {
+							// The wheel turns into a check, then what was sent comes up
+							if (result.type === 'success') {
+								phase = 'done';
+								await pauseAfterSent();
+							}
+							await update({ reset: false });
+						}
+						phase = 'idle';
 					};
 				}}
 			>
 				<label class="field">
 					メールアドレス
-					<input name="email" type="email" autocomplete="email" required />
+					<input name="email" type="email" autocomplete="username webauthn" value={form?.email ?? ''} required />
 				</label>
 				{#if blocked}
 					<p class="error" role="alert">送れませんでした。しばらく待ってから、もう一度やり直してください</p>
 				{:else if form?.message}
-					<p class="error" role="alert">{form.message}</p>
+					<p class="error" role="alert">
+						{form.message}{#if "limit" in form}<br />パスキーがあれば、パスキーでログインできます。{/if}
+					</p>
 				{/if}
-				<button class="btn" type="submit" disabled={sending}>
-					{sending ? '送信中…' : 'メールでログイン・登録'}
-				</button>
+				<SendButton {phase}>{data.reauth ? 'メールでログイン' : 'メールでログイン・登録'}</SendButton>
 			</form>
 		{/if}
-		<p class="legal">
-			登録すると、<a href="/terms">利用規約</a>と<a href="/privacy">プライバシーポリシー</a>に同意したことになります。
-		</p>
+		{#if data.reauth}
+			<a class="cancel" href={data.reauth.back}>やめる</a>
+		{:else}
+			<p class="legal">
+				登録すると、<a href="/terms">利用規約</a>と<a href="/privacy">プライバシーポリシー</a>に同意したことになります。
+			</p>
+		{/if}
 	</div>
 </main>
 
@@ -121,15 +169,15 @@
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
-		padding: 0 24px 32px;
+		/* The logo stays at the top and what is to be done sits at the bottom, so neither moves
+		   with the other (same on the mail-link pages) */
+		padding: clamp(48px, 12vh, 112px) 24px 32px;
 	}
 
 	.brand {
-		flex-grow: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
 		gap: 16px;
 	}
 
@@ -144,6 +192,9 @@
 	.brand p {
 		margin: 0;
 		color: var(--ink-sub);
+		text-align: center;
+		word-break: auto-phrase;
+		text-wrap: balance;
 	}
 
 	.brand .intro {
@@ -166,6 +217,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+	}
+
+	.actions {
+		margin-top: auto;
+		padding-top: 32px;
 	}
 
 	.divider {
@@ -221,6 +277,29 @@
 		line-height: 1.6;
 		color: var(--ink-sub);
 		text-align: center;
+	}
+
+	.brand .lead {
+		max-width: 300px;
+		color: var(--ink);
+		line-height: 1.7;
+		text-align: center;
+	}
+
+	.hint {
+		margin: 0;
+		font-size: 13px;
+		line-height: 1.6;
+		color: var(--ink-sub);
+	}
+
+	.cancel {
+		align-self: center;
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+		padding: 0 12px;
+		font-size: 14px;
 	}
 
 	.sent {

@@ -5,8 +5,8 @@ import { canSeePhoto } from '$lib/server/friends';
 import type { RequestHandler } from './$types';
 
 // An icon photo, for the people who may see it (canSeePhoto); anyone else gets a 404 and the
-// page shows the letters. The address carries ?v=<when it was set>, so the browser keeps it
-// for good and a new photo comes under a new address.
+// page shows the letters. The address carries ?v=<when it was set>, so a new photo comes under
+// a new address. The browser keeps it for a day only, so it goes once a friend is removed.
 export const GET: RequestHandler = async ({ locals, params }) => {
 	if (!locals.user || !(await canSeePhoto(locals.db, locals.user.id, params.id))) error(404, 'Not found');
 	const row = await locals.db.select({ jpeg: userPhotos.jpeg }).from(userPhotos).where(eq(userPhotos.userId, params.id)).get();
@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
 	return new Response(bytes, {
 		headers: {
 			'content-type': 'image/jpeg',
-			'cache-control': 'private, max-age=31536000, immutable',
+			'cache-control': 'private, max-age=86400',
 			'x-content-type-options': 'nosniff'
 		}
 	});

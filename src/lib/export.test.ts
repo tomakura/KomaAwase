@@ -52,6 +52,14 @@ describe('layout', () => {
 		expect(withTime.labelW).toBeLessThan(withTime.cellW * 0.6);
 	});
 
+	it('makes the period column as wide as its widest text', () => {
+		const periods = layout(data, { ...DEFAULT_OPTIONS, period: true, time: false }, (_, t) => t.length * 10);
+		expect(periods.labelW).toBe(14);
+		const times = layout(data, { ...DEFAULT_OPTIONS, period: true, time: true }, (_, t) => t.length * 10);
+		// 「10:30」 is the widest
+		expect(times.labelW).toBe(54);
+	});
+
 	it('drops the columns and rows that are turned off', () => {
 		const bare = layout(data, { ...DEFAULT_OPTIONS, day: false, period: false, time: false });
 		expect(bare.labelW).toBe(0);

@@ -13,7 +13,7 @@
 		{ id: 'other', label: 'そのほか' }
 	] as const;
 	let kind = $state<'bug' | 'request' | 'other'>('bug');
-	let attach = $state(true);
+	let attach = $state(false);
 
 	// Shown in full before sending; nothing else is attached.
 	let info = $state<Record<string, string>>({});

@@ -1,15 +1,19 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, count, desc, eq, or, sql } from 'drizzle-orm';
 import type { Db } from './db';
-import { universities } from './db/schema';
+import { universities, users } from './db/schema';
 
 export const UNIVERSITY_NAME_MAX = 40;
+// A university someone typed in is offered to others once this many people use it, so a
+// joke name or a typo stays with the one who wrote it
+export const SUGGEST_MIN_USERS = 3;
 
 // Full-width letters and odd spaces are folded so 「東京　大学」 and 「東京大学」 are one university.
 export function normalizeUniversityName(input: string) {
 	return input.normalize('NFKC').replace(/\s+/g, ' ').trim();
 }
 
-// Names for the suggestions in はじめの設定 and 大学; preset universities first.
+// Names for the suggestions in はじめの設定 and 大学: the preset universities, and those
+// that SUGGEST_MIN_USERS people or more use; presets first.
 export function listUniversities(db: Db) {
 	return db
 		.select({
@@ -20,9 +24,26 @@ export function listUniversities(db: Db) {
 			periodPreset: universities.periodPreset
 		})
 		.from(universities)
+		.where(
+			or(
+				eq(universities.source, 'preset'),
+				sql`(select count(*) from ${users} where ${users.universityId} = ${universities.id}) >= ${SUGGEST_MIN_USERS}`
+			)
+		)
 		// Sorted before the limit, so however many are added the presets stay in.
 		.orderBy(desc(eq(universities.source, 'preset')), asc(universities.name))
 		.limit(500);
+}
+
+/** The universities people typed in, with how many use each, for the admin page */
+export function listUserUniversities(db: Db) {
+	return db
+		.select({ id: universities.id, name: universities.name, users: count(users.id) })
+		.from(universities)
+		.leftJoin(users, eq(users.universityId, universities.id))
+		.where(eq(universities.source, 'user'))
+		.groupBy(universities.id)
+		.orderBy(desc(count(users.id)), asc(universities.name));
 }
 
 export function getUniversity(db: Db, id: string) {

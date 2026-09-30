@@ -5,6 +5,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Sheet from '$lib/components/Sheet.svelte';
 	import { registerPasskey } from '$lib/passkey';
 	import { tokyoTime } from '$lib/time';
 
@@ -13,6 +14,8 @@
 	let busy = $state(false);
 	let message = $state<string | null>(null);
 	let renaming = $state<string | null>(null);
+	// After a passkey is removed: log out the other devices too?
+	let askOthers = $state(false);
 
 	async function add() {
 		busy = true;
@@ -72,6 +75,10 @@
 								action="?/remove"
 								use:enhance={({ cancel }) => {
 									if (!confirm(`「${key.name ?? 'パスキー'}」を消します。このパスキーではログインできなくなります`)) cancel();
+									return async ({ result, update }) => {
+										await update();
+										if (result.type === 'success' && Number(result.data?.others) > 0) askOthers = true;
+									};
 								}}
 							>
 								<input type="hidden" name="id" value={key.id} />
@@ -92,10 +99,35 @@
 			<Icon name="plus" size={18} />このデバイスでパスキーを作る
 		</button>
 		{#if message}<p class="error" role="alert">{message}</p>{/if}
+		{#if form?.ended}<p class="ui-note" role="status">ほかの端末をログアウトしました。</p>{/if}
 	</div>
 </div>
 
+<Sheet bind:open={askOthers} title="ほかの端末もログアウトしますか？">
+	<p class="ui-note">
+		消したパスキーでログインしている端末があれば、ログアウトさせておくと安心です。どのパスキーでログインしたかは記録していないため、この端末のほかをすべてログアウトします。
+	</p>
+	<form
+		class="ask"
+		method="POST"
+		action="?/endOthers"
+		use:enhance={() => async ({ update }) => {
+			await update();
+			askOthers = false;
+		}}
+	>
+		<button class="btn btn-primary" type="submit">ほかの端末をすべてログアウト</button>
+		<button class="btn" type="button" onclick={() => (askOthers = false)}>しない</button>
+	</form>
+</Sheet>
+
 <style>
+	.ask {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
 	.body {
 		display: flex;
 		flex-direction: column;

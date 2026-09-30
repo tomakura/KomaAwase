@@ -1,12 +1,13 @@
-import { and, asc, eq, sum } from 'drizzle-orm';
+import { and, asc, eq, sql, sum } from 'drizzle-orm';
 import type { Db } from './db';
 import { courseFiles, courses, timetables } from './db/schema';
 import { FILE_MAX_BYTES } from '$lib/files';
-import { hmacSha256Hex } from './hmac';
+import { hmacSha256Hex, newNonce, sha256Hex } from './hmac';
 
 export { FILE_MAX_BYTES };
 export const USER_QUOTA_BYTES = 100 * 1024 * 1024;
 const NAME_MAX = 100;
+const QUOTA_MESSAGE = `資料は全部で${USER_QUOTA_BYTES / 1024 / 1024}MBまでです。いらない資料を消してください`;
 
 // What can be kept with a course. PDFs and images open in the browser; Office files download.
 const TYPES: Record<string, 'inline' | 'attachment'> = {
@@ -24,21 +25,26 @@ export function filesEnabled(env: Env) {
 	return !!env.FILES_URL && !!env.FILES_SECRET;
 }
 
-// One signed request to relay/files.php
+// One signed request to relay/files.php. The signature covers a one-time nonce and, for a
+// put, the file's hash, so it can't be reused or attached to other bytes.
 async function storage(env: Env, action: 'put' | 'get' | 'delete', key: string, body?: ArrayBuffer) {
 	if (!env.FILES_URL || !env.FILES_SECRET) throw new Error('File storage is not configured');
 	const size = body ? String(body.byteLength) : '';
+	const hash = body ? await sha256Hex(body) : '';
 	const timestamp = String(Math.floor(Date.now() / 1000));
+	const nonce = newNonce();
 	const url = new URL(env.FILES_URL);
 	url.searchParams.set('action', action);
 	url.searchParams.set('key', key);
 	if (size) url.searchParams.set('size', size);
+	if (hash) url.searchParams.set('sha256', hash);
 	return fetch(url, {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/octet-stream',
 			'x-koma-timestamp': timestamp,
-			'x-koma-signature': await hmacSha256Hex(env.FILES_SECRET, `${timestamp}.${action}.${key}.${size}`)
+			'x-koma-nonce': nonce,
+			'x-koma-signature': await hmacSha256Hex(env.FILES_SECRET, `${timestamp}.${nonce}.${action}.${key}.${size}.${hash}`)
 		},
 		body,
 		signal: AbortSignal.timeout(30_000)
@@ -84,19 +90,32 @@ export async function saveFile(
 	if (!(mime in TYPES)) return 'PDF・画像・Word・PowerPoint・Excel のファイルを選んでください';
 	if (!body.byteLength) return 'ファイルが空です';
 	if (body.byteLength > FILE_MAX_BYTES) return `1つのファイルは${FILE_MAX_BYTES / 1024 / 1024}MBまでです`;
-	if ((await usedBytes(db, userId)) + body.byteLength > USER_QUOTA_BYTES) {
-		return `資料は全部で${USER_QUOTA_BYTES / 1024 / 1024}MBまでです。いらない資料を消してください`;
-	}
+	// Checked here first so a file that clearly won't fit isn't sent to the storage at all
+	if ((await usedBytes(db, userId)) + body.byteLength > USER_QUOTA_BYTES) return QUOTA_MESSAGE;
 	const cleanName = [...name.replace(/[\u0000-\u001f\u007f/\\]/g, '').trim()].slice(0, NAME_MAX).join('') || '資料';
 
 	const storageKey = randomKey();
 	const res = await storage(env, 'put', storageKey, body);
 	if (!res.ok) throw new Error(`File storage responded ${res.status}: ${await res.text()}`);
+	// Counted and saved in one statement, so uploads at the same moment can't pass the quota together
+	let saved;
 	try {
-		await db.insert(courseFiles).values({ courseId, storageKey, name: cleanName, mime, size: body.byteLength });
+		saved = await db.run(sql`
+			insert into ${courseFiles} (id, course_id, storage_key, name, mime, size)
+			select ${crypto.randomUUID()}, ${courseId}, ${storageKey}, ${cleanName}, ${mime}, ${body.byteLength}
+			where (
+				select coalesce(sum(f.size), 0) from ${courseFiles} f
+				join ${courses} c on c.id = f.course_id
+				join ${timetables} t on t.id = c.timetable_id
+				where t.user_id = ${userId}
+			) + ${body.byteLength} <= ${USER_QUOTA_BYTES}`);
 	} catch (e) {
 		await storage(env, 'delete', storageKey).catch(() => {});
 		throw e;
+	}
+	if (!saved.meta.changes) {
+		await storage(env, 'delete', storageKey).catch(() => {});
+		return QUOTA_MESSAGE;
 	}
 	return null;
 }

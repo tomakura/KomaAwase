@@ -16,6 +16,9 @@ declare global {
 		// Without them the notification settings say they aren't available yet.
 		VAPID_PUBLIC_KEY?: string;
 		VAPID_PRIVATE_KEY?: string;
+		// Cloudflare Turnstile on the contact form; without both, the form goes without it
+		TURNSTILE_SITE_KEY?: string;
+		TURNSTILE_SECRET_KEY?: string;
 		// Set by worker/entry.js on calls it makes to itself (queue and cron), never by requests
 		KOMA_INTERNAL?: boolean;
 	}
@@ -28,16 +31,21 @@ declare global {
 			cf?: IncomingRequestCfProperties
 		}
 
+		// A course opened over the timetable without leaving it (shallow routing, see the home page)
+		interface PageState {
+			course?: import('./routes/courses/[id]/$types').PageData;
+		}
+
 		// interface Error {}
 		interface Locals {
 			db: import('$lib/server/db').Db;
 			user: import('$lib/server/auth/session').SessionUser | null;
+			session: import('$lib/server/auth/session').SessionInfo | null;
 			// The user's timetable for this academic year: null when there is none yet,
 			// undefined when it wasn't read with the session (see hooks.server.ts)
 			timetable?: import('$lib/server/auth/session').KnownTimetable | null;
 		}
 		// interface PageData {}
-		// interface PageState {}
 	}
 }
 

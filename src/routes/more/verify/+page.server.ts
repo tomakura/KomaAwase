@@ -31,7 +31,7 @@ export const actions: Actions = {
 	default: async (event) => {
 		if (!event.locals.user) redirect(303, '/login');
 		const sent = await sendVerificationMail(event);
-		if ('message' in sent) return fail(sent.status, { message: sent.message });
+		if ('message' in sent) return fail(sent.status, { message: sent.message, email: sent.email });
 		return { sentTo: sent.sentTo };
 	}
 };
