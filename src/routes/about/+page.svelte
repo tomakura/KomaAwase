@@ -30,6 +30,7 @@
 		<a class="ui-row" href="/intro"><span>コマあわせとは（機能の紹介）</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/install"><span>ホーム画面に追加する方法</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/feedback?from=/about"><span>不具合・要望を送る</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
+		<a class="ui-row" href="/contact"><span>お問い合わせ</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/terms"><span>利用規約</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/privacy"><span>プライバシーポリシー</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="https://github.com/tomakura/KomaAwase" target="_blank" rel="noopener">

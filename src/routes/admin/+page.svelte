@@ -9,8 +9,9 @@
 
 	const TARGETS = { user: '利用者', group: 'グループ', shared_course: '共有授業' } as const;
 	const KINDS = { bug: '不具合', request: '要望', other: 'そのほか' } as const;
+	type List = 'contact' | 'reports' | 'feedback';
 	// This page with another page of one list, the other list left where it is
-	function pageHref(key: 'reports' | 'feedback', n: number) {
+	function pageHref(key: List, n: number) {
 		const url = new URL(page.url);
 		if (n > 1) url.searchParams.set(key, String(n));
 		else url.searchParams.delete(key);
@@ -39,6 +40,29 @@
 				<span class="ui-row-value"><Icon name="chevron" size={16} /></span>
 			</a>
 		</div>
+	</section>
+
+	<section class="ui-section">
+		<h2 class="ui-section-title">問い合わせ（{data.contactTotal}）</h2>
+		{#each data.contact as c (c.id)}
+			<div class="item">
+				<div class="meta">
+					<b>{c.name}</b>
+					<span class="date">{when(c.createdAt)}</span>
+				</div>
+				<p class="body">{c.body}</p>
+				<div class="foot">
+					<a href="mailto:{c.email}?subject={encodeURIComponent('コマあわせへのお問い合わせ')}">{c.email}</a>
+					<form method="POST" action="?/closeContact" use:enhance>
+						<input type="hidden" name="id" value={c.id} />
+						<button class="small" type="submit">対応済み</button>
+					</form>
+				</div>
+			</div>
+		{:else}
+			<p class="ui-note">未対応の問い合わせはありません。</p>
+		{/each}
+		{@render pager('contact', data.contactPage, pages(data.contactTotal))}
 	</section>
 
 	<section class="ui-section">
@@ -101,7 +125,7 @@
 	</section>
 </div>
 
-{#snippet pager(key: 'reports' | 'feedback', current: number, last: number)}
+{#snippet pager(key: List, current: number, last: number)}
 	{#if last > 1}
 		<nav class="pager" aria-label="ページ">
 			{#if current > 1}<a href={pageHref(key, current - 1)}>新しい{data.pageSize}件</a>{/if}
@@ -121,8 +145,14 @@
 		font-size: 14px;
 	}
 
-	.pager a {
+	.pager a,
+	.foot a {
 		color: var(--accent-text);
+	}
+
+	.foot a {
+		font-size: 12px;
+		overflow-wrap: anywhere;
 	}
 
 	.item {

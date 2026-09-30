@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { and, count, eq, gt, lt } from 'drizzle-orm';
 import { TERM_SYSTEMS, parseDays, periodsRange, termSystemOf } from '$lib/presets';
-import { feedback, passkeys, reports, sessions, timetables, universities, users } from '$lib/server/db/schema';
+import { contactMessages, feedback, passkeys, reports, sessions, timetables, universities, users } from '$lib/server/db/schema';
 import { readTheme, thisYear } from '$lib/server/setup';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import { currentTerm } from '$lib/terms';
@@ -35,11 +35,12 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// What the runner of the app has left to answer
 	let openReports = 0;
 	if (user.role === 'admin') {
-		const [[r], [f]] = await locals.db.batch([
+		const [[r], [f], [c]] = await locals.db.batch([
 			locals.db.select({ n: count() }).from(reports).where(eq(reports.status, 'open')),
-			locals.db.select({ n: count() }).from(feedback).where(eq(feedback.status, 'open'))
+			locals.db.select({ n: count() }).from(feedback).where(eq(feedback.status, 'open')),
+			locals.db.select({ n: count() }).from(contactMessages).where(eq(contactMessages.status, 'open'))
 		]);
-		openReports = (r?.n ?? 0) + (f?.n ?? 0);
+		openReports = (r?.n ?? 0) + (f?.n ?? 0) + (c?.n ?? 0);
 	}
 
 	// The term on now (or next), for 「2026年度 後期」

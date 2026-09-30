@@ -16,6 +16,9 @@ declare global {
 		// Without them the notification settings say they aren't available yet.
 		VAPID_PUBLIC_KEY?: string;
 		VAPID_PRIVATE_KEY?: string;
+		// Cloudflare Turnstile on the contact form; without both, the form goes without it
+		TURNSTILE_SITE_KEY?: string;
+		TURNSTILE_SECRET_KEY?: string;
 		// Set by worker/entry.js on calls it makes to itself (queue and cron), never by requests
 		KOMA_INTERNAL?: boolean;
 	}

@@ -126,6 +126,7 @@
 			<h2 class="ui-section-title">サポート</h2>
 			<div class="ui-list">
 				{@render link('/feedback?from=/more', '不具合・要望を送る')}
+				{@render link('/contact', 'お問い合わせ')}
 				{#if data.supportUrl}
 					<a class="ui-row" href={data.supportUrl} target="_blank" rel="noopener">
 						<span>開発を応援する</span>
@@ -137,7 +138,7 @@
 				{@render link('/about', 'このアプリについて')}
 				{#if data.isAdmin}
 					<a class="ui-row" href="/login?reauth=admin&next=%2Fadmin">
-						<span>運営（通報・要望）</span>
+						<span>運営（問い合わせ・通報・要望）</span>
 						<span class="ui-row-value">
 							<span class="value" class:soon={data.openReports > 0}>{data.openReports ? `未対応 ${data.openReports}件` : 'なし'}</span>
 							<Icon name="chevron" size={16} />
