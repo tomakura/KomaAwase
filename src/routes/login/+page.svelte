@@ -192,6 +192,9 @@
 	.brand p {
 		margin: 0;
 		color: var(--ink-sub);
+		text-align: center;
+		word-break: auto-phrase;
+		text-wrap: balance;
 	}
 
 	.brand .intro {

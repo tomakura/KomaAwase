@@ -66,6 +66,9 @@
 		line-height: 1.7;
 		text-align: center;
 		overflow-wrap: anywhere;
+		/* Break between phrases, not in the middle of a word */
+		word-break: auto-phrase;
+		text-wrap: pretty;
 	}
 
 	.body :global(form) {
