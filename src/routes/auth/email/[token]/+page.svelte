@@ -1,42 +1,32 @@
 <script lang="ts">
-	let { form } = $props();
+	import { enhance } from '$app/forms';
+	import AuthScreen from '$lib/components/AuthScreen.svelte';
+
+	let { data, form } = $props();
+	let busy = $state(false);
 </script>
 
 <svelte:head>
 	<title>ログイン · コマあわせ</title>
 </svelte:head>
 
-<main>
-	<h1>コマあわせにログイン</h1>
-	{#if form?.message}
-		<p class="error" role="alert">{form.message}</p>
+<AuthScreen title="コマあわせ">
+	{#if form?.message || !data.email}
+		<p class="error" role="alert">{form?.message ?? 'リンクの期限が切れているか、すでに使われています'}</p>
 		<a class="btn" href="/login">ログイン画面にもどる</a>
 	{:else}
-		<p>下のボタンを押すとログインします。</p>
-		<form method="POST">
-			<button class="btn btn-primary" type="submit">ログインする</button>
+		<p><b>{data.email}</b> でログインします。</p>
+		<form
+			method="POST"
+			use:enhance={() => {
+				busy = true;
+				return async ({ update }) => {
+					await update();
+					busy = false;
+				};
+			}}
+		>
+			<button class="btn btn-primary" type="submit" disabled={busy}>ログインする</button>
 		</form>
 	{/if}
-</main>
-
-<style>
-	main {
-		max-width: 420px;
-		margin: 0 auto;
-		padding: 64px 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	h1 {
-		margin: 0;
-		font-family: var(--font-display);
-		font-size: 24px;
-	}
-
-	p {
-		margin: 0;
-		line-height: 1.7;
-	}
-</style>
+</AuthScreen>

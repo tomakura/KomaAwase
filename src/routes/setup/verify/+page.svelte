@@ -1,9 +1,15 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import MailSent from '$lib/components/MailSent.svelte';
 	import VerifyBenefits from '$lib/components/VerifyBenefits.svelte';
 
 	let { data, form } = $props();
 	let sending = $state(false);
+	// 「別のアドレスにする」 after the mail was sent
+	let other = $state(false);
+	$effect(() => {
+		if (form?.sentTo) other = false;
+	});
 </script>
 
 <svelte:head>
@@ -18,8 +24,12 @@
 
 	<VerifyBenefits />
 
-	{#if form?.sentTo}
-		<p class="sent" role="status">{form.sentTo} に確認のメールを送りました。1日以内にリンクを開いてください。</p>
+	{#if form?.sentTo && !other}
+		{#key form}
+			<MailSent email={form.sentTo} action="?/send" onother={() => (other = true)}>
+				{form.sentTo} に確認のメールを送りました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
+			</MailSent>
+		{/key}
 		<form method="POST" action="?/skip" use:enhance>
 			<button class="btn btn-primary" type="submit">はじめる</button>
 		</form>
@@ -30,14 +40,14 @@
 			use:enhance={() => {
 				sending = true;
 				return async ({ update }) => {
-					await update();
+					await update({ reset: false });
 					sending = false;
 				};
 			}}
 		>
 			<label class="field">
 				{data.university.name}のメールアドレス
-				<input name="email" type="email" autocomplete="off" placeholder={`…@${data.university.domains[0]}`} required />
+				<input name="email" type="email" autocomplete="off" placeholder={`…@${data.university.domains[0]}`} value={form?.email ?? ''} required />
 			</label>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 			<button class="btn btn-primary" type="submit" disabled={sending}>{sending ? '送っています…' : '確認のメールを送る'}</button>
@@ -94,16 +104,6 @@
 		color: var(--ink-sub);
 	}
 
-	.sent {
-		margin: 0;
-		padding: 14px;
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		background: var(--surface);
-		font-size: 14px;
-		line-height: 1.7;
-		overflow-wrap: anywhere;
-	}
 
 	.later {
 		align-self: center;

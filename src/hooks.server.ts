@@ -13,6 +13,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!d1) throw new Error('D1 binding "DB" is missing');
 	event.locals.db = getDb(d1);
 	event.locals.user = null;
+	event.locals.session = null;
 
 	const token = event.cookies.get(SESSION_COOKIE);
 	if (token) {
@@ -22,6 +23,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const result = await validateSession(event.locals.db, token, year);
 		if (result) {
 			event.locals.user = result.user;
+			event.locals.session = result.session;
 			event.locals.timetable = result.timetable;
 			setSessionCookie(event.cookies, token, result.expiresAt);
 		} else {

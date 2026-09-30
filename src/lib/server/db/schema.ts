@@ -14,7 +14,9 @@ const createdAt = () =>
 // --- accounts & auth ---
 
 // Which notifications to send; a missing key means on
-export type NotifySettings = Partial<Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin', boolean>>;
+export type NotifySettings = Partial<
+	Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'groupRequest' | 'groupApproved', boolean>
+>;
 
 // `photo` is when the user's photo (user_photos) was last set, which also busts caches
 export type UserIcon = { color: string; text: string; photo?: number };
@@ -46,6 +48,8 @@ export const users = sqliteTable('users', {
 	// How far the enrollment check prompts have gone (see verify-prompt.ts): null = none shown yet.
 	// Reset to null when the person verifies.
 	verifyPromptStage: integer('verify_prompt_stage'),
+	// When they agreed to send screenshots to the AI services abroad, the first time they import
+	importConsentAt: integer('import_consent_at', { mode: 'timestamp_ms' }),
 	createdAt: createdAt()
 });
 
@@ -71,6 +75,9 @@ export const pushSubscriptions = sqliteTable(
 		endpoint: text('endpoint').notNull().unique(),
 		p256dh: text('p256dh').notNull(),
 		auth: text('auth').notNull(),
+		// The session that turned it on, so logging that device out stops its notifications.
+		// Not a foreign key; null for ones made before this was kept.
+		sessionId: text('session_id'),
 		createdAt: createdAt()
 	},
 	(t) => [index('push_subscriptions_user_idx').on(t.userId)]
@@ -110,7 +117,8 @@ export const passkeys = sqliteTable(
 	(t) => [index('passkeys_user_idx').on(t.userId)]
 );
 
-// id is the SHA-256 of the cookie token, so a leaked table can't be replayed.
+// id is the SHA-256 of the cookie token, so a leaked table can't be replayed. The times and
+// the browser are null for sessions made before they were kept (shown as 不明な端末).
 export const sessions = sqliteTable(
 	'sessions',
 	{
@@ -118,7 +126,13 @@ export const sessions = sqliteTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }),
+		// Updated at most once an hour
+		lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+		userAgent: text('user_agent'),
+		// When the person last signed in on it, for what asks them to sign in again first
+		authedAt: integer('authed_at', { mode: 'timestamp_ms' })
 	},
 	(t) => [index('sessions_user_idx').on(t.userId)]
 );
@@ -128,6 +142,14 @@ export const authChallenges = sqliteTable('auth_challenges', {
 	id: id(),
 	challenge: text('challenge').notNull(),
 	userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+});
+
+// Counts that must hold across all users, such as mail sent per hour and per day. A row is
+// dropped once it has expired.
+export const rateCounts = sqliteTable('rate_counts', {
+	key: text('key').primaryKey(),
+	n: integer('n').notNull().default(0),
 	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
 });
 
@@ -446,6 +468,8 @@ export const groups = sqliteTable('friend_groups', {
 	// Passed to the longest-standing member when the owner leaves
 	ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
 	inviteCode: text('invite_code').notNull().unique(),
+	// Whether the owner approves each person who opens the invite
+	approval: integer('approval', { mode: 'boolean' }).notNull().default(false),
 	createdAt: createdAt()
 });
 
@@ -463,6 +487,37 @@ export const groupMembers = sqliteTable(
 		joinedAt: createdAt()
 	},
 	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_members_user_idx').on(t.userId)]
+);
+
+// People asking to join a group that needs approval. Their choice of sharing waits here.
+export const groupRequests = sqliteTable(
+	'group_requests',
+	{
+		groupId: text('group_id')
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		shareTimetable: integer('share_timetable', { mode: 'boolean' }).notNull().default(true),
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_requests_user_idx').on(t.userId)]
+);
+
+// People the owner made leave; the invite no longer lets them in until the owner allows it
+export const groupBans = sqliteTable(
+	'group_bans',
+	{
+		groupId: text('group_id')
+			.notNull()
+			.references(() => groups.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		createdAt: createdAt()
+	},
+	(t) => [primaryKey({ columns: [t.groupId, t.userId] })]
 );
 
 // --- operations ---
@@ -541,6 +596,23 @@ export const feedback = sqliteTable(
 		// For the daily limit on sending
 		index('feedback_user_created_idx').on(t.userId, t.createdAt)
 	]
+);
+
+// Messages from the contact form (/contact), which works without signing in, so people who
+// left or never signed up can reach the operator.
+export const contactMessages = sqliteTable(
+	'contact_messages',
+	{
+		id: id(),
+		name: text('name').notNull(),
+		email: text('email').notNull(),
+		body: text('body').notNull(),
+		status: text('status', { enum: ['open', 'closed'] })
+			.notNull()
+			.default('open'),
+		createdAt: createdAt()
+	},
+	(t) => [index('contact_messages_status_idx').on(t.status), index('contact_messages_email_idx').on(t.email, t.createdAt)]
 );
 
 // Enrollment checks: a link sent to a university address was opened. One address

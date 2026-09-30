@@ -1,48 +1,56 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
+	import AuthScreen from '$lib/components/AuthScreen.svelte';
 
-	let { form } = $props();
+	let { data, form } = $props();
+	let busy = $state(false);
+	const view = $derived(form?.state ?? data.state);
 </script>
 
 <svelte:head>
 	<title>在籍確認 · コマあわせ</title>
 </svelte:head>
 
-<main>
-	<h1>在籍確認</h1>
+<AuthScreen title="在籍確認">
 	{#if form?.university !== undefined}
 		<p role="status">{form.university}の在籍を確認できました。友だちや同じグループの人に「在籍確認済み」の印が見えます。</p>
-		<a class="btn" href={page.data.signedIn ? '/more/verify' : '/login'}>コマあわせを開く</a>
-	{:else if form?.message}
-		<p class="error" role="alert">{form.message}</p>
+		<a class="btn btn-primary" href="/more/verify">コマあわせを開く</a>
+	{:else if form?.message || view === 'expired'}
+		<p class="error" role="alert">{form?.message ?? 'リンクの期限が切れているか、すでに使われています'}</p>
 		<a class="btn" href="/more/verify">もう一度申し込む</a>
-	{:else}
-		<p>下のボタンを押すと、確認が終わります。</p>
-		<form method="POST" use:enhance>
-			<button class="btn btn-primary" type="submit">確認する</button>
+	{:else if view === 'other-account'}
+		<p role="alert">このリンクは、別のアカウントで申し込まれたものです。申し込んだアカウントでログインしてから、もう一度開いてください。</p>
+		<form method="POST" action="/logout">
+			<input type="hidden" name="next" value={page.url.pathname} />
+			<button class="btn btn-primary" type="submit">ログアウトする</button>
+		</form>
+	{:else if view === 'taken'}
+		<p role="alert">このアドレスは、ほかのアカウントの在籍確認に使われています。</p>
+		<p class="note">そのアカウントを使うか、退会してから確認してください。心当たりがないときは、<a href="/contact">運営に連絡</a>してください。</p>
+		<a class="btn" href="/more/verify">もどる</a>
+	{:else if data.state === 'ready'}
+		<p><b>{data.nickname}</b> さんのアカウントで、{data.university}の在籍確認をします。</p>
+		<p class="address">確認するアドレス：{data.email}</p>
+		<form
+			method="POST"
+			use:enhance={() => {
+				busy = true;
+				return async ({ update }) => {
+					await update();
+					busy = false;
+				};
+			}}
+		>
+			<button class="btn btn-primary" type="submit" disabled={busy}>確認する</button>
 		</form>
 	{/if}
-</main>
+</AuthScreen>
 
 <style>
-	main {
-		max-width: 420px;
-		margin: 0 auto;
-		padding: 64px 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	h1 {
-		margin: 0;
-		font-family: var(--font-display);
-		font-size: 24px;
-	}
-
-	p {
-		margin: 0;
-		line-height: 1.7;
+	.address,
+	.note {
+		font-size: 14px;
+		color: var(--ink-soft);
 	}
 </style>

@@ -1,21 +1,17 @@
-import { error } from '@sveltejs/kit';
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
+import { requireAdmin } from '$lib/server/auth/reauth';
 import { feedback, groups, reports, sharedCourses, users } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
 
 // Reports and feedback for whoever runs the app: users with role 'admin', set in D1 by hand
 // (`update users set role = 'admin' where email = '…'`).
-function requireAdmin(locals: App.Locals) {
-	if (locals.user?.role !== 'admin') error(404, 'Not found');
-	return locals.user;
-}
 
 // Each list pages on its own (?reports=2, ?feedback=3), oldest open items included.
 const PAGE = 50;
 const pageOf = (url: URL, key: string) => Math.min(Math.max(Math.floor(Number(url.searchParams.get(key))) || 1, 1), 1000);
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	requireAdmin(locals);
+	await requireAdmin(locals, url);
 	const reportPage = pageOf(url, 'reports');
 	const feedbackPage = pageOf(url, 'feedback');
 	const [reportRows, feedbackRows, [reportTotal], [feedbackTotal]] = await locals.db.batch([
@@ -86,13 +82,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	closeReport: async ({ locals, request }) => {
-		requireAdmin(locals);
+	closeReport: async ({ locals, request, url }) => {
+		await requireAdmin(locals, url);
 		const id = String((await request.formData()).get('id') ?? '');
 		await locals.db.update(reports).set({ status: 'closed' }).where(and(eq(reports.id, id), eq(reports.status, 'open')));
 	},
-	closeFeedback: async ({ locals, request }) => {
-		requireAdmin(locals);
+	closeFeedback: async ({ locals, request, url }) => {
+		await requireAdmin(locals, url);
 		const id = String((await request.formData()).get('id') ?? '');
 		await locals.db.update(feedback).set({ status: 'closed' }).where(and(eq(feedback.id, id), eq(feedback.status, 'open')));
 	}
