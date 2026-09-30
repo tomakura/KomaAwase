@@ -2,6 +2,8 @@
 
 D1（SQLite）に置いている。定義は `src/lib/server/db/schema.ts`、マイグレーションは `drizzle/`。
 
+D1 のマイグレーションは自動では当たらない（[README](../README.md) の「本番に出すとき」）。`0021_sessions_groups_contact`（ログイン中の端末、グループの承認・退出、お問い合わせ、メモの並び順、スクショ読み取りの同意）は、本番に手で当てる。
+
 ## 時間割
 
 ```mermaid
@@ -28,7 +30,7 @@ erDiagram
 | `COURSE_TERMS` | course_id, term_id | 授業と学期は多対多。「Q1とQ2」「通年」を表せる |
 | `COURSE_SLOTS` | course_id, weekday, period_number, span, week_pattern, room | 週2回なら2行。`span` は連続コマ数、`week_pattern` は毎週（`every`）・奇数週（`odd`）・偶数週（`even`）。週は学期の始まる週を1週目として数える。**教室は枠ごと**。枠が0行の授業はオンデマンド・集中講義 |
 | `COURSE_TEACHERS` | course_id, name, sort_order | 先生は何人でも |
-| `COURSE_NOTES` | course_id, kind, date, body, due, done | `kind` は `memo`・`task`・`cancel`。`date` はメモの日付か休講の日、`due` は課題の締切。授業につながるので、どの枠から開いても同じ |
+| `COURSE_NOTES` | course_id, kind, date, body, due, done, sort_order | `kind` は `memo`・`task`・`cancel`。`date` はメモの日付か休講の日、`due` は課題の締切。授業につながるので、どの枠から開いても同じ。`sort_order` はメモを手で並べたときの順（小さいほど上）で、メモだけが使う。並べていなければ null で、日付の新しい順・同じ日は足した順の新しい方が上（`src/lib/notes.ts` の `orderMemos`）。並べたあとに足したメモは、いちばん上の数より小さい値を付けて先頭に置く。書いた中身（メモ・課題の名前と締切・休講の日とメモ）は直せて、直しても種類・足した日・順は変わらない |
 | `COURSE_FILES` | course_id, storage_key, name, mime, size | 資料。実体はシンレンタルサーバー（`relay/files.php`）に `storage_key` の名前で置く。本人しか見られない |
 
 同期している授業（`synced`）は、授業名・先生・曜日時限・教室・隔週・授業の形を `SHARED_COURSES` から読む。色・取る学期・メモ・資料・課題は本人のもの。
@@ -51,7 +53,7 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `UNIVERSITIES` | name, email_domains, term_preset, period_preset, source | `name` は一意。`source` は `preset`（ひな形あり）か `user`（だれかが入力した名前。ひな形なし）。`email_domains` は在籍確認に使い、完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する） |
+| `UNIVERSITIES` | name, email_domains, term_preset, period_preset, source | `name` は一意。`source` は `preset`（ひな形あり）か `user`（だれかが入力した名前。ひな形なし）。入力候補に出るのは `preset` と、`users.university_id` で選んでいる人が3人以上（`SUGGEST_MIN_USERS`）の大学だけ。`user` の名前は、入力した本人はそのまま使えるが、3人に届くまでほかの人の候補には出ない（`/admin` の「利用者が作った大学」で人数を見られる）。`email_domains` は在籍確認に使い、完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する） |
 | `SHARED_COURSES` | university_id, year, code, title, terms, delivery, intensive_from, intensive_to, source, version | `code` はシラバスの授業コード。`source` は `syllabus` か `user`。`terms` は開講する学期の名前（Q3 など）で、登録したときの値のまま変えない（Q3 だけ取る人の保存で「Q3・Q4 の授業」が書き換わらないように）。「授業をさがす」で学期をしぼるのに使う |
 | `SHARED_COURSE_SLOTS` | shared_course_id, weekday, period_number, span, week_pattern, room | シラバスに教室がない大学は、みんなの登録で埋める |
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |
@@ -73,21 +75,36 @@ erDiagram
   USERS ||--o{ BLOCKS : blocks
   USERS ||--o{ GROUP_MEMBERS : joins
   FRIEND_GROUPS ||--|{ GROUP_MEMBERS : has
+  USERS ||--o{ GROUP_REQUESTS : "asks to join"
+  FRIEND_GROUPS ||--o{ GROUP_REQUESTS : receives
+  USERS ||--o{ GROUP_BANS : "kept out of"
+  FRIEND_GROUPS ||--o{ GROUP_BANS : has
+  USERS ||--o{ SESSIONS : "signed in on"
 ```
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `USERS` | email, nickname, google_sub, icon, theme, days_shown, university_id, setup_at, friend_code, role, verify_prompt_stage | `icon` は `{"color": "ai", "text": "は"}`（なければニックネームの1文字目と、id から決めた色）。`university_id` は本人の大学で、新しい年度の時間割のひな形に使う（外部キーにはしていない。足すと users を作り直すことになるため）。`setup_at` ははじめの設定を終えた時刻。`friend_code` は友だちリンクの10文字（初めて要るときに作る。作り直せる）。`role` は `admin` だけ。`verify_prompt_stage` は在籍確認をすすめる画面をどこまで出したか（null=まだ。99=一度も確認していない人に出した、30/14/7=期限の何日前まで、0=切れたあとまで。確認すると null に戻る。`src/lib/verify-prompt.ts`）。写真のアイコンは `icon.photo`（設定した時刻）があるときだけ |
+| `USERS` | email, nickname, google_sub, icon, theme, days_shown, university_id, setup_at, friend_code, role, verify_prompt_stage, import_consent_at | `icon` は `{"color": "ai", "text": "は"}`（なければニックネームの1文字目と、id から決めた色）。`university_id` は本人の大学で、新しい年度の時間割のひな形に使う（外部キーにはしていない。足すと users を作り直すことになるため）。`setup_at` ははじめの設定を終えた時刻。`friend_code` は友だちリンクの10文字（初めて要るときに作る。作り直せる）。`role` は `admin` だけ。`import_consent_at` はスクショ読み取りで、画像を外部のサービスへ送ることに同意した時刻（null のあいだは、読み取りの画面が同意を求め、アップロードは 403 で断る）。`verify_prompt_stage` は在籍確認をすすめる画面をどこまで出したか（null=まだ。99=一度も確認していない人に出した、30/14/7=期限の何日前まで、0=切れたあとまで。確認すると null に戻る。`src/lib/verify-prompt.ts`）。写真のアイコンは `icon.photo`（設定した時刻）があるときだけ |
 | `USER_PHOTOS` | user_id, jpeg, updated_at | アイコンの写真。端末で作った256ピクセル四方の JPEG を base64 で持つ（毎回読む users とは分ける）。退会で消える |
 | `PASSKEYS` | id, user_id, public_key, counter, name | 1人で複数持てる。`name` は作ったときに AAGUID（パスワードマネージャー）か端末から付け、本人が変えられる |
-| `UNIV_VERIFICATIONS` | user_id, university_id, email, verified_at, expires_at | 1人1件（user_id が主キー）。`email` は一意で、同じアドレスで別のアカウントを確認すると前のアカウントから外れる。毎年5月1日に切れる（4月に確認し直す） |
-| `VERIFY_TOKENS` | id, user_id, university_id, email, expires_at | 在籍確認のメールのリンク。`id` はトークンの SHA-256。1日で切れ、1回だけ使える。1人3件まで |
+| `UNIV_VERIFICATIONS` | user_id, university_id, email, verified_at, expires_at | 1人1件（user_id が主キー）。`email` は一意で、確認は別のアカウントに移らない：ほかのアカウントの行にあるアドレスでは確認できない（リンクを開いたときに断る）。期限が切れても行は残るので、そのアドレスは退会するまで、そのアカウントのものとして残る。毎年5月1日に切れる（4月に確認し直す） |
+| `VERIFY_TOKENS` | id, user_id, university_id, email, expires_at | 在籍確認のメールのリンク。`id` はトークンの SHA-256。1日で切れ、1回だけ使える。1人3件まで。同じアドレスには、だれが申し込んでも60秒あけないと作らない。リンクを使えるのは、申し込んだアカウントでログインしているときだけ |
 | `FRIENDSHIPS` | requester_id, addressee_id, pair, status | `pair` は2人の id を並べたもので一意（どちらから申請しても1行）。`status` は `pending` か `accepted`。承認されるまで時間割は見えない |
 | `BLOCKS` | blocker_id, blocked_id | 友だち・グループより優先。ブロックすると友だちの行も消す |
-| `FRIEND_GROUPS` | name, owner_id, invite_code | サークル・ゼミなど（`GROUPS` は SQLite のキーワードと重なるので避けた）。`owner_id` の人が名前の変更などをできる。抜けると、いちばん前からいるメンバーに引き継ぐ |
+| `FRIEND_GROUPS` | name, owner_id, invite_code, approval | サークル・ゼミなど（`GROUPS` は SQLite のキーワードと重なるので避けた）。`owner_id` の人が名前の変更などをできる。抜けると、いちばん前からいるメンバーに引き継ぐ。`approval` が真だと、招待リンクを開いた人は参加できず、申請になる |
 | `GROUP_MEMBERS` | group_id, user_id, share_timetable | `share_timetable` はそのグループに時間割を見せるか（初期値は見せる） |
+| `GROUP_REQUESTS` | group_id, user_id, share_timetable | 承認制のグループへの参加の申請。主キーは (group_id, user_id)。申請のときに選んだ `share_timetable` を持っておき、承認されたら `GROUP_MEMBERS` にそのまま入れる。承認・断る・本人の取り消しで消える |
+| `GROUP_BANS` | group_id, user_id | 作った人が「退出させた」人。主キーは (group_id, user_id)。ここにいる人は招待リンクから参加も申請もできない。作った人が「参加できるようにする」で消す。退出させると、メンバーの行と申請も消える |
 
 時間割が見られるのは、本人、承認した友だち、同じグループで `share_timetable` を選んだメンバーだけ。どちらかがブロックしていたら見えない（`src/lib/server/friends.ts` の `visibleUserIds`）。
+
+## ログインの記録・通知・回数
+
+| テーブル | 主な列 | メモ |
+|---|---|---|
+| `SESSIONS` | id, user_id, expires_at, created_at, last_used_at, user_agent, authed_at | ログインしている端末ごとに1行。`id` は Cookie の値の SHA-256。有効は30日で、残りが15日を切ると延ばす。`last_used_at` は最後に使った時刻（更新は1時間に1回まで）、`user_agent` は「iPhone・Safari」のような端末の名前を出すために持つ（400文字まで）。`authed_at` はその端末で最後にログインした時刻で、退会と運営の画面が「もう一度ログイン」を求めるか決めるのに使う。この列を持つ前のログインは null で、「不明な端末」と出す |
+| `PUSH_SUBSCRIPTIONS` | user_id, endpoint, p256dh, auth, session_id | 通知を受け取る端末。`session_id` は通知をオンにしたときのログイン（外部キーにはしていない。前からある行は null）。そのログインが終わる（ログアウト、「ログイン中の端末」から外す）と、この行も消える |
+| `RATE_COUNTS` | key, n, expires_at | アプリ全体で数える回数。今はメールの送信数だけ（キーは `mail:h:<時間>` と `mail:d:<日本時間の日>`）。`expires_at` を過ぎた行は毎日の Cron で消す |
 
 ## 運営まわり
 
@@ -96,16 +113,18 @@ erDiagram
 | `REPORTS` | reporter_id, target_type, target_id, reason, detail, status | `target_type` は `user`・`group`・`shared_course`。理由は種類ごとに決まった選択肢から。`/admin` で対応済み（`closed`）にする |
 | `IMPORT_JOBS` | user_id, timetable_id, status, image, provider, result, error, attempts, retry_at, finished_at, closed_at | スクショ読み取りの順番待ちの正本。`status` は `queued`・`processing`・`retry`（翌日に再挑戦）・`done`・`failed`。`image` は切り抜いた画像（JPEG の data URL、1.4MB まで）で、読み終わるか、あきらめた時点で消す。`closed_at` は結果を保存したか閉じた時刻 |
 | `FEEDBACK` | user_id, kind, body, env, status | 不具合・要望。`env` は送る人が見て付けることを選んだ端末の情報だけ |
+| `CONTACT_MESSAGES` | name, email, body, status | お問い合わせ（`/contact`）。ログインしていない人も送れるので、`users` とはつなげない。`status` は `open` か `closed`（`/admin` で対応済み）。直近24時間で、全体で50件、1つのアドレスで3件まで |
 
 ## 退会したとき
 
 | データ | 扱い |
 |---|---|
-| アカウント、パスキー、在籍確認 | 消す |
+| アカウント、パスキー、在籍確認、ログインの記録（`SESSIONS`）、通知の宛先 | 消す |
 | 時間割、授業、メモ・資料・課題、シンに置いた資料のファイル | 消す。ファイルは D1 の行より先に、1回に40件ずつ消す（無料プランの外部へのリクエストの上限のため、残りがあると画面がもう一度送る）。消せなかったら退会もしない |
-| 友だち、ブロック、グループの所属 | 消す。自分が持ち主のグループは、いちばん前からいるメンバーに引き継ぐ。ほかにいなければ消す |
+| 友だち、ブロック、グループの所属、参加の申請、退出させられた記録 | 消す。自分が持ち主のグループは、いちばん前からいるメンバーに引き継ぐ。ほかにいなければ消す |
 | スクショ読み取りの記録 | 消す |
 | 通報・フィードバック | 送った人の情報を外して残す |
+| お問い合わせ（`CONTACT_MESSAGES`） | アカウントとつながっていないので、退会しても残る。消してほしいときはお問い合わせで頼んでもらう |
 | 共有授業データ（`SHARED_COURSES`） | ほかの人も使っているので**消さない** |
 | 共有授業データの変更履歴（`SHARED_COURSE_EDITS`） | `user_id` を外して匿名にして残す |
 
