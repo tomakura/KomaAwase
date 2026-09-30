@@ -1,4 +1,6 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
+import { and, eq } from 'drizzle-orm';
+import { courseAbsences } from '$lib/server/db/schema';
 import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
@@ -41,6 +43,21 @@ export const actions: Actions = {
 		if ('message' in parsed) return fail(400, { message: parsed.message });
 		await addNote(event.locals.db, courseId, parsed.note);
 		return { added: true };
+	},
+	// Today (Japan time); a day already recorded stays one
+	absent: async (event) => {
+		const courseId = await ownCourse(event);
+		await event.locals.db
+			.insert(courseAbsences)
+			.values({ courseId, date: tokyoTime(Date.now()).date })
+			.onConflictDoNothing();
+	},
+	removeAbsence: async (event) => {
+		const courseId = await ownCourse(event);
+		const form = await event.request.formData();
+		await event.locals.db
+			.delete(courseAbsences)
+			.where(and(eq(courseAbsences.id, String(form.get('id'))), eq(courseAbsences.courseId, courseId)));
 	},
 	done: async (event) => {
 		const courseId = await ownCourse(event);

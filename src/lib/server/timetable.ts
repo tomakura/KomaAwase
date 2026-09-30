@@ -248,6 +248,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 				delivery: courses.delivery,
 				intensiveFrom: courses.intensiveFrom,
 				intensiveTo: courses.intensiveTo,
+				credits: courses.credits,
 				syncMode: courses.syncMode,
 				sharedCourseId: courses.sharedCourseId
 			})
@@ -292,6 +293,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string) 
 				delivery: values.delivery,
 				intensiveFrom: values.intensiveFrom,
 				intensiveTo: values.intensiveTo,
+				credits: values.credits,
 				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
 				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : []))
 			};

@@ -1,6 +1,6 @@
 // Tables follow docs/data-model.md. Friends and groups come with their features.
 import { sql } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 const id = () =>
 	text('id')
@@ -229,6 +229,10 @@ export const courses = sqliteTable(
 		delivery: text('delivery', { enum: ['ondemand', 'intensive'] }),
 		intensiveFrom: text('intensive_from'), // YYYY-MM-DD
 		intensiveTo: text('intensive_to'),
+		// Credits (単位数); a synced course reads the shared course's instead
+		credits: real('credits'),
+		// How many absences the class allows, for the warning; personal
+		absenceLimit: integer('absence_limit'),
 		createdAt: createdAt()
 	},
 	(t) => [
@@ -301,6 +305,20 @@ export const courseNotes = sqliteTable(
 	(t) => [index('course_notes_course_idx').on(t.courseId)]
 );
 
+// The days a class was missed, by date, so a mistake can be taken back. Personal: never shared.
+export const courseAbsences = sqliteTable(
+	'course_absences',
+	{
+		id: id(),
+		courseId: text('course_id')
+			.notNull()
+			.references(() => courses.id, { onDelete: 'cascade' }),
+		date: text('date').notNull(), // YYYY-MM-DD
+		createdAt: createdAt()
+	},
+	(t) => [uniqueIndex('course_absences_course_date_idx').on(t.courseId, t.date)]
+);
+
 // Things to remember that belong to the person, not to a class: a test, a circle meeting, an
 // interview. A class's homework stays in course_notes; the 予定 tab shows both.
 export const events = sqliteTable(
@@ -358,6 +376,7 @@ export const sharedCourses = sqliteTable(
 		delivery: text('delivery', { enum: ['ondemand', 'intensive'] }),
 		intensiveFrom: text('intensive_from'),
 		intensiveTo: text('intensive_to'),
+		credits: real('credits'),
 		source: text('source', { enum: ['syllabus', 'user'] }).notNull(),
 		version: integer('version').notNull().default(1),
 		createdAt: createdAt(),

@@ -10,9 +10,11 @@
 		delivery: Delivery | null;
 		intensiveFrom: string | null;
 		intensiveTo: string | null;
+		credits: number | null;
 	};
 	type CourseValues = SharedValues & {
 		color: string;
+		absenceLimit?: number | null;
 		termIds: string[];
 		syncMode: 'synced' | 'personal';
 	};
@@ -58,7 +60,9 @@
 		unscheduled: initial.slots.length === 0 && initial.delivery !== null,
 		delivery: initial.delivery ?? 'ondemand',
 		intensiveFrom: initial.intensiveFrom ?? '',
-		intensiveTo: initial.intensiveTo ?? ''
+		intensiveTo: initial.intensiveTo ?? '',
+		credits: initial.credits ?? ('' as number | ''),
+		absenceLimit: initial.absenceLimit ?? ('' as number | '')
 	});
 
 	const periodNumbers = $derived(periods.map((p) => p.number));
@@ -76,6 +80,7 @@
 		v.delivery = shared.delivery ?? 'ondemand';
 		v.intensiveFrom = shared.intensiveFrom ?? '';
 		v.intensiveTo = shared.intensiveTo ?? '';
+		v.credits = shared.credits ?? '';
 	}
 
 	const syncHeading = $derived(
@@ -270,6 +275,17 @@
 					</label>
 				{/each}
 			</div>
+		</div>
+
+		<div class="numbers">
+			<label class="field">
+				単位数（任意）
+				<input name="credits" type="number" inputmode="decimal" min="0" max="20" step="0.5" bind:value={v.credits} />
+			</label>
+			<label class="field">
+				欠席できる回数（任意）
+				<input name="absence_limit" type="number" inputmode="numeric" min="1" max="99" step="1" bind:value={v.absenceLimit} />
+			</label>
 		</div>
 
 		<div class="group">
@@ -600,6 +616,16 @@
 		position: absolute;
 		opacity: 0;
 		pointer-events: none;
+	}
+
+	.numbers {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+
+	.numbers :global(input) {
+		min-width: 0;
 	}
 
 	.terms {

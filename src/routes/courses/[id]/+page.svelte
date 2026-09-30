@@ -80,6 +80,10 @@
 		uploading = false;
 	}
 
+	// Absences: recorded by date, one a day
+	const absentToday = $derived(data.absences.some((a) => a.date === data.today));
+	const absenceLeft = $derived(course.absenceLimit ? course.absenceLimit - data.absences.length : null);
+
 	function dueLabel(due: string) {
 		const days = daysBetween(data.today, due);
 		if (days > 0) return { text: `あと${days}日`, late: false };
@@ -131,6 +135,7 @@
 					<span class="chip"><b>{slotLabels[i]}</b>{#if slot.room}&nbsp;· {slot.room}{/if}</span>
 				{/each}
 				{#if delivery}<span class="chip"><b>{delivery}</b></span>{/if}
+				{#if course.credits}<span class="chip muted">{course.credits}単位</span>{/if}
 				{#if termNames}<span class="chip muted">{termNames}</span>{/if}
 				{#if course.syncMode === 'synced' && data.shared}
 					<span class="chip muted synced">
@@ -236,6 +241,31 @@
 		{/if}
 
 		<div class="lists">
+			<section>
+				<h2>欠席</h2>
+				<div class="item">
+					<span class="text">
+						<span class="main">{data.absences.length}回{course.absenceLimit ? `（${course.absenceLimit}回まで）` : ''}</span>
+						{#if absenceLeft !== null && absenceLeft < 0}
+							<span class="sub warn">上限を超えています</span>
+						{:else if absenceLeft === 0}
+							<span class="sub warn">上限に達しています</span>
+						{:else if absenceLeft === 1}
+							<span class="sub warn">あと1回で上限です</span>
+						{/if}
+					</span>
+					<form method="POST" action={actionHref('absent', data.termParam)} use:enhance>
+						<button class="absent" type="submit" disabled={absentToday}>{absentToday ? '今日は記録ずみ' : '欠席した'}</button>
+					</form>
+				</div>
+				{#each data.absences as a (a.id)}
+					<div transition:slide={motion()} class="item">
+						<span class="text"><span class="main">{withDay(a.date)}</span></span>
+						{@render removeButton(a.id, `${withDay(a.date)}の欠席`, 'removeAbsence')}
+					</div>
+				{/each}
+			</section>
+
 			{#if tasks.length}
 				<section>
 					<h2>課題</h2>
@@ -693,6 +723,30 @@
 	.sub {
 		font-size: 12px;
 		color: var(--ink-sub);
+	}
+
+	.sub.warn {
+		color: var(--accent-text);
+		font-weight: 700;
+	}
+
+	.absent {
+		flex-shrink: 0;
+		height: 36px;
+		padding: 0 12px;
+		border: 1px solid var(--line-strong);
+		border-radius: 10px;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 13px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.absent:disabled {
+		color: var(--ink-sub);
+		cursor: default;
 	}
 
 	.body {

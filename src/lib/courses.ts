@@ -95,3 +95,15 @@ export function meetsInWeek(week: WeekPattern | undefined, termStart: string | n
 	const index = Math.floor(daysBetween(monday(termStart), monday(date)) / 7) + 1;
 	return (index % 2 === 1) === (week === 'odd');
 }
+
+export const CREDITS_MAX = 20;
+export const ABSENCE_LIMIT_MAX = 99;
+
+// An empty field is no value; a number in steps of `step` up to `max` is one; anything else is invalid
+export function readNumber(value: FormDataEntryValue | null, max: number, step: number): number | null | 'invalid' {
+	const text = String(value ?? '').trim();
+	if (!text) return null;
+	const n = Number(text);
+	const ok = Number.isFinite(n) && n >= (step < 1 ? 0 : step) && n <= max && Number.isInteger(n / step);
+	return ok ? n : 'invalid';
+}

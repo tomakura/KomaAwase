@@ -2,6 +2,7 @@ import { and, asc, eq, type Column } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
 import {
+	courseAbsences,
 	courseFiles,
 	courseNotes,
 	courseSlots,
@@ -25,7 +26,7 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 export async function exportData(db: Db, user: { id: string }) {
 	const me = user.id;
 	const own = (table: { timetableId: Column }) => eq(table.timetableId, timetables.id);
-	const [account, tables, termRows, periodRows, courseRows, termLinks, slots, teachers, notes, files, eventRows, { friends }, groupRows] =
+	const [account, tables, termRows, periodRows, courseRows, termLinks, slots, teachers, notes, files, absences, eventRows, { friends }, groupRows] =
 		await Promise.all([
 			db
 				.select({
@@ -87,6 +88,13 @@ export async function exportData(db: Db, user: { id: string }) {
 				.innerJoin(courses, eq(courses.id, courseFiles.courseId))
 				.innerJoin(timetables, own(courses))
 				.where(eq(timetables.userId, me)),
+			db
+				.select({ courseId: courseAbsences.courseId, date: courseAbsences.date })
+				.from(courseAbsences)
+				.innerJoin(courses, eq(courses.id, courseAbsences.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(courseAbsences.date)),
 			db.select().from(events).where(eq(events.userId, me)).orderBy(asc(events.date)),
 			listFriendships(db, me),
 			(() => {
@@ -132,6 +140,9 @@ export async function exportData(db: Db, user: { id: string }) {
 					delivery: c.delivery,
 					intensiveFrom: c.intensiveFrom,
 					intensiveTo: c.intensiveTo,
+					credits: c.credits,
+					absenceLimit: c.absenceLimit,
+					absences: by(absences, c.id).map((a) => a.date),
 					terms: termLinks.filter((l) => l.courseId === c.id).map((l) => termName.get(l.termId) ?? ''),
 					slots: slots
 						.filter((s) => s.slot.courseId === c.id)

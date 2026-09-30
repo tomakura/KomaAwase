@@ -25,6 +25,7 @@ export type SharedValues = {
 	delivery: Delivery | null;
 	intensiveFrom: string | null;
 	intensiveTo: string | null;
+	credits: number | null;
 };
 
 // Fixed key order, so two sets of values compare equal as JSON
@@ -35,7 +36,8 @@ function normalize(v: SharedValues): SharedValues {
 		slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, week: s.week ?? 'every', room: s.room })),
 		delivery: v.delivery,
 		intensiveFrom: v.intensiveFrom,
-		intensiveTo: v.intensiveTo
+		intensiveTo: v.intensiveTo,
+		credits: v.credits ?? null
 	};
 }
 
@@ -97,7 +99,8 @@ export function sharedCoursesFrom(
 						.map((s) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, week: s.weekPattern, room: s.room })),
 					delivery: r.delivery,
 					intensiveFrom: r.intensiveFrom,
-					intensiveTo: r.intensiveTo
+					intensiveTo: r.intensiveTo,
+					credits: r.credits
 				})
 			}
 		])
@@ -203,7 +206,8 @@ export function writeShared(
 		title: after.title,
 		delivery: after.delivery,
 		intensiveFrom: after.intensiveFrom,
-		intensiveTo: after.intensiveTo
+		intensiveTo: after.intensiveTo,
+		credits: after.credits
 	};
 
 	if (existing) {
@@ -474,7 +478,8 @@ export function deleteShared(db: Db, id: string): BatchItem<'sqlite'>[] {
 
 // Raw statements in a batch can't take bound values (drizzle's D1 batch fails on them), so the
 // merge writes its few values as SQL literals: quotes doubled, which is all SQLite needs.
-const literal = (v: string | null) => (v === null ? 'null' : `'${v.replace(/'/g, "''")}'`);
+const literal = (v: string | number | null) =>
+	v === null ? 'null' : typeof v === 'number' ? String(Number(v)) : `'${v.replace(/'/g, "''")}'`;
 
 // Courses linked to `from` in a timetable that has `into` as well
 const bothLinked = (from: string, into: string) =>
@@ -533,7 +538,7 @@ export function mergeShared(db: Db, from: SharedCourse, into: SharedCourse): Bat
 		),
 		db.run(
 			sql.raw(`update courses set title = ${literal(v.title)}, delivery = ${literal(v.delivery)},
-			intensive_from = ${literal(v.intensiveFrom)}, intensive_to = ${literal(v.intensiveTo)},
+			intensive_from = ${literal(v.intensiveFrom)}, intensive_to = ${literal(v.intensiveTo)}, credits = ${literal(v.credits)},
 			sync_mode = 'personal', shared_course_id = null where id in (${both})`)
 		),
 		db.update(courses).set({ sharedCourseId: into.id }).where(eq(courses.sharedCourseId, from.id)),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysLabel, meetsInWeek, periodLabel } from './courses';
+import { daysLabel, meetsInWeek, periodLabel, readNumber } from './courses';
 
 describe('meetsInWeek', () => {
 	// Q3 starts on Thursday 2026-09-24: its first week is Monday 9/21 to Sunday 9/27.
@@ -26,4 +26,22 @@ it('labels periods and days', () => {
 	expect(daysLabel([1, 2, 3, 4, 5])).toBe('月〜金');
 	expect(daysLabel([1, 3, 5])).toBe('月・水・金');
 	expect(daysLabel([1, 2, 3, 4, 5, 7])).toBe('月〜金・日');
+});
+
+describe('readNumber', () => {
+	it('is null for an empty field, and a number in the steps up to the maximum', () => {
+		expect(readNumber(null, 20, 0.5)).toBeNull();
+		expect(readNumber(' ', 20, 0.5)).toBeNull();
+		expect(readNumber('1.5', 20, 0.5)).toBe(1.5);
+		expect(readNumber('0', 20, 0.5)).toBe(0);
+		expect(readNumber('3', 99, 1)).toBe(3);
+	});
+
+	it('is invalid outside them', () => {
+		expect(readNumber('1.3', 20, 0.5)).toBe('invalid');
+		expect(readNumber('21', 20, 0.5)).toBe('invalid');
+		expect(readNumber('-1', 20, 0.5)).toBe('invalid');
+		expect(readNumber('0', 99, 1)).toBe('invalid');
+		expect(readNumber('abc', 99, 1)).toBe('invalid');
+	});
 });
