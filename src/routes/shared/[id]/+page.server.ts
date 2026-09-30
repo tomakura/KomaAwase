@@ -1,9 +1,19 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { timetables, universities } from '$lib/server/db/schema';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
-import { canEditShared, loadEdits, loadSharedCourse, restoreShared, syncedCount, writeShared } from '$lib/server/shared-courses';
+import {
+	adminSearchShared,
+	canEditShared,
+	loadEdits,
+	loadSharedCourse,
+	mergePreview,
+	mergeShared,
+	restoreShared,
+	syncedCount,
+	writeShared
+} from '$lib/server/shared-courses';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -36,7 +46,32 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		locals.db.select({ name: universities.name }).from(universities).where(eq(universities.id, course.universityId)).get(),
 		canEditShared(locals.db, me.id, course)
 	]);
+	// The admin folds this course into another one (授業をほかの授業と同期させる): pick it by a
+	// search (?merge=), then see who it reaches (?into=)
+	const isAdmin = me.role === 'admin';
+	const mergeQuery = isAdmin ? url.searchParams.get('merge') : null;
+	const intoId = isAdmin ? url.searchParams.get('into') : null;
+	const into = intoId && intoId !== course.id ? await loadSharedCourse(locals.db, intoId) : null;
+	const target = into && into.universityId === course.universityId && into.year === course.year ? into : null;
+	const [candidates, preview] = await Promise.all([
+		mergeQuery !== null
+			? adminSearchShared(locals.db, {
+					universityId: course.universityId,
+					year: course.year,
+					q: mergeQuery.trim().slice(0, 50),
+					excludeId: course.id
+				})
+			: [],
+		target ? mergePreview(locals.db, course.id, target.id) : null
+	]);
 	return {
+		merge: isAdmin
+			? {
+					query: mergeQuery,
+					candidates: candidates.map((c) => ({ id: c.id, version: c.version, users: c.users, source: c.source, values: c.values })),
+					target: target && preview ? { id: target.id, version: target.version, values: target.values, ...preview } : null
+				}
+			: null,
 		back: safeNext(url.searchParams.get('back')) ?? '/',
 		course: {
 			id: course.id,
@@ -49,7 +84,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		},
 		users,
 		canEdit,
-		isAdmin: me.role === 'admin',
+		isAdmin,
 		edits: history.edits.map((e) => ({ id: e.id, createdAt: e.createdAt, diff: e.diff })),
 		page,
 		more: history.more,
@@ -112,6 +147,29 @@ export const actions: Actions = {
 			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', edit: true });
 		}
 		return { edited: true };
+	},
+	// Fold this course into another: everyone syncing it syncs the other, and this one is deleted
+	merge: async ({ locals, params, url, request }) => {
+		const me = requireUser(locals, url);
+		if (me.role !== 'admin') error(404, 'Not found');
+		const course = await usable(locals.db, me, params.id);
+		const form = await request.formData();
+		const into = await loadSharedCourse(locals.db, String(form.get('into') ?? ''));
+		if (!into || into.id === course.id || into.universityId !== course.universityId || into.year !== course.year) {
+			return fail(400, { message: '同期させる授業が見つかりません。選び直してください', merge: true });
+		}
+		// The versions the confirmation showed: if either changed since, nothing is merged
+		if (Number(form.get('version')) !== course.version || Number(form.get('into_version')) !== into.version) {
+			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', merge: true });
+		}
+		try {
+			const statements = mergeShared(locals.db, course, into);
+			await locals.db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
+		} catch (e) {
+			console.error('shared course merge failed', e);
+			return fail(409, { message: '同期させられませんでした。読み込み直してから、もう一度やり直してください', merge: true });
+		}
+		redirect(303, `/shared/${into.id}?back=${encodeURIComponent(safeNext(String(form.get('back') ?? '')) ?? '/')}&merged=1`);
 	},
 	report: async ({ locals, params, url, request }) => {
 		const me = requireUser(locals, url);

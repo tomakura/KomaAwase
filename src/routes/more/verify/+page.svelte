@@ -24,7 +24,8 @@
 					<b>{data.verification.university}の在籍を確認済み</b>
 					<span>{data.verification.email} · {day(data.verification.expiresAt)}まで</span>
 				</div>
-				<b class="days" class:soon={data.verification.days <= 30}>あと{data.verification.days}日</b>
+				<!-- The days are shown from 30 before, when the prompts to check again begin -->
+				{#if data.verification.days <= 30}<b class="days soon">あと{data.verification.days}日</b>{/if}
 			</div>
 			<p class="ui-note">毎年5月1日に切れます。4月になったら、もう一度確認してください。卒業したあともメールが使える大学があるためです。</p>
 		{:else}

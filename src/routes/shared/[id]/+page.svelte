@@ -51,6 +51,15 @@
 		else url.searchParams.delete('page');
 		return url.pathname + url.search;
 	}
+	// The merge picker: ?merge= is the search, ?into= the course chosen (keeps ?back=)
+	function mergeHref(query: string, into?: string) {
+		const url = new URL(page.url);
+		url.searchParams.delete('merged');
+		url.searchParams.set('merge', query);
+		if (into) url.searchParams.set('into', into);
+		else url.searchParams.delete('into');
+		return url.pathname + url.search;
+	}
 	let reporting = $state(false);
 </script>
 
@@ -111,11 +120,64 @@
 				<button class="btn btn-primary" type="submit">直す</button>
 			</form>
 		</section>
+
+		{#if data.merge}
+			<section class="ui-section">
+				<h2 class="ui-section-title">ほかの授業と同期させる</h2>
+				{#if page.url.searchParams.get('merged')}<p class="done" role="status">同期させました。この授業に、もう1つの授業をまとめました。</p>{/if}
+				{#if data.merge.target}
+					{@const target = data.merge.target}
+					<div class="merge">
+						<p>「{data.course.values.title}」を「{target.values.title}」にまとめます。</p>
+						<dl>
+							<dt>まとめる授業</dt>
+							<dd>{fields(data.course.values)['授業名']} · {fields(data.course.values)['先生']} · {fields(data.course.values)['曜日・時限']}</dd>
+							<dt>まとめ先</dt>
+							<dd>{fields(target.values)['授業名']} · {fields(target.values)['先生']} · {fields(target.values)['曜日・時限']}</dd>
+						</dl>
+						<ul>
+							<li>この授業を使っている{data.merge.target.people}人が、まとめ先と同期します。授業名・先生・教室・コマも、まとめ先の内容になります</li>
+							{#if target.both}<li>両方を入れている{target.both}人は、この授業が「自分だけで使う」に変わって、今の内容のまま残ります</li>{/if}
+							<li>この授業は消えます。変更の履歴も消えて、元に戻せません</li>
+						</ul>
+						<form method="POST" action="?/merge" use:enhance>
+							<input type="hidden" name="back" value={data.back} />
+							<input type="hidden" name="into" value={target.id} />
+							<input type="hidden" name="into_version" value={target.version} />
+							<input type="hidden" name="version" value={data.course.version} />
+							{#if form?.message && form.merge}<p class="error" role="alert">{form.message}</p>{/if}
+							<button class="btn btn-primary" type="submit">まとめる</button>
+							<a class="btn" href={mergeHref(data.merge.query ?? '')}>やめる</a>
+						</form>
+					</div>
+				{:else if data.merge.query === null}
+					<p class="ui-note">名前が少し違うだけで別の授業になっているときに、同じ大学・年度の授業にまとめられます。</p>
+					<a class="btn" href={mergeHref('')}>まとめ先をさがす</a>
+				{:else}
+					<form method="GET" role="search" class="merge-search">
+						<input type="hidden" name="back" value={data.back} />
+						<input type="search" name="merge" value={data.merge.query} placeholder="まとめ先の授業名・先生・授業コード" maxlength="50" aria-label="まとめ先をさがす" />
+						<button class="btn" type="submit">さがす</button>
+					</form>
+					<div class="ui-list">
+						{#each data.merge.candidates as c (c.id)}
+							{@const v = fields(c.values)}
+							<a class="candidate" href={mergeHref(data.merge.query, c.id)}>
+								<b>{v['授業名']}</b>
+								<span>{v['先生']} · {v['曜日・時限']} · {c.source === 'syllabus' ? 'シラバス' : `${c.users}人が同期中`}</span>
+							</a>
+						{:else}
+							<p class="ui-note">見つかりませんでした。</p>
+						{/each}
+					</div>
+				{/if}
+			</section>
+		{/if}
 	{/if}
 
 	<section class="ui-section">
 		<h2 class="ui-section-title">変更の履歴</h2>
-		{#if form?.message && !form.edit}<p class="error" role="alert">{form.message}</p>{/if}
+		{#if form?.message && !form.edit && !form.merge}<p class="error" role="alert">{form.message}</p>{/if}
 		{#if form?.restored}<p class="done" role="status">元に戻しました。</p>{/if}
 		<div class="ui-list">
 			{#each data.edits as edit, i (edit.id)}
@@ -271,6 +333,86 @@
 		font-size: 12px;
 		font-weight: 700;
 		cursor: pointer;
+	}
+
+	.merge {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		font-size: 14px;
+		line-height: 1.7;
+	}
+
+	.merge p,
+	.merge ul {
+		margin: 0;
+	}
+
+	.merge ul {
+		padding-left: 20px;
+	}
+
+	.merge dl {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 4px 12px;
+		margin: 0;
+		font-size: 13px;
+	}
+
+	.merge dt {
+		color: var(--ink-sub);
+	}
+
+	.merge dd {
+		margin: 0;
+	}
+
+	.merge form {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.merge form .error {
+		flex-basis: 100%;
+	}
+
+	.merge-search {
+		display: flex;
+		gap: 8px;
+	}
+
+	.merge-search input[type='search'] {
+		flex: 1 1 0;
+		min-width: 0;
+		height: 44px;
+		box-sizing: border-box;
+		padding: 0 12px;
+		border: 1px solid var(--line-strong);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 16px;
+	}
+
+	.candidate {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 10px 12px;
+		color: var(--ink);
+		text-decoration: none;
+	}
+
+	.candidate + .candidate {
+		border-top: 1px solid var(--slot);
+	}
+
+	.candidate span {
+		font-size: 12px;
+		color: var(--ink-sub);
 	}
 
 	.admin-edit {

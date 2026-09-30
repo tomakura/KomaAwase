@@ -217,7 +217,8 @@ export const courses = sqliteTable(
 			.notNull()
 			.references(() => timetables.id, { onDelete: 'cascade' }),
 		// shared_courses.id. Not a foreign key: adding one would rebuild this table, and shared
-		// courses are never deleted.
+		// courses are deleted only when an admin folds one into another (mergeShared), which
+		// moves these links first.
 		sharedCourseId: text('shared_course_id'),
 		syncMode: text('sync_mode', { enum: ['synced', 'personal'] })
 			.notNull()

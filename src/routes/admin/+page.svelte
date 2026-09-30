@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
+	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { tokyoTime } from '$lib/time';
 
@@ -30,6 +31,15 @@
 
 <div class="ui-page">
 	<PageHeader title="運営" back="/more" />
+
+	<section class="ui-section">
+		<div class="ui-list">
+			<a class="ui-row" href="/admin/courses">
+				<span>授業の管理（直す・まとめる）</span>
+				<span class="ui-row-value"><Icon name="chevron" size={16} /></span>
+			</a>
+		</div>
+	</section>
 
 	<section class="ui-section">
 		<h2 class="ui-section-title">通報（{data.reportTotal}）</h2>
