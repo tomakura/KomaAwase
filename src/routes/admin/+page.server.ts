@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { requireAdmin } from '$lib/server/auth/reauth';
 import { contactMessages, feedback, groups, reports, sharedCourses, users } from '$lib/server/db/schema';
+import { SUGGEST_MIN_USERS, listUserUniversities } from '$lib/server/universities';
 import type { Actions, PageServerLoad } from './$types';
 
 // Contact messages, reports and feedback for whoever runs the app: users with role 'admin', set in D1 by hand
@@ -86,6 +87,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const names = new Map([...people, ...groupRows, ...courseRows].map((r) => [r.id, r.name]));
 
 	return {
+		userUniversities: await listUserUniversities(locals.db),
+		suggestMin: SUGGEST_MIN_USERS,
 		contact: contactRows,
 		reports: reportRows.map((r) => ({ ...r, target: names.get(r.targetId) ?? '（消えています）' })),
 		feedback: feedbackRows,

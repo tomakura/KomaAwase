@@ -43,6 +43,21 @@
 	</section>
 
 	<section class="ui-section">
+		<h2 class="ui-section-title">利用者が作った大学（{data.userUniversities.length}）</h2>
+		<p class="ui-note">{data.suggestMin}人以上が使うと、ほかの人の入力候補に出ます。</p>
+		<div class="ui-list">
+			{#each data.userUniversities as u (u.id)}
+				<div class="ui-row">
+					<span class="uni">{u.name}</span>
+					<span class="ui-row-value"><span class="value">{u.users}人</span></span>
+				</div>
+			{:else}
+				<p class="ui-note">ありません。</p>
+			{/each}
+		</div>
+	</section>
+
+	<section class="ui-section">
 		<h2 class="ui-section-title">問い合わせ（{data.contactTotal}）</h2>
 		{#each data.contact as c (c.id)}
 			<div class="item">
@@ -143,6 +158,10 @@
 		gap: 16px;
 		padding: 12px 0 0;
 		font-size: 14px;
+	}
+
+	.uni {
+		overflow-wrap: anywhere;
 	}
 
 	.pager a,
