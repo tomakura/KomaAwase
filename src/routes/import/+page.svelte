@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import Cropper from '$lib/components/Cropper.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -154,6 +155,16 @@
 			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
 			<SharedLock access={data.access} what="スクショからの読み込み" from="/import" />
 			<p class="ui-note">授業は <a href="/courses/new">自分で入力</a> することもできます。</p>
+		{:else if (!data.job || data.job.status === 'failed') && !data.consented}
+			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。はじめて使うときは、次のことに同意してください。</p>
+			<div class="notes">
+				<p class="consent">読み取りのため、画像をアメリカの Groq か Cloudflare に送ります。読み取りが終わると、画像はすぐに消します。</p>
+				<a class="policy" href="/privacy">くわしくはプライバシーポリシー</a>
+			</div>
+			<form method="POST" action="?/consent" use:enhance>
+				<button class="btn btn-primary consent-button" type="submit">同意して読み込む</button>
+			</form>
+			<p class="ui-note">授業は <a href="/courses/new">自分で入力</a> することもできます。</p>
 		{:else if !data.job || data.job.status === 'failed'}
 			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
 
@@ -303,6 +314,21 @@
 		margin: 0;
 		font-size: 14px;
 		font-weight: 700;
+	}
+
+	.consent {
+		margin: 0;
+		font-size: 14px;
+		line-height: 1.7;
+	}
+
+	.policy {
+		font-size: 13px;
+		color: var(--accent-text);
+	}
+
+	.consent-button {
+		width: 100%;
 	}
 
 	.item {

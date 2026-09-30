@@ -17,6 +17,7 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 	const body = (await request.json().catch(() => null)) as { image?: unknown; tiled?: unknown; term?: unknown } | null;
 	if (typeof body?.image !== 'string') error(400, '画像を読み込めませんでした');
 
+	if (!locals.user.importConsentAt) return json({ message: '読み込む前に、画面を開き直して同意してください' }, { status: 403 });
 	const term = typeof body.term === 'string' && body.term.length <= 64 ? body.term : null;
 	const timetable = await currentTimetable(locals.db, locals.user);
 	if ((await sharedAccess(locals.db, locals.user.id, timetable.universityId)) !== 'ok') {
