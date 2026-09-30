@@ -26,7 +26,12 @@
 		(data.terms.find((t) => t.id === data.termParam) ?? currentTerm(data.terms, tokyoTime(data.now).date))?.id
 	);
 	const term = $derived(data.terms.find((t) => t.id === termId));
-	const selectTerm = (id: string) => replaceState(timetableHref(id), {});
+	// Changing the term brings its cells in one after another (not the first time it opens)
+	let staggered = $state(false);
+	const selectTerm = (id: string) => {
+		staggered = true;
+		replaceState(timetableHref(id), {});
+	};
 
 	const clock = $derived(time.clock);
 	const on = $derived(termIsOn(term, clock.date));
@@ -148,8 +153,9 @@
 
 		<!-- The other term's classes fade in -->
 		{#key termId}
-			<div in:fade={motion(200)}>
+			<div>
 				<TimetableGrid
+					stagger={staggered}
 					periods={data.periods}
 					{days}
 					courses={termCourses}
@@ -160,7 +166,9 @@
 					courseHref={(id) => courseHref(id, termId ?? null)}
 				/>
 
-				<UnscheduledCards courses={unscheduled} href={(id) => courseHref(id, termId ?? null)} />
+				<div in:fade={motion(200)}>
+					<UnscheduledCards courses={unscheduled} href={(id) => courseHref(id, termId ?? null)} />
+				</div>
 			</div>
 		{/key}
 	</main>

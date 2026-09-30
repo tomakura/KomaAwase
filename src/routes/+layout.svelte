@@ -93,7 +93,7 @@
 		if (!connection.guardNavigation(navigation.to.url, navigation.from?.url.pathname)) navigation.cancel();
 	});
 
-	// How a navigation moves: between the tabs it fades, deeper pages come in from the right
+	// How a navigation moves: between the tabs it slides, deeper pages come in from the right
 	// and go back out to it, and a course opens as a sheet from the bottom (see app.css).
 	const TABS = ['/', '/overlay', '/friends', '/more'];
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
@@ -102,7 +102,8 @@
 	function motion(from: string, to: string) {
 		if (COURSE.test(to) && !from.startsWith('/courses/')) return 'sheet-open';
 		if (COURSE.test(from) && !to.startsWith('/courses/')) return 'sheet-close';
-		if (TABS.includes(from) && TABS.includes(to)) return 'fade';
+		// Between the tabs the screen slides the way the tab is: from the right to a tab on the right
+		if (TABS.includes(from) && TABS.includes(to)) return TABS.indexOf(to) > TABS.indexOf(from) ? 'tab-right' : 'tab-left';
 		if (depth(to) > depth(from)) return 'forward';
 		if (depth(to) < depth(from)) return 'back';
 		return 'fade';

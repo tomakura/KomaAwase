@@ -324,6 +324,20 @@ button.ui-row {
 		animation: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both nav-in-left;
 	}
 
+	/* Between the bottom tabs the screen slides the way the tab lies (the bar itself stays) */
+	:root[data-nav='tab-right']::view-transition-old(root) {
+		animation: 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both tab-out-left;
+	}
+	:root[data-nav='tab-right']::view-transition-new(root) {
+		animation: 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both tab-in-right;
+	}
+	:root[data-nav='tab-left']::view-transition-old(root) {
+		animation: 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both tab-out-right;
+	}
+	:root[data-nav='tab-left']::view-transition-new(root) {
+		animation: 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both tab-in-left;
+	}
+
 	/* A course opens as a sheet over the timetable and closes back down */
 	:root[data-nav^='sheet'] .course-sheet {
 		view-transition-name: course-sheet;
@@ -371,6 +385,30 @@ button.ui-row {
 	}
 }
 
+@keyframes tab-in-right {
+	from {
+		transform: translateX(56px);
+		opacity: 0;
+	}
+}
+@keyframes tab-out-left {
+	to {
+		transform: translateX(-56px);
+		opacity: 0;
+	}
+}
+@keyframes tab-in-left {
+	from {
+		transform: translateX(-56px);
+		opacity: 0;
+	}
+}
+@keyframes tab-out-right {
+	to {
+		transform: translateX(56px);
+		opacity: 0;
+	}
+}
 @keyframes nav-in-right {
 	from {
 		transform: translateX(28px);
