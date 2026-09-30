@@ -2,7 +2,7 @@ import { dev } from '$app/environment';
 import { and, count, eq, gt, lt, max } from 'drizzle-orm';
 import type { Db } from '$lib/server/db';
 import { emailTokens } from '$lib/server/db/schema';
-import { hmacSha256Hex } from '$lib/server/hmac';
+import { hmacSha256Hex, newNonce } from '$lib/server/hmac';
 import { MAIL_COOLDOWN_MS } from '$lib/server/mail-limit';
 import { generateToken, hashToken } from './token';
 
@@ -73,12 +73,14 @@ export async function sendRelayMail(env: Env, kind: 'signin' | 'verify', to: str
 
 	const body = JSON.stringify({ to, link, kind });
 	const timestamp = String(Math.floor(Date.now() / 1000));
+	const nonce = newNonce();
 	const res = await fetch(env.RELAY_URL, {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/json',
 			'x-koma-timestamp': timestamp,
-			'x-koma-signature': await hmacSha256Hex(env.RELAY_SECRET, `${timestamp}.${body}`)
+			'x-koma-nonce': nonce,
+			'x-koma-signature': await hmacSha256Hex(env.RELAY_SECRET, `${timestamp}.${nonce}.${body}`)
 		},
 		body,
 		signal: AbortSignal.timeout(10_000)
