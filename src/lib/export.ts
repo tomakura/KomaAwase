@@ -4,7 +4,7 @@ import { DAY_NAMES, type WeekPattern } from './courses';
 
 export type ExportOptions = {
 	format: 'tall' | 'wide';
-	hideRoom: boolean;
+	room: boolean;
 	day: boolean;
 	period: boolean;
 	time: boolean;
@@ -13,7 +13,7 @@ export type ExportOptions = {
 
 export const DEFAULT_OPTIONS: ExportOptions = {
 	format: 'tall',
-	hideRoom: true,
+	room: false,
 	day: true,
 	period: true,
 	time: false,
@@ -64,19 +64,34 @@ const BODY = '"Zen Kaku Gothic New", sans-serif';
 
 type Box = { x: number; y: number; w: number; h: number };
 
+const time = (t: string) => t.replace(/^0/, '');
+
+/** Text width in a canvas font; in tests, a rough guess from the font size */
+export type Measure = (font: string, text: string) => number;
+const guess: Measure = (font, text) => [...text].length * Number(/(\d+)px/.exec(font)?.[1] ?? 20) * 0.6;
+
+const periodFont = (s: number) => `700 ${Math.round(30 * s)}px ${DISPLAY}`;
+const timeFont = (s: number) => `500 ${Math.round(20 * s)}px ${BODY}`;
+
 /**
  * Where everything goes. The period and day labels take only the room their text needs,
  * so the slots stay as large as possible (the mock's labels were too wide).
  */
-export function layout(data: ExportData, o: ExportOptions) {
+export function layout(data: ExportData, o: ExportOptions, measure: Measure = guess) {
 	const { width, height } = SIZES[o.format];
 	const tall = o.format === 'tall';
+	const s = tall ? 1 : 0.9;
 	const pad = tall ? 60 : 44;
 	const headerH = o.name || tall ? (tall ? 84 : 64) : 44;
 	const footerH = tall ? 72 + (data.unscheduled.length ? 64 : 0) : 0;
 	const gap = tall ? 10 : 8;
 
-	const labelW = o.time ? (tall ? 92 : 84) : o.period ? (tall ? 40 : 36) : 0;
+	// As wide as the widest period number or time, and no wider
+	const texts = [
+		...(o.period ? data.periods.map((p) => measure(periodFont(s), String(p.number))) : []),
+		...(o.time ? data.periods.flatMap((p) => [time(p.start), time(p.end)].map((t) => measure(timeFont(s), t))) : [])
+	];
+	const labelW = texts.length ? Math.ceil(Math.max(...texts)) + 4 : 0;
 	const dayH = o.day ? (tall ? 44 : 38) : 0;
 
 	const grid: Box = {
@@ -226,10 +241,11 @@ function drawBadge(ctx: CanvasRenderingContext2D, right: number, centerY: number
 	text(ctx, label, box.x + padX + logo + 8 * scale, centerY, font, SOFT, 'left', 'middle');
 }
 
-const time = (t: string) => t.replace(/^0/, '');
-
 export function drawTimetable(ctx: CanvasRenderingContext2D, data: ExportData, o: ExportOptions) {
-	const L = layout(data, o);
+	const L = layout(data, o, (font, value) => {
+		ctx.font = font;
+		return ctx.measureText(value).width;
+	});
 	const s = L.tall ? 1 : 0.9;
 	ctx.clearRect(0, 0, L.width, L.height);
 	roundRect(ctx, { x: 0, y: 0, w: L.width, h: L.height }, 0, SURFACE);
@@ -279,11 +295,11 @@ export function drawTimetable(ctx: CanvasRenderingContext2D, data: ExportData, o
 			const b = L.labelBox(i);
 			let y = b.y + 8;
 			if (o.period) {
-				text(ctx, String(p.number), b.x + b.w / 2, y, `700 ${Math.round(30 * s)}px ${DISPLAY}`, INK, 'center', 'top');
+				text(ctx, String(p.number), b.x + b.w / 2, y, periodFont(s), INK, 'center', 'top');
 				y += 36 * s;
 			}
 			if (o.time) {
-				const small = `500 ${Math.round(20 * s)}px ${BODY}`;
+				const small = timeFont(s);
 				text(ctx, time(p.start), b.x + b.w / 2, y, small, SOFT, 'center', 'top');
 				text(ctx, time(p.end), b.x + b.w / 2, y + 24 * s, small, SUB, 'center', 'top');
 			}
@@ -310,7 +326,7 @@ export function drawTimetable(ctx: CanvasRenderingContext2D, data: ExportData, o
 
 			// Alternate weeks show even with rooms hidden: 「奇 B-203」, or 「奇数週」 alone
 			const week = slot.week === 'odd' ? '奇' : slot.week === 'even' ? '偶' : null;
-			const shownRoom = o.hideRoom ? null : slot.room;
+			const shownRoom = o.room ? slot.room : null;
 			const room = week && shownRoom ? `${week} ${shownRoom}` : week ? `${week}数週` : shownRoom;
 			const roomH = room ? roomSize + 12 : 0;
 			const maxLines = Math.max(1, Math.floor((b.h - inner * 2 - (room ? roomH + 6 : 0)) / lineH));

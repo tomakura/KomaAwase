@@ -17,7 +17,7 @@
 	--now-text: #7a3016;
 	--shu: #d9653b;
 	--ai: #3569a8;
-	--accent-text: #b9502b;
+	--accent-text: #ae4a27;
 	--logo-blend: multiply;
 
 	--course-red: #f8dcdc;
@@ -124,6 +124,13 @@
 	--live-text-dc: 0.04;
 
 	color-scheme: dark;
+}
+
+/* No rubber band past the top and bottom of the page (iOS 16+). In a browser tab on Android
+   this also turns off pull to refresh; the installed app has none anyway */
+html,
+body {
+	overscroll-behavior: none;
 }
 
 body {

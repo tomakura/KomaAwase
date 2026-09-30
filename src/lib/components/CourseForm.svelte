@@ -204,15 +204,14 @@
 						<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
 						<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
 					</svg>
-					<span>授業を同じ大学のみんなと共有するには、在籍確認が必要です</span>
+					<span>
+						{#if sync.locked === 'need-verify'}
+							この授業は、あなたの時間割にだけ保存されます。<a href="/more/verify">在籍確認</a>をすると、同じ大学のみんなと授業の情報を共有できます。
+						{:else}
+							この授業は、あなたの時間割にだけ保存されます。この大学は、まだ在籍確認に対応していません。
+						{/if}
+					</span>
 				</div>
-				<span class="note">
-					{#if sync.locked === 'need-verify'}
-						この授業は自分だけで使います。<a href="/more/verify">在籍確認</a>をすると、共有できます。
-					{:else}
-						この大学は、まだ在籍確認に対応していません。この授業は自分だけで使います。
-					{/if}
-				</span>
 			</div>
 		{/if}
 		<input type="hidden" name="sync" value={sync.canSync ? v.syncMode : 'personal'} />

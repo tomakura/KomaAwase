@@ -11,7 +11,7 @@
 
 {#if icon.photo && failed !== icon.photo}
 	<img
-		class="icon"
+		class="user-icon"
 		style:--size="{size}px"
 		style:background={icon.hex}
 		src={icon.photo}
@@ -22,7 +22,7 @@
 	/>
 {:else}
 	<span
-		class="icon"
+		class="user-icon"
 		style:--size="{size}px"
 		style:background={icon.hex}
 		style:font-size="{Math.round(size * (splitGraphemes(text).length > 1 ? 0.4 : 0.5))}px"
@@ -31,7 +31,7 @@
 {/if}
 
 <style>
-	.icon {
+	.user-icon {
 		width: var(--size);
 		height: var(--size);
 		flex-shrink: 0;
@@ -46,7 +46,7 @@
 		white-space: nowrap;
 	}
 
-	img.icon {
+	img.user-icon {
 		object-fit: cover;
 	}
 </style>

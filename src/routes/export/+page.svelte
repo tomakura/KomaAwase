@@ -22,7 +22,10 @@
 	const STORAGE_KEY = 'koma.export';
 	function saved(): ExportOptions {
 		try {
-			return { ...DEFAULT_OPTIONS, ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') };
+			const { hideRoom, ...rest } = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+			// Saved before 「教室名をかくす」 became 「教室名を入れる」
+			if (typeof hideRoom === 'boolean' && rest.room === undefined) rest.room = !hideRoom;
+			return { ...DEFAULT_OPTIONS, ...rest };
 		} catch {
 			return { ...DEFAULT_OPTIONS };
 		}
@@ -136,8 +139,8 @@
 		}
 	}
 
-	const TOGGLES: { key: 'hideRoom' | 'day' | 'period' | 'time' | 'name'; label: string }[] = [
-		{ key: 'hideRoom', label: '教室名をかくす' },
+	const TOGGLES: { key: 'room' | 'day' | 'period' | 'time' | 'name'; label: string }[] = [
+		{ key: 'room', label: '教室名を入れる' },
 		{ key: 'day', label: '曜日を入れる' },
 		{ key: 'period', label: '時限を入れる' },
 		{ key: 'time', label: '時刻を入れる' },
