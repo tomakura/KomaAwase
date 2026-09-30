@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, inArray, sql, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne, sql, type SQLWrapper } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Delivery, WeekPattern } from '$lib/courses';
 import { compareJa } from '$lib/sort';
 import type { Db } from './db';
 import {
 	courses,
+	reports,
 	sharedCourseEdits,
 	sharedCourseSlots,
 	sharedCourseTeachers,
@@ -245,6 +246,16 @@ export function writeShared(
 
 const likePattern = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
+// A search by title, teacher or course code
+const queryMatch = (q: string) => {
+	const pattern = likePattern(q);
+	return sql`(${sharedCourses.title} like ${pattern} escape '\\'
+		or ${sharedCourses.code} like ${pattern} escape '\\'
+		or exists (select 1 from ${sharedCourseTeachers}
+			where ${sharedCourseTeachers.sharedCourseId} = ${sharedCourses.id}
+			and ${sharedCourseTeachers.name} like ${pattern} escape '\\'))`;
+};
+
 // Courses at a weekday and period (in the given term), or matching a search by title,
 // teacher or course code. Courses already in the timetable are left out.
 export async function searchSharedCourses(
@@ -260,12 +271,7 @@ export async function searchSharedCourses(
 ) {
 	let match;
 	if (opts.q) {
-		const pattern = likePattern(opts.q);
-		match = sql`(${sharedCourses.title} like ${pattern} escape '\\'
-			or ${sharedCourses.code} like ${pattern} escape '\\'
-			or exists (select 1 from ${sharedCourseTeachers}
-				where ${sharedCourseTeachers.sharedCourseId} = ${sharedCourses.id}
-				and ${sharedCourseTeachers.name} like ${pattern} escape '\\'))`;
+		match = queryMatch(opts.q);
 	} else if (opts.slot) {
 		match = sql`exists (select 1 from ${sharedCourseSlots}
 			where ${sharedCourseSlots.sharedCourseId} = ${sharedCourses.id}
@@ -376,4 +382,116 @@ export async function syncedCount(db: Db, sharedCourseId: string) {
 		.from(courses)
 		.where(and(eq(courses.sharedCourseId, sharedCourseId), eq(courses.syncMode, 'synced')));
 	return row?.n ?? 0;
+}
+
+/**
+ * For the admin: a university's shared courses of a year, by title, teacher or course code
+ * (the first 50 by title when there is no search), with how many people sync each.
+ */
+export async function adminSearchShared(
+	db: Db,
+	opts: { universityId: string; year: number; q: string; excludeId?: string }
+) {
+	const rows = await db
+		.select({ id: sharedCourses.id })
+		.from(sharedCourses)
+		.where(
+			and(
+				eq(sharedCourses.universityId, opts.universityId),
+				eq(sharedCourses.year, opts.year),
+				opts.q ? queryMatch(opts.q) : undefined,
+				opts.excludeId ? ne(sharedCourses.id, opts.excludeId) : undefined
+			)
+		)
+		.orderBy(asc(sharedCourses.title))
+		// The ids go into IN (...) lists below (D1: at most 100 bound values).
+		.limit(50);
+	const ids = rows.map((r) => r.id);
+	if (!ids.length) return [];
+	const [details, counts] = await Promise.all([
+		loadSharedCourses(db, ids),
+		db
+			.select({ id: courses.sharedCourseId, n: count() })
+			.from(courses)
+			.where(and(inArray(courses.sharedCourseId, ids), eq(courses.syncMode, 'synced')))
+			.groupBy(courses.sharedCourseId)
+	]);
+	const users = new Map(counts.map((c) => [c.id, c.n]));
+	return ids.flatMap((id) => {
+		const course = details.get(id);
+		return course ? [{ ...course, users: users.get(id) ?? 0 }] : [];
+	});
+}
+
+// Raw statements in a batch can't take bound values (drizzle's D1 batch fails on them), so the
+// merge writes its few values as SQL literals: quotes doubled, which is all SQLite needs.
+const literal = (v: string | null) => (v === null ? 'null' : `'${v.replace(/'/g, "''")}'`);
+
+// Courses linked to `from` in a timetable that has `into` as well
+const bothLinked = (from: string, into: string) =>
+	sql`select a.id from courses a where a.shared_course_id = ${from}
+		and a.timetable_id in (select b.timetable_id from courses b where b.shared_course_id = ${into})`;
+const bothLinkedRaw = (from: string, into: string) =>
+	`select a.id from courses a where a.shared_course_id = ${literal(from)}
+		and a.timetable_id in (select b.timetable_id from courses b where b.shared_course_id = ${literal(into)})`;
+
+/** How many people a merge of `from` into `into` reaches, and how many of them have both */
+export async function mergePreview(db: Db, from: string, into: string) {
+	const [linked, both] = await Promise.all([
+		db.all<{ n: number }>(
+			sql`select count(distinct t.user_id) as n from courses c join timetables t on t.id = c.timetable_id where c.shared_course_id = ${from}`
+		),
+		db.all<{ n: number }>(
+			sql`select count(distinct t.user_id) as n from courses c join timetables t on t.id = c.timetable_id where c.id in (${bothLinked(from, into)})`
+		)
+	]);
+	return { people: Number(linked[0]?.n ?? 0), both: Number(both[0]?.n ?? 0) };
+}
+
+/**
+ * Statements that fold shared course `from` into `into`: everyone linked to `from` is linked
+ * to `into` and reads its values; `from` is deleted with its history, and reports about it
+ * are closed. Someone with both in one timetable keeps `from` as their own (自分だけで使う,
+ * with the values they were seeing), so nothing is lost or doubled. Each course must still
+ * be at the version that was read, else the batch stops at the guards and rolls back.
+ */
+export function mergeShared(db: Db, from: SharedCourse, into: SharedCourse): BatchItem<'sqlite'>[] {
+	const guard = (c: SharedCourse) => [
+		db
+			.update(sharedCourses)
+			.set({ updatedAt: new Date() })
+			.where(and(eq(sharedCourses.id, c.id), eq(sharedCourses.version, c.version))),
+		db.run(sql`select json(case when changes() = 1 then 'true' else 'version conflict' end)`)
+	];
+	const both = bothLinkedRaw(from.id, into.id);
+	const v = from.values;
+	return [
+		...guard(from),
+		...guard(into),
+		db.run(sql.raw(`delete from course_slots where course_id in (${both})`)),
+		db.run(sql.raw(`delete from course_teachers where course_id in (${both})`)),
+		db.run(
+			sql.raw(`insert into course_slots (id, course_id, weekday, period_number, span, week_pattern, room)
+			select lower(hex(randomblob(16))), a.id, s.weekday, s.period_number, s.span, s.week_pattern, s.room
+			from courses a join shared_course_slots s on s.shared_course_id = a.shared_course_id
+			where a.id in (${both})`)
+		),
+		db.run(
+			sql.raw(`insert into course_teachers (id, course_id, name, sort_order)
+			select lower(hex(randomblob(16))), a.id, t.name, t.sort_order
+			from courses a join shared_course_teachers t on t.shared_course_id = a.shared_course_id
+			where a.id in (${both})`)
+		),
+		db.run(
+			sql.raw(`update courses set title = ${literal(v.title)}, delivery = ${literal(v.delivery)},
+			intensive_from = ${literal(v.intensiveFrom)}, intensive_to = ${literal(v.intensiveTo)},
+			sync_mode = 'personal', shared_course_id = null where id in (${both})`)
+		),
+		db.update(courses).set({ sharedCourseId: into.id }).where(eq(courses.sharedCourseId, from.id)),
+		db
+			.update(reports)
+			.set({ status: 'closed' })
+			.where(and(eq(reports.targetType, 'shared_course'), eq(reports.targetId, from.id))),
+		db.delete(sharedCourses).where(eq(sharedCourses.id, from.id))
+	];
 }
