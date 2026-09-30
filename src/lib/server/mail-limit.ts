@@ -20,7 +20,7 @@ export const MAIL_LIMIT_MESSAGES = {
 	day: '今日のメールの送信は、アプリ全体の上限に達しました。明日、もう一度送ってください。'
 } as const;
 export const MAIL_COOLDOWN_MESSAGE =
-	'このアドレスには、少し前にメールを送りました。もう一度送れるのは60秒後です。届いたメールを確かめてください。';
+	'このアドレスには、少し前にメールを送信しました。もう一度送れるのは60秒後です。届いたメールを確かめてください。';
 
 /** The counters a mail sent at `now` goes into: this hour, and this day in Japan */
 export function mailWindows(now: number) {

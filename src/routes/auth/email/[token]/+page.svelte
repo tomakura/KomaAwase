@@ -10,7 +10,7 @@
 	<title>ログイン · コマあわせ</title>
 </svelte:head>
 
-<AuthScreen title="コマあわせ">
+<AuthScreen>
 	{#if form?.message || !data.email}
 		<p class="error" role="alert">{form?.message ?? 'リンクの期限が切れているか、すでに使われています'}</p>
 		<a class="btn" href="/login">ログイン画面にもどる</a>

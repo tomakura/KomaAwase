@@ -5,11 +5,13 @@
 	import Logo from '$lib/components/Logo.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import MailSent from '$lib/components/MailSent.svelte';
+	import SendButton from '$lib/components/SendButton.svelte';
+	import { pauseAfterSent } from '$lib/send';
 	import { clearPageCaches } from '$lib/offline';
 
 	let { data, form } = $props();
 	let busy = $state(false);
-	let sending = $state(false);
+	let phase = $state<'idle' | 'sending' | 'done'>('idle');
 	// 'none': cancelled, or no passkey on this device (browsers don't tell them apart)
 	let passkeyResult = $state<'none' | 'failed' | null>(null);
 	let blocked = $state(false);
@@ -109,7 +111,7 @@
 		{#if form?.sentTo && !other}
 			{#key form}
 				<MailSent email={form.sentTo} action="?/email" onother={() => (other = true)}>
-					{form.sentTo} にログイン用のリンクを送りました。15分以内に開いてください。届かないときは、迷惑メールのフォルダも見てください。
+					{form.sentTo} にログイン用のリンクを送信しました。15分以内に開いてください。届かないときは、迷惑メールのフォルダも見てください。
 				</MailSent>
 			{/key}
 		{:else}
@@ -117,14 +119,21 @@
 				method="POST"
 				action="?/email"
 				use:enhance={() => {
-					sending = true;
+					phase = 'sending';
 					blocked = false;
 					return async ({ result, update }) => {
 						// Cloudflare's rate limit answers with its own page, which isn't a form result;
 						// the form stays and says to wait instead of the whole screen being replaced.
 						if (result.type === 'error') blocked = true;
-						else await update({ reset: false });
-						sending = false;
+						else {
+							// The wheel turns into a check, then what was sent comes up
+							if (result.type === 'success') {
+								phase = 'done';
+								await pauseAfterSent();
+							}
+							await update({ reset: false });
+						}
+						phase = 'idle';
 					};
 				}}
 			>
@@ -139,9 +148,7 @@
 						{form.message}{#if "limit" in form}<br />パスキーがあれば、パスキーでログインできます。{/if}
 					</p>
 				{/if}
-				<button class="btn" type="submit" disabled={sending}>
-					{sending ? '送信中…' : data.reauth ? 'メールでログイン' : 'メールでログイン・登録'}
-				</button>
+				<SendButton {phase}>{data.reauth ? 'メールでログイン' : 'メールでログイン・登録'}</SendButton>
 			</form>
 		{/if}
 		{#if data.reauth}
@@ -162,8 +169,8 @@
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
-		gap: 40px;
-		/* The logo stays where it is however much is below it (same place on the mail-link pages) */
+		/* The logo stays at the top and what is to be done sits at the bottom, so neither moves
+		   with the other (same on the mail-link pages) */
 		padding: clamp(48px, 12vh, 112px) 24px 32px;
 	}
 
@@ -207,6 +214,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+	}
+
+	.actions {
+		margin-top: auto;
+		padding-top: 32px;
 	}
 
 	.divider {

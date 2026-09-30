@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { fly } from 'svelte/transition';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import SendButton from '$lib/components/SendButton.svelte';
+	import { motion } from '$lib/motion';
+	import { pauseAfterSent } from '$lib/send';
 
 	let { data, form } = $props();
+	let phase = $state<'idle' | 'sending' | 'done'>('idle');
 
 	type Turnstile = {
 		render: (el: HTMLElement, options: Record<string, unknown>) => string;
@@ -47,19 +52,28 @@
 
 	{#if form?.sent}
 		<div class="body">
-			<p class="thanks" role="status">送りました。返信は、入力したメールアドレスにお送りします。</p>
-			<a class="btn" href={data.signedIn ? '/more' : '/login'}>もどる</a>
+			<!-- Comes up from below -->
+			<p class="thanks" role="status" in:fly|global={{ y: 28, ...motion(420) }}>送信しました。返信は、入力したメールアドレスにお送りします。</p>
+			<a class="btn" href={data.signedIn ? '/more' : '/login'} in:fly|global={{ y: 28, delay: 70, ...motion(420) }}>もどる</a>
 		</div>
 	{:else}
 		<form
 			class="body"
 			method="POST"
-			use:enhance={() =>
-				async ({ result, update }) => {
+			use:enhance={() => {
+				phase = 'sending';
+				return async ({ result, update }) => {
+					// The wheel turns into a check, then what was sent comes up
+					if (result.type === 'success') {
+						phase = 'done';
+						await pauseAfterSent();
+					}
 					await update({ reset: false });
+					phase = 'idle';
 					// A token works once: a failed send needs a fresh one
 					if (result.type !== 'success' && widgetId) turnstile()?.reset(widgetId);
-				}}
+				};
+			}}
 		>
 			{#if data.signedIn}
 				<p class="ui-note">アプリの不具合や要望は、<a href="/feedback?from=/contact">不具合・要望を送る</a>からも送れます。</p>
@@ -84,7 +98,7 @@
 			<p class="ui-note">返信は、入力したメールアドレスにお送りします。</p>
 
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-			<button class="btn btn-primary" type="submit">送る</button>
+			<SendButton {phase} class="btn btn-primary">送る</SendButton>
 		</form>
 	{/if}
 </div>

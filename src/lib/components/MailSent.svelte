@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
 	import { enhance } from '$app/forms';
 	import { MAIL_COOLDOWN_SECONDS } from '$lib/mail';
+	import { motion } from '$lib/motion';
 
 	// What was sent, with a way to send it again once a minute has passed (the server says
 	// the same) and to go back to the form for another address
@@ -20,8 +22,10 @@
 	});
 </script>
 
-<div class="sent" role="status">{@render children()}</div>
+<!-- Comes up from below, one after the other -->
+<div class="sent" role="status" in:fly|global={{ y: 28, ...motion(420) }}>{@render children()}</div>
 <form
+	in:fly|global={{ y: 28, delay: 70, ...motion(420) }}
 	method="POST"
 	{action}
 	use:enhance={() => {
@@ -37,7 +41,7 @@
 		{sending ? '送っています…' : left > 0 ? `もう一度送る（${left}秒）` : 'もう一度送る'}
 	</button>
 </form>
-<button class="other" type="button" onclick={onother}>別のアドレスにする</button>
+<button class="other" type="button" in:fly|global={{ y: 28, delay: 140, ...motion(420) }} onclick={onother}>別のアドレスにする</button>
 
 <style>
 	.sent {

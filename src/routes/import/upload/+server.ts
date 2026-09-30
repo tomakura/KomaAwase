@@ -1,7 +1,7 @@
 import { dev } from '$app/environment';
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { importJobs } from '$lib/server/db/schema';
+import { importJobs, users } from '$lib/server/db/schema';
 import { createImportJob, enqueue } from '$lib/server/import/jobs';
 import { currentTimetable } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
@@ -14,14 +14,18 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 	// Only this site's pages may send (SvelteKit checks this for forms, not for fetch).
 	if (request.headers.get('origin') !== url.origin) error(403, 'forbidden');
 	if (!platform) error(500);
-	const body = (await request.json().catch(() => null)) as { image?: unknown; tiled?: unknown; term?: unknown } | null;
+	const body = (await request.json().catch(() => null)) as { image?: unknown; tiled?: unknown; term?: unknown; agreed?: unknown } | null;
 	if (typeof body?.image !== 'string') error(400, '画像を読み込めませんでした');
 
-	if (!locals.user.importConsentAt) return json({ message: '読み込む前に、画面を開き直して同意してください' }, { status: 403 });
+	// The page asks to check "読み込む前に" (the image goes to the AI services) before the button works
+	if (body.agreed !== true) return json({ message: '「読み込む前に」を確かめて、チェックを入れてください' }, { status: 403 });
 	const term = typeof body.term === 'string' && body.term.length <= 64 ? body.term : null;
 	const timetable = await currentTimetable(locals.db, locals.user);
 	if ((await sharedAccess(locals.db, locals.user.id, timetable.universityId)) !== 'ok') {
 		return json({ message: 'スクショからの読み込みは、在籍確認をすると使えます' }, { status: 403 });
+	}
+	if (!locals.user.importConsentAt) {
+		await locals.db.update(users).set({ importConsentAt: new Date() }).where(eq(users.id, locals.user.id));
 	}
 	const created = await createImportJob(locals.db, locals.user.id, timetable.id, body.image, body.tiled === true, term);
 	if ('message' in created) return json({ message: created.message }, { status: 400 });

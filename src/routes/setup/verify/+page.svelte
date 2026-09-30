@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import MailSent from '$lib/components/MailSent.svelte';
+	import SendButton from '$lib/components/SendButton.svelte';
+	import { pauseAfterSent } from '$lib/send';
 	import VerifyBenefits from '$lib/components/VerifyBenefits.svelte';
 
 	let { data, form } = $props();
-	let sending = $state(false);
+	let phase = $state<'idle' | 'sending' | 'done'>('idle');
 	// 「別のアドレスにする」 after the mail was sent
 	let other = $state(false);
 	$effect(() => {
@@ -27,7 +29,7 @@
 	{#if form?.sentTo && !other}
 		{#key form}
 			<MailSent email={form.sentTo} action="?/send" onother={() => (other = true)}>
-				{form.sentTo} に確認のメールを送りました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
+				{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
 			</MailSent>
 		{/key}
 		<form method="POST" action="?/skip" use:enhance>
@@ -38,10 +40,15 @@
 			method="POST"
 			action="?/send"
 			use:enhance={() => {
-				sending = true;
-				return async ({ update }) => {
+				phase = 'sending';
+				return async ({ result, update }) => {
+					// The wheel turns into a check, then what was sent comes up
+					if (result.type === 'success') {
+						phase = 'done';
+						await pauseAfterSent();
+					}
 					await update({ reset: false });
-					sending = false;
+					phase = 'idle';
 				};
 			}}
 		>
@@ -50,7 +57,7 @@
 				<input name="email" type="email" autocomplete="off" placeholder={`…@${data.university.domains[0]}`} value={form?.email ?? ''} required />
 			</label>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-			<button class="btn btn-primary" type="submit" disabled={sending}>{sending ? '送っています…' : '確認のメールを送る'}</button>
+			<SendButton {phase} class="btn btn-primary">確認のメールを送る</SendButton>
 			<p class="note">このアドレスはほかの人には見えません。あとから「その他」→「在籍確認」でもできます。</p>
 		</form>
 		<form method="POST" action="?/skip" use:enhance>

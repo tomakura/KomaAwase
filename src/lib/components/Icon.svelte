@@ -33,7 +33,9 @@
 		key: 'M8 9.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0zM9.3 12.7L3.5 18.5V21H6v-2h2v-2h2l1.3-1.3M14.5 8.5h.01',
 		phone: 'M8.5 3h7A1.5 1.5 0 0 1 17 4.5v15a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5v-15A1.5 1.5 0 0 1 8.5 3zM11 18h2',
 		monitor: 'M4.5 4.5h15a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1zM12 16v3.5M8 19.5h8',
-		warning: 'M12 4l9 16H3zM12 10v4.5M12 17.5h.01'
+		warning: 'M12 4l9 16H3zM12 10v4.5M12 17.5h.01',
+		// A door with an arrow going out
+		logout: 'M14 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H14M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5'
 	} as const;
 	export type IconName = keyof typeof PATHS;
 </script>

@@ -1,12 +1,10 @@
 import { redirect } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { TOTAL_DAILY_LIMIT } from '$lib/import-quota';
 import { DAILY_LIMIT, latestJobs, queuePosition, quotaUsed, readSlot } from '$lib/server/import/jobs';
-import { users } from '$lib/server/db/schema';
 import { currentTimetable } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
-import type { Actions, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
 // `back` is whatever the query said, so one that cannot be read as a URL (//, http://[) gives no term
 const backTerm = (back: string | null) => {
@@ -33,8 +31,6 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	const current = jobs.find((j) => !j.closedAt);
 	return {
 		access,
-		// Agreed once, before the first screenshot, to it going to the AI services
-		consented: !!me.importConsentAt,
 		// Everyone's screenshots for today are taken: when one sent now would be read (null when it is read at once)
 		readAt: used >= TOTAL_DAILY_LIMIT ? ((await readSlot(locals.db))?.getTime() ?? null) : null,
 		dailyLimit: DAILY_LIMIT,
@@ -53,11 +49,4 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 				}
 			: null
 	};
-};
-
-export const actions: Actions = {
-	consent: async ({ locals, url }) => {
-		const me = requireUser(locals, url);
-		await locals.db.update(users).set({ importConsentAt: new Date() }).where(eq(users.id, me.id));
-	}
 };

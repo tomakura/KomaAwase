@@ -12,7 +12,7 @@
 	<title>在籍確認 · コマあわせ</title>
 </svelte:head>
 
-<AuthScreen title="在籍確認">
+<AuthScreen subtitle="在籍確認">
 	{#if form?.university !== undefined}
 		<p role="status">{form.university}の在籍を確認できました。友だちや同じグループの人に「在籍確認済み」の印が見えます。</p>
 		<a class="btn btn-primary" href="/more/verify">コマあわせを開く</a>
@@ -20,7 +20,7 @@
 		<p class="error" role="alert">{form?.message ?? 'リンクの期限が切れているか、すでに使われています'}</p>
 		<a class="btn" href="/more/verify">もう一度申し込む</a>
 	{:else if view === 'other-account'}
-		<p role="alert">このリンクは、別のアカウントで申し込まれたものです。申し込んだアカウントでログインしてから、もう一度開いてください。</p>
+		<p role="alert">アカウントが一致しません。<br />在籍確認を完了するには、同じアカウントでログインする必要があります。</p>
 		<form method="POST" action="/logout">
 			<input type="hidden" name="next" value={page.url.pathname} />
 			<button class="btn btn-primary" type="submit">ログアウトする</button>

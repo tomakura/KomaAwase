@@ -24,7 +24,7 @@
 <div class="ui-page">
 	<PageHeader title="ログイン中の端末" back="/more" />
 	<div class="body">
-		<p class="ui-note">なくした端末や、使わなくなった端末は、ここからログアウトさせられます。</p>
+		<p class="ui-note">ログイン済みの端末を管理できます。</p>
 		<div class="ui-list">
 			{#each data.sessions as s (s.id)}
 				<div transition:slide={motion()} class="device">
@@ -42,7 +42,7 @@
 							}}
 						>
 							<input type="hidden" name="id" value={s.id} />
-							<button class="small" type="submit">ログアウトさせる</button>
+							<button class="out" type="submit" aria-label="この端末をログアウトさせる"><Icon name="logout" size={20} /></button>
 						</form>
 					{/if}
 				</div>
@@ -127,5 +127,19 @@
 	form {
 		display: flex;
 		flex-direction: column;
+	}
+
+	.out {
+		width: 44px;
+		height: 44px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--line-bold);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		cursor: pointer;
 	}
 </style>

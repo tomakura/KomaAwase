@@ -211,7 +211,7 @@
 	<section class="free-card">
 		<h2>みんな空いてるコマ</h2>
 		{#if alone}
-			<p>{friends.length ? '重ねる人を選ぶと出ます' : '友だちを追加すると出ます'}</p>
+			<p>友だちを選択すると表示されます</p>
 		{:else if result.free.length}
 			<!-- By day, which reads faster than one chip per slot -->
 			<div class="free-days">

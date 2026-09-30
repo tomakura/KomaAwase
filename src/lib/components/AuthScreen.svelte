@@ -2,14 +2,16 @@
 	import Logo from '$lib/components/Logo.svelte';
 	import type { Snippet } from 'svelte';
 
-	// A page opened from a mail link: the logo and a title at the top, then what it does
-	let { title, children }: { title: string; children: Snippet } = $props();
+	// A page opened from a mail link: the logo and the name at the top (the same on every one),
+	// what the page is about under them, and what it does at the bottom
+	let { subtitle, children }: { subtitle?: string; children: Snippet } = $props();
 </script>
 
 <main>
 	<div class="head">
 		<Logo size={88} />
-		<h1>{title}</h1>
+		<h1>コマあわせ</h1>
+		{#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
 	</div>
 	<div class="body">
 		{@render children()}
@@ -45,7 +47,15 @@
 		text-align: center;
 	}
 
+	.subtitle {
+		margin: -4px 0 0;
+		font-size: 15px;
+		font-weight: 700;
+		color: var(--ink-soft);
+	}
+
 	.body {
+		margin-top: auto;
 		display: flex;
 		flex-direction: column;
 		gap: 14px;
