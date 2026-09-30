@@ -1,4 +1,10 @@
 <script lang="ts">
+	// The fonts come from this site, split by characters so a page loads only what it shows
+	import '@fontsource/zen-kaku-gothic-new/400.css';
+	import '@fontsource/zen-kaku-gothic-new/500.css';
+	import '@fontsource/zen-kaku-gothic-new/700.css';
+	import '@fontsource/zen-maru-gothic/500.css';
+	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
 	import { beforeNavigate, invalidateAll, onNavigate } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';

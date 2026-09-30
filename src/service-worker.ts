@@ -2,12 +2,12 @@
 /// <reference no-default-lib="true"/>
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
-// Keeps the app opening without a connection: the built files are cached up front, and pages
-// are fetched from the network first, falling back to the last copy seen on this device. The
-// fallback comes when the network fails and also when it is too slow (SLOW_MS), since a bad
-// connection often doesn't fail, it just never answers. A page that is being awaited shows a
-// spinner instead of nothing (see waiting). The page copies hold the user's timetable, so
-// signing out clears them (see PAGE_CACHE_PREFIX).
+// Keeps the app opening without a connection: the built files are cached up front (fonts as
+// they are used), and pages are fetched from the network first, falling back to the last copy
+// seen on this device. The fallback comes when the network fails and also when it is too slow
+// (SLOW_MS), since a bad connection often doesn't fail, it just never answers. A page that is
+// being awaited shows a spinner instead of nothing (see waiting). The page copies hold the
+// user's timetable, so signing out clears them (see PAGE_CACHE_PREFIX).
 import { build, files, version } from '$service-worker';
 import { PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER } from '$lib/offline';
 import { WAIT_DONE, leaveScript, stampHtml, themeOf, waitShell } from '$lib/wait';
@@ -16,7 +16,11 @@ const sw = self as unknown as ServiceWorkerGlobalScope;
 const ASSETS = `assets-${version}`;
 // Per version, so an old page never points at files a new version dropped
 const PAGES = `${PAGE_CACHE_PREFIX}${version}`;
-const precached = new Set([...build, ...files]);
+// The fonts come in hundreds of small files split by character, most of which no page uses:
+// they are kept as pages ask for them instead (see keepFont)
+const isFont = (path: string) => path.endsWith('.woff2');
+const precached = new Set([...build, ...files].filter((path) => !isFont(path)));
+const fonts = new Set(build.filter(isFont));
 // How long the network gets to answer before a saved copy is shown instead
 const SLOW_MS = 4000;
 // A page not answered within this long is awaited behind a spinner
@@ -179,6 +183,16 @@ async function follow(
 	}
 }
 
+// A font file from the cache, or fetched and kept for next time (and for opening offline)
+async function keepFont(event: FetchEvent) {
+	const cache = await caches.open(ASSETS);
+	const cached = await cache.match(event.request);
+	if (cached) return cached;
+	const response = await fetch(event.request);
+	if (response.ok) event.waitUntil(cache.put(event.request, response.clone()).catch(() => {}));
+	return response;
+}
+
 // The app refreshing its copies (src/lib/sync.ts): the network's answer or nothing, saved as it
 // goes by, so the app can tell whether the server really answered
 async function refresh(event: FetchEvent) {
@@ -197,6 +211,10 @@ sw.addEventListener('fetch', (event) => {
 
 	if (precached.has(url.pathname)) {
 		event.respondWith(caches.match(request).then((cached) => cached ?? fetch(request)));
+		return;
+	}
+	if (fonts.has(url.pathname)) {
+		event.respondWith(keepFont(event));
 		return;
 	}
 	const data = url.pathname.endsWith('/__data.json');

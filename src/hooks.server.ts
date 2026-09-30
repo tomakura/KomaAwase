@@ -4,6 +4,29 @@ import { SESSION_COOKIE, clearSessionCookie, setSessionCookie, validateSession }
 import { themeColorTags } from '$lib/theme';
 import { academicYear, tokyoTime } from '$lib/time';
 
+// On every response: no framing by other sites, no guessing at content types, only the
+// origin as the referrer elsewhere, HTTPS from then on, and no camera, microphone or location.
+// The Content-Security-Policy for pages is SvelteKit's (the csp option in vite.config.ts).
+const SECURITY_HEADERS = {
+	'x-frame-options': 'DENY',
+	'x-content-type-options': 'nosniff',
+	'referrer-policy': 'strict-origin-when-cross-origin',
+	'strict-transport-security': 'max-age=31536000',
+	'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+};
+
+function secured(response: Response) {
+	// A response passed through from fetch() can't be changed, so it's copied first
+	try {
+		for (const [key, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(key, value);
+		return response;
+	} catch {
+		const copy = new Response(response.body, response);
+		for (const [key, value] of Object.entries(SECURITY_HEADERS)) copy.headers.set(key, value);
+		return copy;
+	}
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
 	// The app's check that the server answers (src/lib/connection.svelte.ts), while its
 	// connection is poor. Answered before the database and the session are read.
@@ -33,8 +56,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// The theme is in the HTML from the start, so a dark page never flashes light.
 	const theme = event.locals.user?.theme ?? 'system';
-	return resolve(event, {
+	const response = await resolve(event, {
 		transformPageChunk: ({ html }) =>
 			html.replace('%koma.theme%', theme).replace('%koma.themeColor%', themeColorTags(theme))
 	});
+	return secured(response);
 };
