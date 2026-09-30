@@ -65,18 +65,37 @@
 		{/if}
 		<TermBar year={data.year} terms={data.terms} bind:termId onchange={selectTerm} />
 
-		<!-- A new timetable: the ways to fill it, up front -->
+		<!-- A new timetable: the ways to fill it, up front. Searching and importing need an
+			 enrollment check; where there is none to be had, only typing in is offered. -->
 		{#if !data.courses.length && !data.imported}
 			<section class="start">
-				<h2>授業を登録する</h2>
-				<a class="way primary" href="/import?back=/{termId ? `&term=${encodeURIComponent(termId)}` : ''}">
-					<Icon name="image" size={22} />
-					<span><b>スクショから読み込む</b>ほかのアプリの時間割をまとめて登録</span>
-				</a>
-				<a class="way" href="/courses/search{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
-					<Icon name="search" size={22} />
-					<span><b>授業をさがす</b>同じ大学の人が登録した授業から選ぶ</span>
-				</a>
+				{#if data.access === 'ok'}
+					<h2>授業を登録する</h2>
+					<a class="way primary" href="/import?back=/{termId ? `&term=${encodeURIComponent(termId)}` : ''}">
+						<Icon name="image" size={22} />
+						<span><b>スクショから読み込む</b>ほかのアプリの時間割をまとめて登録</span>
+					</a>
+					<a class="way" href="/courses/search{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
+						<Icon name="search" size={22} />
+						<span><b>授業をさがす</b>同じ大学の人が登録した授業から選ぶ</span>
+					</a>
+				{:else}
+					<h2>授業を登録する</h2>
+					{#if data.access === 'need-verify'}
+						<div class="lock">
+							<b>在籍確認をすると使えます</b>
+							<ul>
+								<li>授業をさがす（同じ大学の人の授業から選ぶ）</li>
+								<li>スクショから読み込む</li>
+							</ul>
+							<a class="btn btn-primary" href="/more/verify">在籍確認する</a>
+						</div>
+					{/if}
+					<a class="way" href="/courses/new{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
+						<Icon name="edit" size={22} />
+						<span><b>自分で入力する</b></span>
+					</a>
+				{/if}
 				<p class="ui-note">下の時間割の空いているコマを押しても追加できます。</p>
 			</section>
 		{/if}
@@ -147,6 +166,33 @@
 		border-radius: 14px;
 		background: var(--surface);
 		color: var(--ink);
+		text-decoration: none;
+	}
+
+	.lock {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 14px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+
+	.lock b {
+		font-size: 14px;
+	}
+
+	.lock ul {
+		margin: 0;
+		padding-left: 20px;
+		font-size: 13px;
+		line-height: 1.7;
+		color: var(--ink-soft);
+	}
+
+	.lock .btn {
+		margin-top: 4px;
 		text-decoration: none;
 	}
 

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { beforeNavigate, goto } from '$app/navigation';
+	import Sheet from '$lib/components/Sheet.svelte';
 	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, courseColor, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
 
 	type Slot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
@@ -63,6 +65,29 @@
 
 	const periodNumbers = $derived(periods.map((p) => p.number));
 	let saving = $state(false);
+
+	// Leaving with edits that weren't saved asks first. Saving itself is let through, and so is
+	// leaving after answering 「戻る」.
+	const startedWith = JSON.stringify(v);
+	const changed = $derived(JSON.stringify(v) !== startedWith);
+	let leaving = false;
+	let asking = $state(false);
+	let goingTo: URL | null = null;
+	beforeNavigate(({ cancel, to, willUnload }) => {
+		if (leaving || !changed) return;
+		// Closing the tab or leaving the site: the browser's own question, which can't be reworded
+		if (willUnload || !to) return cancel();
+		cancel();
+		goingTo = to.url;
+		asking = true;
+	});
+	function leave() {
+		const target = goingTo;
+		asking = false;
+		if (!target) return;
+		leaving = true;
+		goto(target);
+	}
 
 	// Syncing again shows the shared values, so local edits never overwrite them by accident.
 	function setSync(mode: 'synced' | 'personal') {
@@ -161,9 +186,12 @@
 	{action}
 	use:enhance={() => {
 		saving = true;
+		leaving = true;
 		return async ({ update }) => {
 			await update({ reset: false });
 			saving = false;
+			// Not saved (an error to fix): edits are guarded again
+			leaving = false;
 		};
 	}}
 >
@@ -377,7 +405,20 @@
 	</div>
 </form>
 
+<Sheet bind:open={asking} title="変更を保存していません。戻りますか？">
+	<div class="leave-buttons">
+		<button class="btn" type="button" onclick={leave}>戻る</button>
+		<button class="btn btn-primary" type="button" onclick={() => (asking = false)}>編集を続ける</button>
+	</div>
+</Sheet>
+
 <style>
+	.leave-buttons {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+
 	form {
 		max-width: 480px;
 		margin: 0 auto;
