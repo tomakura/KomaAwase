@@ -39,6 +39,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			id: c.id,
 			source: c.source,
 			users: c.users,
+			using: c.using,
 			title: c.values.title,
 			teachers: c.values.teachers,
 			slots: c.values.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span }))

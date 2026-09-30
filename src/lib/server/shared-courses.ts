@@ -408,19 +408,51 @@ export async function adminSearchShared(
 		.limit(50);
 	const ids = rows.map((r) => r.id);
 	if (!ids.length) return [];
-	const [details, counts] = await Promise.all([
-		loadSharedCourses(db, ids),
-		db
-			.select({ id: courses.sharedCourseId, n: count() })
-			.from(courses)
-			.where(and(inArray(courses.sharedCourseId, ids), eq(courses.syncMode, 'synced')))
-			.groupBy(courses.sharedCourseId)
-	]);
-	const users = new Map(counts.map((c) => [c.id, c.n]));
+	const [details, usage] = await Promise.all([loadSharedCourses(db, ids), usageCounts(db, ids)]);
 	return ids.flatMap((id) => {
 		const course = details.get(id);
-		return course ? [{ ...course, users: users.get(id) ?? 0 }] : [];
+		return course ? [{ ...course, users: usage.get(id)?.synced ?? 0, using: usage.get(id)?.linked ?? 0 }] : [];
 	});
+}
+
+/**
+ * For the admin: how many timetables sync each course (`synced`) and how many have it at all
+ * (`linked`), which includes those that stopped syncing and kept their own copy (自分だけで使う,
+ * still linked so overlays group them). Up to 90 ids at a time.
+ */
+export async function usageCounts(db: Db, ids: string[]) {
+	const rows = ids.length
+		? await db
+				.select({
+					id: courses.sharedCourseId,
+					linked: count(),
+					synced: sql<number>`sum(case when ${courses.syncMode} = 'synced' then 1 else 0 end)`
+				})
+				.from(courses)
+				.where(inArray(courses.sharedCourseId, ids.slice(0, CHUNK)))
+				.groupBy(courses.sharedCourseId)
+		: [];
+	return new Map(rows.map((r) => [r.id ?? '', { linked: r.linked, synced: Number(r.synced) }]));
+}
+
+/**
+ * Statements that delete a shared course nobody has in a timetable, with its history and the
+ * reports about it. The delete only happens while no course links to it: if someone added it
+ * since the page was read, the guard stops the batch and D1 rolls it back.
+ */
+export function deleteShared(db: Db, id: string): BatchItem<'sqlite'>[] {
+	return [
+		db
+			.delete(sharedCourses)
+			.where(
+				and(
+					eq(sharedCourses.id, id),
+					sql`not exists (select 1 from ${courses} where ${courses.sharedCourseId} = ${sharedCourses.id})`
+				)
+			),
+		db.run(sql`select json(case when changes() = 1 then 'true' else 'in use' end)`),
+		db.delete(reports).where(and(eq(reports.targetType, 'shared_course'), eq(reports.targetId, id)))
+	];
 }
 
 // Raw statements in a batch can't take bound values (drizzle's D1 batch fails on them), so the
