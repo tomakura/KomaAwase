@@ -18,24 +18,38 @@
 		<p class="count">{data.members}人が参加しています</p>
 	</div>
 
-	<form method="POST" use:enhance>
-		<!-- The choice people make on joining, where they can't miss it -->
-		<div class="choice">
-			<div class="row">
-				<span id="share-label">このグループに時間割を見せる</span>
-				<Switch bind:checked={share} labelledby="share-label" name="share" />
-			</div>
-			<p>
-				{share
-					? 'メンバーはあなたの時間割を見たり、重ねたりできます。メモ・資料・課題は見えません。'
-					: 'メンバーにはあなたの時間割が見えません。'}
-				参加したあとも変えられます。
-			</p>
+	{#if data.banned}
+		<div class="actions">
+			<p class="notice" role="status">このグループには参加できません。</p>
+			<a class="btn" href="/">もどる</a>
 		</div>
-		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-		<button class="btn btn-primary" type="submit">参加する</button>
-		<a class="later" href="/">やめる</a>
-	</form>
+	{:else if (data.requested || form?.requested) && !form?.cancelled}
+		<form class="actions" method="POST" action="?/cancel" use:enhance>
+			<p class="notice" role="status">申請しました。作った人が承認すると参加できます。</p>
+			<a class="btn btn-primary" href="/">時間割にもどる</a>
+			<button class="later" type="submit">申請を取り消す</button>
+		</form>
+	{:else}
+		<form class="actions" method="POST" action="?/join" use:enhance>
+			<!-- The choice people make on joining, where they can't miss it -->
+			<div class="choice">
+				<div class="row">
+					<span id="share-label">このグループに時間割を見せる</span>
+					<Switch bind:checked={share} labelledby="share-label" name="share" />
+				</div>
+				<p>
+					{share
+						? 'メンバーはあなたの時間割を見たり、重ねたりできます。メモ・資料・課題は見えません。'
+						: 'メンバーにはあなたの時間割が見えません。'}
+					参加したあとも変えられます。
+				</p>
+			</div>
+			{#if data.approval}<p class="ui-note">このグループは承認制です。作った人が承認すると参加できます。</p>{/if}
+			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
+			<button class="btn btn-primary" type="submit">{data.approval ? '参加を申請する' : '参加する'}</button>
+			<a class="later" href="/">やめる</a>
+		</form>
+	{/if}
 </main>
 
 <style>
@@ -83,10 +97,20 @@
 		color: var(--ink-sub);
 	}
 
-	form {
+	.actions {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+	}
+
+	.notice {
+		margin: 0;
+		padding: 14px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		font-size: 14px;
+		line-height: 1.7;
 	}
 
 	.choice {
@@ -118,6 +142,12 @@
 	.later {
 		align-self: center;
 		padding: 12px;
+		border: none;
+		background: none;
+		color: var(--accent-text);
+		font: inherit;
 		font-size: 14px;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 </style>
