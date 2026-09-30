@@ -384,13 +384,24 @@ export async function syncedCount(db: Db, sharedCourseId: string) {
 	return row?.n ?? 0;
 }
 
+/** The term names (Q1, 前期…) the university's shared courses of a year are tagged with */
+export async function sharedTermNames(db: Db, universityId: string, year: number) {
+	const rows = await db
+		.select({ terms: sharedCourses.terms })
+		.from(sharedCourses)
+		.where(and(eq(sharedCourses.universityId, universityId), eq(sharedCourses.year, year)));
+	return [...new Set(rows.flatMap((r) => r.terms))].sort(compareJa);
+}
+
 /**
  * For the admin: a university's shared courses of a year, by title, teacher or course code
- * (the first 50 by title when there is no search), with how many people sync each.
+ * (the first 50 by title when there is no search), with how many people sync each and how
+ * many have it at all. `term` keeps those tagged with that term name; `unused` those no
+ * timetable has.
  */
 export async function adminSearchShared(
 	db: Db,
-	opts: { universityId: string; year: number; q: string; excludeId?: string }
+	opts: { universityId: string; year: number; q: string; excludeId?: string; term?: string; unused?: boolean }
 ) {
 	const rows = await db
 		.select({ id: sharedCourses.id })
@@ -400,7 +411,13 @@ export async function adminSearchShared(
 				eq(sharedCourses.universityId, opts.universityId),
 				eq(sharedCourses.year, opts.year),
 				opts.q ? queryMatch(opts.q) : undefined,
-				opts.excludeId ? ne(sharedCourses.id, opts.excludeId) : undefined
+				opts.excludeId ? ne(sharedCourses.id, opts.excludeId) : undefined,
+				opts.term
+					? sql`exists (select 1 from json_each(${sharedCourses.terms}) where json_each.value = ${opts.term})`
+					: undefined,
+				opts.unused
+					? sql`not exists (select 1 from ${courses} where ${courses.sharedCourseId} = ${sharedCourses.id})`
+					: undefined
 			)
 		)
 		.orderBy(asc(sharedCourses.title))

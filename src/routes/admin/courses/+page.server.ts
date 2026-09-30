@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { count, desc, eq } from 'drizzle-orm';
 import { sharedCourses, universities } from '$lib/server/db/schema';
-import { adminSearchShared } from '$lib/server/shared-courses';
+import { adminSearchShared, sharedTermNames } from '$lib/server/shared-courses';
 import type { PageServerLoad } from './$types';
 
 // The shared courses for whoever runs the app: find one by name, teacher or code to fix it
@@ -27,9 +27,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const askedYear = Number(url.searchParams.get('y'));
 	const year = yearsOf.includes(askedYear) ? askedYear : (yearsOf[0] ?? null);
 	const q = (url.searchParams.get('q') ?? '').trim().slice(0, 50);
+	const terms = university && year !== null ? await sharedTermNames(locals.db, university.id, year) : [];
+	const askedTerm = url.searchParams.get('t') ?? '';
+	const term = terms.includes(askedTerm) ? askedTerm : '';
+	const unused = url.searchParams.get('z') === '1';
 	const results =
-		university && year !== null ? await adminSearchShared(locals.db, { universityId: university.id, year, q }) : [];
+		university && year !== null
+			? await adminSearchShared(locals.db, { universityId: university.id, year, q, term: term || undefined, unused })
+			: [];
 	return {
+		terms,
+		term,
+		unused,
 		universities: list.map(({ id, name }) => ({ id, name })),
 		university: university?.id ?? null,
 		years: yearsOf,
