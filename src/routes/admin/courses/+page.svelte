@@ -37,6 +37,19 @@
 					</label>
 				</div>
 				<div class="pick">
+					<label>
+						学期
+						<select name="t" value={data.term}>
+							<option value="">すべて</option>
+							{#each data.terms as t (t)}<option value={t}>{t}</option>{/each}
+						</select>
+					</label>
+					<label class="check">
+						<input type="checkbox" name="z" value="1" checked={data.unused} />
+						使用中0人だけ
+					</label>
+				</div>
+				<div class="pick">
 					<input type="search" name="q" value={data.q} placeholder="授業名・先生・授業コード" maxlength="50" aria-label="授業をさがす" />
 					<button class="btn btn-primary" type="submit">さがす</button>
 				</div>
@@ -44,8 +57,8 @@
 
 			<div class="ui-list">
 				{#each data.results as c (c.id)}
-					<a class="course" href="/shared/{c.id}?back={back}">
-						<b>{c.title}</b>
+					<a class="course" class:unused={c.using === 0} href="/shared/{c.id}?back={back}">
+						<b>{c.title}{#if c.using === 0}<em>使用中 0人</em>{/if}</b>
 						<span>
 							{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人
 						</span>
@@ -125,6 +138,40 @@
 
 	.course b {
 		font-size: 15px;
+	}
+
+	/* Nobody has it in a timetable: it can be deleted */
+	.course.unused {
+		border-left: 4px solid var(--accent-text);
+		background: color-mix(in srgb, var(--accent-text) 10%, var(--surface));
+	}
+
+	.course em {
+		margin-left: 8px;
+		padding: 1px 6px;
+		border-radius: 5px;
+		background: var(--accent-text);
+		color: var(--surface);
+		font-size: 11px;
+		font-style: normal;
+		font-weight: 700;
+	}
+
+	.pick .check {
+		flex-direction: row;
+		align-items: center;
+		align-self: flex-end;
+		gap: 8px;
+		height: 44px;
+		font-size: 14px;
+		color: var(--ink);
+	}
+
+	.check input {
+		width: 20px;
+		height: 20px;
+		margin: 0;
+		accent-color: var(--ink);
 	}
 
 	.course span {
