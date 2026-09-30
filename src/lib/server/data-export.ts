@@ -1,0 +1,159 @@
+import { and, asc, eq, type Column } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
+import type { Db } from './db';
+import {
+	courseFiles,
+	courseNotes,
+	courseSlots,
+	courseTeachers,
+	courseTerms,
+	courses,
+	events,
+	groups,
+	groupMembers,
+	periods,
+	terms,
+	timetables,
+	universities,
+	users
+} from './db/schema';
+import { listFriendships } from './friends';
+
+const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
+
+/** Everything a person has in the app that is theirs, for the file they can save (その他 → データの書き出し) */
+export async function exportData(db: Db, user: { id: string }) {
+	const me = user.id;
+	const own = (table: { timetableId: Column }) => eq(table.timetableId, timetables.id);
+	const [account, tables, termRows, periodRows, courseRows, termLinks, slots, teachers, notes, files, eventRows, { friends }, groupRows] =
+		await Promise.all([
+			db
+				.select({
+					email: users.email,
+					nickname: users.nickname,
+					university: universities.name,
+					daysShown: users.daysShown,
+					theme: users.theme,
+					notify: users.notify,
+					createdAt: users.createdAt
+				})
+				.from(users)
+				.leftJoin(universities, eq(universities.id, users.universityId))
+				.where(eq(users.id, me))
+				.get(),
+			db.select().from(timetables).where(eq(timetables.userId, me)).orderBy(asc(timetables.year)),
+			db
+				.select({ timetableId: terms.timetableId, name: terms.name, group: terms.groupName, start: terms.startDate, end: terms.endDate, id: terms.id })
+				.from(terms)
+				.innerJoin(timetables, own(terms))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(terms.sortOrder)),
+			db
+				.select({ timetableId: periods.timetableId, number: periods.number, start: periods.startTime, end: periods.endTime })
+				.from(periods)
+				.innerJoin(timetables, own(periods))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(periods.number)),
+			db.select({ course: courses }).from(courses).innerJoin(timetables, own(courses)).where(eq(timetables.userId, me)).orderBy(asc(courses.title)),
+			db
+				.select({ courseId: courseTerms.courseId, termId: courseTerms.termId })
+				.from(courseTerms)
+				.innerJoin(courses, eq(courses.id, courseTerms.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me)),
+			db
+				.select({ slot: courseSlots })
+				.from(courseSlots)
+				.innerJoin(courses, eq(courses.id, courseSlots.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me)),
+			db
+				.select({ courseId: courseTeachers.courseId, name: courseTeachers.name })
+				.from(courseTeachers)
+				.innerJoin(courses, eq(courses.id, courseTeachers.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(courseTeachers.sortOrder)),
+			db
+				.select({ note: courseNotes })
+				.from(courseNotes)
+				.innerJoin(courses, eq(courses.id, courseNotes.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(courseNotes.createdAt)),
+			db
+				.select({ courseId: courseFiles.courseId, name: courseFiles.name, mime: courseFiles.mime, size: courseFiles.size })
+				.from(courseFiles)
+				.innerJoin(courses, eq(courses.id, courseFiles.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me)),
+			db.select().from(events).where(eq(events.userId, me)).orderBy(asc(events.date)),
+			listFriendships(db, me),
+			(() => {
+				const mine = alias(groupMembers, 'mine');
+				return db
+					.select({ id: groups.id, name: groups.name, ownerId: groups.ownerId, member: users.nickname })
+					.from(groups)
+					.innerJoin(mine, and(eq(mine.groupId, groups.id), eq(mine.userId, me)))
+					.innerJoin(groupMembers, eq(groupMembers.groupId, groups.id))
+					.innerJoin(users, eq(users.id, groupMembers.userId))
+					.orderBy(asc(groups.name));
+			})()
+		]);
+
+	const termName = new Map(termRows.map((t) => [t.id, t.name]));
+	const courseTitle = new Map(courseRows.map((r) => [r.course.id, r.course.title]));
+	const by = <T extends { courseId: string }>(rows: T[], courseId: string) => rows.filter((r) => r.courseId === courseId);
+
+	const groupList = new Map<string, { name: string; owner: boolean; members: string[] }>();
+	for (const g of groupRows) {
+		const entry = groupList.get(g.id) ?? { name: g.name, owner: g.ownerId === me, members: [] };
+		entry.members.push(g.member ?? '');
+		groupList.set(g.id, entry);
+	}
+
+	return {
+		app: 'コマあわせ',
+		format: 1,
+		exportedAt: new Date().toISOString(),
+		account: account && { ...account, createdAt: iso(account.createdAt) },
+		timetables: tables.map((t) => ({
+			year: t.year,
+			name: t.name,
+			archived: t.archived,
+			terms: termRows.filter((x) => x.timetableId === t.id).map(({ name, group, start, end }) => ({ name, group, start, end })),
+			periods: periodRows.filter((x) => x.timetableId === t.id).map(({ number, start, end }) => ({ number, start, end })),
+			courses: courseRows
+				.filter((r) => r.course.timetableId === t.id)
+				.map(({ course: c }) => ({
+					title: c.title,
+					color: c.color,
+					shared: c.syncMode === 'synced',
+					delivery: c.delivery,
+					intensiveFrom: c.intensiveFrom,
+					intensiveTo: c.intensiveTo,
+					terms: termLinks.filter((l) => l.courseId === c.id).map((l) => termName.get(l.termId) ?? ''),
+					slots: slots
+						.filter((s) => s.slot.courseId === c.id)
+						.map(({ slot: s }) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, week: s.weekPattern, room: s.room })),
+					teachers: by(teachers, c.id).map((x) => x.name),
+					notes: notes
+						.filter((n) => n.note.courseId === c.id)
+						.map(({ note: n }) => ({ kind: n.kind, date: n.date, body: n.body, due: n.due, done: n.done })),
+					files: by(files, c.id).map(({ name, mime, size }) => ({ name, mime, size }))
+				}))
+		})),
+		events: eventRows.map((e) => ({
+			title: e.title,
+			date: e.date,
+			start: e.startTime,
+			end: e.endTime,
+			place: e.place,
+			memo: e.memo,
+			course: e.courseId ? (courseTitle.get(e.courseId) ?? null) : null
+		})),
+		// Only the nicknames
+		friends: friends.map((f) => f.nickname),
+		groups: [...groupList.values()]
+	};
+}

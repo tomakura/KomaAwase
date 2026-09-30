@@ -20,3 +20,16 @@ export async function copyText(text: string): Promise<'copied' | 'failed'> {
 		return 'failed';
 	}
 }
+
+// Sharing some text: the phone's share sheet where there is one, else the clipboard.
+export async function shareText(text: string): Promise<'shared' | 'copied' | 'cancelled' | 'failed'> {
+	if (navigator.share) {
+		try {
+			await navigator.share({ text });
+			return 'shared';
+		} catch (e) {
+			if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
+		}
+	}
+	return copyText(text);
+}

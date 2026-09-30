@@ -9,10 +9,12 @@
 	import TermBar from '$lib/components/TermBar.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES } from '$lib/courses';
+	import { freeText } from '$lib/free-text';
 	import { glide } from '$lib/glide';
 	import { iconOf } from '$lib/icons';
 	import { motion } from '$lib/motion';
 	import { OVERLAY_COOKIE, cellKey, classFill, lookingAt, overlay, termOn, type OverlayGroup, type OverlayPerson } from '$lib/overlay';
+	import { copyText, shareText } from '$lib/share';
 	import { currentTerm } from '$lib/terms';
 	import { tokyoTime } from '$lib/time';
 
@@ -94,6 +96,19 @@
 			return periods.length ? [[day, periods] as const] : [];
 		})
 	);
+
+	// Sending the free slots to the people to meet
+	const text = $derived(freeText(term && { year: data.year, groupName: term.groupName, name: term.name }, freeByDay));
+	let sent = $state<string | null>(null);
+
+	async function copy() {
+		sent = (await copyText(text)) === 'copied' ? 'コピーしました' : 'コピーできませんでした';
+	}
+
+	async function share() {
+		const result = await shareText(text);
+		sent = result === 'copied' ? 'コピーしました' : result === 'failed' ? 'コピーできませんでした' : null;
+	}
 
 	const elsewhere = $derived(
 		selected.flatMap((id) => {
@@ -215,6 +230,11 @@
 					</div>
 				{/each}
 			</div>
+			<div class="free-actions">
+				<button class="small" type="button" onclick={copy}><Icon name="copy" size={16} />コピー</button>
+				<button class="small" type="button" onclick={share}><Icon name="share" size={16} />共有</button>
+			</div>
+			{#if sent}<p role="status">{sent}</p>{/if}
 		{:else}
 			<p>重なる空きコマはありません</p>
 		{/if}
@@ -473,6 +493,27 @@
 		border: 1px solid var(--line-strong);
 		border-radius: 7px;
 		font-size: 12px;
+	}
+
+	.free-actions {
+		display: flex;
+		gap: 8px;
+	}
+
+	.free-actions button {
+		height: 36px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 0 12px;
+		border: 1px solid var(--line-strong);
+		border-radius: 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 13px;
+		font-weight: 700;
+		cursor: pointer;
 	}
 
 	.spacer {

@@ -25,7 +25,7 @@ const sleep = (ms: number) => new Promise<null>((resolve) => setTimeout(resolve,
 
 // Never kept: sign-in, anything that changes data, files, the Worker's own routes, and the
 // admin page (other people's reports and feedback)
-const NETWORK_ONLY = /^\/(login|logout|auth|api|internal|verify|admin|import\/upload|courses\/[^/]+\/files)(\/|$)/;
+const NETWORK_ONLY = /^\/(login|logout|auth|api|internal|verify|admin|import\/upload|more\/data|courses\/[^/]+\/files)(\/|$)/;
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(

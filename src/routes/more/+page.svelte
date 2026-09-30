@@ -117,6 +117,10 @@
 						<Icon name="chevron" size={16} />
 					</span>
 				</a>
+				<a class="ui-row" href="/more/data" download data-sveltekit-reload>
+					<span>データの書き出し</span>
+					<span class="ui-row-value"><Icon name="download" size={16} /></span>
+				</a>
 			</div>
 		</section>
 
