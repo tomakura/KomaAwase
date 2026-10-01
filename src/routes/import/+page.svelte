@@ -188,7 +188,9 @@
 				<div class="item">
 					<span class="num">2</span>
 					<span>
-						画像は読み取りのためにGroq・Cloudflareへ送られます。AIの学習には使われず、読み取りが終わるとすぐに削除します（読み取れなかったときも3日で削除します）。
+						画像は米国の Groq と Cloudflare に送られ、AIが読み取ります。米国には日本のような全国共通の個人情報保護法がありません。両社は画像を学習に使わず、読み取ったらすぐに消します（読み取れなかったときも3日で消します）。<a
+							href="/privacy#foreign">くわしく見る</a
+						>
 					</span>
 				</div>
 				<div class="item">
@@ -203,7 +205,7 @@
 
 			<label class="agree">
 				<input type="checkbox" bind:checked={agreed} />
-				上のことを確認しました
+				上のことを確認し、画像を米国の Groq と Cloudflare に送ることに同意します
 			</label>
 
 			{#if message}<p class="error" role="alert">{message}</p>{/if}
