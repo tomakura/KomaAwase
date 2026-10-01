@@ -14,7 +14,7 @@
 ![ロゴマーク](assets/logo-mark.svg)
 
 - 文字は Zen Maru Gothic の太字で「コマあわせ」
-- キャッチコピー：友だちと、時間割を共有しよう。
+- キャッチコピー：友だちと時間割を共有しよう。
 - 書き出し画像のすみには「コマあわせ で作成」の札を入れる
 - ダークモードでは、重なりを `multiply` から `screen` に変えて明るくする
 - アプリのアイコン（`static/icons/`、`apple-touch-icon.png`、`favicon.ico`）は `scripts/make-icons.mjs` でこのマークから作る。生成りの地にのせ、maskable は切り抜かれても欠けないように中央の80%の中に収める

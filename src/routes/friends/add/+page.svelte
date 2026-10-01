@@ -79,7 +79,7 @@
 		>
 			<button class="regenerate" type="submit">リンクとコードを作り直す</button>
 		</form>
-		<p class="ui-note">リンクを知らない人に広まってしまったときに。友だちはそのまま残ります。</p>
+		<p class="ui-note">知らない人にリンクが広まったときに使います。友だちはそのまま残ります。</p>
 		{#if form?.regenerated}<p class="status" role="status">新しいリンクにしました</p>{/if}
 	</section>
 </div>

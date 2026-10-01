@@ -20,7 +20,7 @@
 		<p class="error" role="alert">{form?.message ?? 'リンクの期限が切れているか、すでに使われています'}</p>
 		<a class="btn" href="/more/verify">もう一度申し込む</a>
 	{:else if view === 'other-account'}
-		<p role="alert">アカウントが一致しません。<br />在籍確認を完了するには、同じアカウントでログインする必要があります。</p>
+		<p role="alert">アカウントが一致しません。<br />申し込んだときと同じアカウントでログインしてから、もう一度リンクを開いてください。</p>
 		<form method="POST" action="/logout">
 			<input type="hidden" name="next" value={page.url.pathname} />
 			<button class="btn btn-primary" type="submit">ログアウトする</button>

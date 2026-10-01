@@ -24,7 +24,7 @@
 		<a class="btn" href="/feedback?from={encodeURIComponent(from)}">要望を送る</a>
 	{:else}
 		<b>{what}は、在籍確認をすると使えます</b>
-		<span>大学のメールアドレスにリンクを送って、開くだけです。</span>
+		<span>大学のメールアドレスに届くリンクを開くと確認できます。</span>
 		<a class="btn btn-primary" href="/more/verify">在籍確認する</a>
 	{/if}
 </div>

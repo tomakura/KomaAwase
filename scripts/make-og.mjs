@@ -73,7 +73,7 @@ h1 { font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 84
 <div class="text">
 <svg class="mark" width="96" height="96" viewBox="0 0 48 48"><rect x="4" y="8" width="26" height="26" rx="7" fill="#D9653B"/><rect x="18" y="14" width="26" height="26" rx="7" fill="#3569A8" style="mix-blend-mode:multiply"/></svg>
 <h1>コマあわせ</h1>
-<p class="tag">友だちと、時間割を共有しよう。</p>
+<p class="tag">友だちと時間割を共有しよう。</p>
 <p class="sub">重ねると、みんなが空いているコマが<br>すぐわかる。</p>
 </div>
 <div class="card"><div class="chips">${chips}</div><div class="grid">${days}${cells}</div></div>
