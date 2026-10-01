@@ -24,7 +24,7 @@
 <div class="ui-page">
 	<PageHeader title="ログイン中の端末" back="/more" />
 	<div class="body">
-		<p class="ui-note">ログイン済みの端末を管理できます。</p>
+		<p class="ui-note">ログインしている端末を確かめて、ログアウトさせられます。</p>
 		<div class="ui-list">
 			{#each data.sessions as s (s.id)}
 				<div transition:slide={motion()} class="device">

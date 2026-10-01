@@ -21,7 +21,7 @@
 <main>
 	<header>
 		<h1>在籍確認をしませんか</h1>
-		<p>{data.university.name}のメールアドレスにリンクを送って、開くだけです。確認すると、次のことができます。</p>
+		<p>{data.university.name}のメールアドレスに届くリンクを開くと確認できます。確認すると、次のことができます。</p>
 	</header>
 
 	<VerifyBenefits />

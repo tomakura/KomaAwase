@@ -57,11 +57,11 @@
 	{#if shown?.kind === 'expiring' || shown?.kind === 'lapsed'}
 		<p>
 			在籍確認は、毎年5月1日に切れます。切れると、みんなの授業データとスクショの読み込みが使えなくなります。
-			大学のメールアドレスにリンクを送って、開くだけで確認し直せます。
+			大学のメールアドレスに届くリンクを開くと、確認し直せます。
 		</p>
 		<a class="btn btn-primary" href="/more/verify" onclick={() => (open = false)}>確認し直す</a>
 	{:else}
-		<p>大学のメールアドレスにリンクを送って、開くだけです。確認すると、次のことができます。</p>
+		<p>大学のメールアドレスに届くリンクを開くと確認できます。確認すると、次のことができます。</p>
 		<VerifyBenefits />
 		<a class="btn btn-primary" href="/more/verify" onclick={() => (open = false)}>在籍確認する</a>
 	{/if}

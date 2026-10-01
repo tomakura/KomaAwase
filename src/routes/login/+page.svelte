@@ -74,7 +74,7 @@
 		{#if data.reauth}
 			<p class="lead">{data.reauth.lead}</p>
 		{:else}
-			<p>友だちと、時間割を共有しよう。</p>
+			<p>友だちと時間割を共有しよう。</p>
 			<a class="intro" href="/intro">コマあわせとは<Icon name="chevron" size={14} /></a>
 		{/if}
 	</div>

@@ -1,7 +1,7 @@
 {
 	"name": "コマあわせ",
 	"short_name": "コマあわせ",
-	"description": "友だちと、時間割を共有しよう。",
+	"description": "友だちと時間割を共有しよう。",
 	"lang": "ja",
 	"start_url": "/",
 	"scope": "/",

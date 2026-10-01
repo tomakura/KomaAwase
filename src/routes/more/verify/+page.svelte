@@ -35,7 +35,7 @@
 				<!-- The days are shown from 30 before, when the prompts to check again begin -->
 				{#if data.verification.days <= 30}<b class="days soon">あと{data.verification.days}日</b>{/if}
 			</div>
-			<p class="ui-note">毎年5月1日に切れます。4月になったら、もう一度確認してください。卒業したあともメールが使える大学があるためです。</p>
+			<p class="ui-note">在籍確認は、毎年5月1日までにもう一度行う必要があります。</p>
 		{:else}
 			{#if data.verification && data.verification.days <= 0}
 				<p class="lapsed" role="status">在籍確認の期限が切れています（{day(data.verification.expiresAt)}まで）。</p>
@@ -50,7 +50,7 @@
 			<p class="ui-note">先に<a href="/more/university">大学</a>を選んでください。</p>
 		{:else if !data.university.domains.length}
 			<p class="ui-note">
-				{data.university.name}はまだ在籍確認に対応していません。対応してほしいときは、大学のメールアドレスの@から後ろを添えて
+				{data.university.name}はまだ在籍確認に対応していません。対応してほしいときは、大学のメールアドレスの@より後ろを書いて
 				<a href="/feedback?from=/more/verify">要望</a>を送ってください。
 			</p>
 		{:else if form?.sentTo && !other}
