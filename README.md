@@ -25,7 +25,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 - 授業の資料はシンの `relay/files.php` に保存する。手元で試すときは [relay/README.md](relay/README.md#手元で試すとき) のとおり PHP を動かし、`.dev.local.vars` を作る
 - パスキーは `localhost` で試せる。スマホで試すときは HTTPS が必要
 - スクショの読み取りは、手元でも Workers AI（本物）につながる。`npm run dev` では順番待ちを通さずにその場で読む。Cron は `npx wrangler dev --test-scheduled` で開き、`/__scheduled` を呼ぶと動く
-- Worker の入口は `worker/entry.js`（SvelteKit の Worker に順番待ちと Cron を足したもの）。アダプターは `svelte-kit.wrangler.jsonc` を読む（[docs/architecture.md](docs/architecture.md#worker-の入口)）
+- Worker のエントリーポイントは `worker/entry.js`（SvelteKit の Worker に順番待ちと Cron を足したもの）。アダプターは `svelte-kit.wrangler.jsonc` を読む（[docs/architecture.md](docs/architecture.md#worker-のエントリーポイント)）
 - アイコンを作り直すときは `node scripts/make-icons.mjs static`
 - リンクを共有したときの画像（`static/og.png`）を作り直すときは `node scripts/make-og.mjs static/og.png`（Playwright と curl が要る。詳しくはスクリプトの先頭）
 - 表示にかかる CPU を測るときは、`npm run build` と `npx wrangler deploy --dry-run --outdir .bench` のあと `node --no-warnings scripts/bench-worker.mjs <セッションのトークン>`（Node.js 22.16 以上）（`FIRST=1` で起動直後の1回目だけ）
