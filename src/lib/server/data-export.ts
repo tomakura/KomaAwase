@@ -22,7 +22,7 @@ import { listFriendships } from './friends';
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
-/** Everything a person has in the app that is theirs, for the file they can save (その他 → データの書き出し) */
+/** Everything a person has in the app that is theirs, for the file they can save (その他 → 自分のデータを保存) */
 export async function exportData(db: Db, user: { id: string }) {
 	const me = user.id;
 	const own = (table: { timetableId: Column }) => eq(table.timetableId, timetables.id);

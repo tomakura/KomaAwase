@@ -124,7 +124,7 @@
 			? 'この授業を同じ大学のみんなと共有できます'
 			: sync.shared.source === 'syllabus'
 				? 'シラバスの授業とつながっています'
-				: 'みんなの登録の授業とつながっています'
+				: 'みんなの授業と同期しています'
 	);
 	const syncNote = $derived(
 		v.syncMode === 'personal'
@@ -132,7 +132,7 @@
 			: sync.shared && !sync.canEdit
 				? 'だれかが教室などを直すと、自動で反映されます。この授業を同期していて在籍確認済みの人が、みんなのデータを直せます。内容を変えて保存すると「自分だけで使う」に切り替わります。'
 				: sync.shared
-				? 'だれかが教室などを直すと、自動で反映されます。ここで直した内容も、同期しているみんなに反映されます。'
+				? 'だれかが教室などを直すと、自動で反映されます。ここでの変更は、同じ授業に同期している人の時間割にも反映されます。'
 				: '同じ大学の人が「授業をさがす」で見つけられるようになります。'
 	);
 
@@ -432,7 +432,7 @@
 	</div>
 </form>
 
-<Sheet bind:open={asking} title="変更を保存していません。戻りますか？">
+<Sheet bind:open={asking} title="保存していない変更があります。変更を破棄して戻りますか？">
 	<div class="leave-buttons">
 		<button class="btn" type="button" onclick={leave}>戻る</button>
 		<button class="btn btn-primary" type="button" onclick={() => (asking = false)}>編集を続ける</button>

@@ -45,7 +45,7 @@ export const actions: Actions = {
 	join: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const group = await invited(locals.db, params.code);
-		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'このグループには参加できません' });
+		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'この招待からは参加できません。招待した人にご確認ください。' });
 		const share = (await request.formData()).get('share') === 'on';
 		if (group.approval) {
 			const asked = !!(await requestOf(locals.db, group.id, me.id));

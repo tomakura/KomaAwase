@@ -20,12 +20,12 @@
 
 	{#if data.banned}
 		<div class="actions">
-			<p class="notice" role="status">このグループには参加できません。</p>
+			<p class="notice" role="status">この招待からは参加できません。招待した人にご確認ください。</p>
 			<a class="btn" href="/">もどる</a>
 		</div>
 	{:else if (data.requested || form?.requested) && !form?.cancelled}
 		<form class="actions" method="POST" action="?/cancel" use:enhance>
-			<p class="notice" role="status">申請しました。作った人が承認すると参加できます。</p>
+			<p class="notice" role="status">申請しました。グループの管理者が承認すると参加できます。</p>
 			<a class="btn btn-primary" href="/">時間割にもどる</a>
 			<button class="later" type="submit">申請を取り消す</button>
 		</form>
@@ -44,7 +44,7 @@
 					参加したあとも変えられます。
 				</p>
 			</div>
-			{#if data.approval}<p class="ui-note">このグループは承認制です。作った人が承認すると参加できます。</p>{/if}
+			{#if data.approval}<p class="ui-note">このグループは承認制です。グループの管理者が承認すると参加できます。</p>{/if}
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 			<button class="btn btn-primary" type="submit">{data.approval ? '参加を申請する' : '参加する'}</button>
 			<a class="later" href="/">やめる</a>

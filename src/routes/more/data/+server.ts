@@ -3,7 +3,7 @@ import { exportData } from '$lib/server/data-export';
 import { tokyoTime } from '$lib/time';
 import type { RequestHandler } from './$types';
 
-// The person's own data as one JSON file (その他 → データの書き出し)
+// The person's own data as one JSON file (その他 → 自分のデータを保存)
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login');
 	const data = await exportData(locals.db, locals.user);

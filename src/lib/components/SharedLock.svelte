@@ -15,7 +15,7 @@
 
 <div class="lock">
 	{#if access === 'no-university'}
-		<b>{what}は、大学を選ぶと使えます</b>
+		<b>{what}は、大学を選び、大学メールで在籍確認をすると使えます</b>
 		<span>「その他」→「大学」から選べます。</span>
 		<a class="btn btn-primary" href="/more/university">大学を選ぶ</a>
 	{:else if access === 'unsupported'}

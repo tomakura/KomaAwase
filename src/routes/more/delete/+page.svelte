@@ -56,12 +56,12 @@
 		<label class="agree">
 			<!-- Required rather than a disabled button, so the form works before (or without) JavaScript -->
 			<input type="checkbox" name="confirm" required checked={form?.more} />
-			上のことを確認しました
+			消える情報と、退会後も残る情報を確認しました。
 		</label>
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		<!-- With JavaScript the page carries on by itself; without, one press per round -->
-		{#if form?.more}<p class="more" role="status">資料のファイルを少しずつ消しています。もう一度「退会する」を押して続けてください。</p>{/if}
-		<button class="btn danger" type="submit" disabled={deleting}>{deleting ? '削除しています…' : '退会する'}</button>
+		{#if form?.more}<p class="more" role="status">資料のファイルを少しずつ消しています。もう一度「アカウントを完全に削除」を押して続けてください。</p>{/if}
+		<button class="btn danger" type="submit" disabled={deleting}>{deleting ? '削除しています…' : 'アカウントを完全に削除'}</button>
 	</form>
 </div>
 

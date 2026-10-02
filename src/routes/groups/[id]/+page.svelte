@@ -141,7 +141,7 @@
 <Sheet bind:open={inviting} title="メンバーを招待する">
 	<p class="ui-note">
 		{data.group.approval
-			? 'このリンクを開いた人は、参加を申請できます。作った人が承認すると参加できます。'
+			? 'このリンクを開いた人は、参加を申請できます。グループの管理者が承認すると参加できます。'
 			: 'このリンクを開いた人は、だれでもグループに参加できます。知らない人に広まったら作り直してください。'}
 	</p>
 	<div class="qr"><QrCode text={data.invite} size={180} label="招待リンクのQRコード" /></div>
@@ -152,7 +152,7 @@
 			type="button"
 			onclick={async () => (status = (await copyText(data.invite)) === 'copied' ? 'リンクをコピーしました' : 'リンクをコピーできませんでした')}
 		>
-			<Icon name="copy" size={18} />コピー
+			<Icon name="copy" size={18} />リンクをコピー
 		</button>
 	</div>
 	{#if status}<p class="ui-note" role="status">{status}</p>{/if}

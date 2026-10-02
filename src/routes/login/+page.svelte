@@ -87,7 +87,7 @@
 		{#if passkeyResult === 'failed'}
 			<p class="error" role="alert">パスキーでログインできませんでした。もう一度試すか、メールでログインしてください。</p>
 		{:else if passkeyResult === 'none'}
-			<p class="hint" role="status">パスキーがないときは、下のメールでログインしてください。</p>
+			<p class="hint" role="status">パスキーを使用できません。もう一度試すか、他の方法でログインしてください。</p>
 		{/if}
 
 		<div class="divider"><span>{data.reauth ? 'パスキーがないとき' : 'はじめての人・パスキーがない人'}</span></div>
@@ -106,14 +106,14 @@
 			{#if data.suspended}<p class="error" role="alert">{SUSPENDED_MESSAGE}</p>{/if}
 			{#if data.googleFailed}<p class="error" role="alert">Googleでログインできませんでした。もう一度やり直してください</p>{/if}
 			{#if data.googleUseMail}
-				<p class="error" role="alert">このGoogleアカウントのメールアドレスでは続けられません。下からメールアドレスでログインしてください</p>
+				<p class="error" role="alert">このGoogleアカウントでは続けられません。同じメールアドレスに届くリンクでログインしてください。</p>
 			{/if}
 		{/if}
 
 		{#if form?.sentTo && !other}
 			{#key form}
 				<MailSent email={form.sentTo} action="?/email" onother={() => (other = true)}>
-					{form.sentTo} にログイン用のリンクを送信しました。15分以内に開いてください。届かないときは、迷惑メールのフォルダも見てください。
+					{form.sentTo} にリンクを送りました。15分以内に開いてください。届かない場合は迷惑メールをご確認ください。
 				</MailSent>
 			{/key}
 		{:else}
@@ -150,7 +150,7 @@
 						{form.message}{#if "limit" in form}<br />パスキーがあれば、パスキーでログインできます。{/if}
 					</p>
 				{/if}
-				<SendButton {phase}>{data.reauth ? 'メールでログイン' : 'メールでログイン・登録'}</SendButton>
+				<SendButton {phase}>{data.reauth ? 'メールでログイン' : 'メールアドレスで続ける'}</SendButton>
 			</form>
 		{/if}
 		{#if data.reauth}
