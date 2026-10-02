@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { readImport } from '$lib/import';
 import { RETRY_AFTER_RESET, TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } from '$lib/import-quota';
 import type { Db } from '../db';
@@ -18,25 +18,24 @@ const DAY = 24 * 60 * 60 * 1000;
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 export const IMAGE_MAX = 1_500_000;
 
+// Jobs that count toward today's free quota (quotaUsed)
+const spokenFor = () =>
+	or(
+		inArray(importJobs.status, ['queued', 'processing']),
+		and(eq(importJobs.status, 'retry'), lt(importJobs.retryAt, new Date(lastQuotaReset().getTime() + DAY))),
+		and(
+			or(eq(importJobs.status, 'done'), and(eq(importJobs.status, 'failed'), gt(importJobs.attempts, 0))),
+			gte(importJobs.finishedAt, lastQuotaReset())
+		)
+	);
+
 /**
  * How much of today's free quota is spoken for: screenshots waiting or being read, those put
  * off to a time before the next reset (they come back to the queue then), and those read
  * since the quotas last reset.
  */
 export async function quotaUsed(db: Db) {
-	const [row] = await db
-		.select({ n: count() })
-		.from(importJobs)
-		.where(
-			or(
-				inArray(importJobs.status, ['queued', 'processing']),
-				and(eq(importJobs.status, 'retry'), lt(importJobs.retryAt, new Date(lastQuotaReset().getTime() + DAY))),
-				and(
-					or(eq(importJobs.status, 'done'), and(eq(importJobs.status, 'failed'), gt(importJobs.attempts, 0))),
-					gte(importJobs.finishedAt, lastQuotaReset())
-				)
-			)
-		);
+	const [row] = await db.select({ n: count() }).from(importJobs).where(spokenFor());
 	return row?.n ?? 0;
 }
 
@@ -61,42 +60,58 @@ export async function readSlot(db: Db) {
 
 /**
  * Saves a screenshot to be read. `deferred` when the day's total is used up: it isn't sent to
- * the queue, and is read after the quotas reset (see nextRetryTime).
+ * the queue, and is read after the quotas reset (see nextRetryTime). The limits are checked
+ * and the job saved in one statement, so screenshots sent at the same moment can't pass a
+ * limit together; the checks before it only find the message to show.
  */
-export async function createImportJob(db: Db, userId: string, timetableId: string, image: string, tiled = false, termId: string | null = null) {
+export async function createImportJob(
+	db: Db,
+	userId: string,
+	timetableId: string,
+	image: string,
+	tiled = false,
+	termId: string | null = null,
+	consentVersion: string | null = null
+) {
 	if (image.length > IMAGE_MAX || !IMAGE_PATTERN.test(image)) {
 		return { message: '画像を読み込めませんでした。別の画像でやり直してください' };
 	}
 	const since = new Date(Date.now() - DAY);
-	const [[today], [active]] = await db.batch([
-		db
-			.select({ n: count() })
-			.from(importJobs)
-			.where(and(eq(importJobs.userId, userId), gte(importJobs.createdAt, since))),
-		db
-			.select({ n: count() })
-			.from(importJobs)
-			.where(and(eq(importJobs.userId, userId), inArray(importJobs.status, ['queued', 'processing', 'retry'])))
-	]);
-	if ((today?.n ?? 0) >= DAILY_LIMIT) return { message: `読み込みは1日${DAILY_LIMIT}回までです。明日またやり直してください` };
-	if ((active?.n ?? 0) >= ACTIVE_LIMIT) return { message: '読み込み中のものが終わってから、次の画像を送ってください' };
+	const today = db.select({ n: count() }).from(importJobs).where(and(eq(importJobs.userId, userId), gte(importJobs.createdAt, since)));
+	const active = db
+		.select({ n: count() })
+		.from(importJobs)
+		.where(and(eq(importJobs.userId, userId), inArray(importJobs.status, ['queued', 'processing', 'retry'])));
+	const [[todayCount], [activeCount]] = await db.batch([today, active]);
+	if ((todayCount?.n ?? 0) >= DAILY_LIMIT) return { message: TODAY_FULL };
+	if ((activeCount?.n ?? 0) >= ACTIVE_LIMIT) return { message: ACTIVE_FULL };
 	const deferred = (await quotaUsed(db)) >= TOTAL_DAILY_LIMIT;
 	const retryAt = deferred ? await readSlot(db) : null;
-	if (deferred && !retryAt) return { message: '読み込みが混み合っています。しばらくたってから、もう一度やり直してください' };
-	const row = await db
-		.insert(importJobs)
-		.values({
-			userId,
-			timetableId,
-			image,
-			tiled,
-			termId,
-			...(deferred ? { status: 'retry' as const, retryAt } : {})
-		})
-		.returning({ id: importJobs.id })
-		.get();
-	return { id: row.id, deferred };
+	if (deferred && !retryAt) return { message: CROWDED };
+
+	// The day's total is judged again as the job is saved; one that fills up meanwhile puts it
+	// off to the next morning
+	const id = crypto.randomUUID();
+	const used = db.select({ n: count() }).from(importJobs).where(spokenFor());
+	const later = (retryAt ?? nextRetryTime()).getTime();
+	const saved = await db.run(sql`
+		insert into ${importJobs} (id, user_id, timetable_id, image, tiled, term_id, consent_version, status, retry_at)
+		select ${id}, ${userId}, ${timetableId}, ${image}, ${tiled ? 1 : 0}, ${termId}, ${consentVersion},
+			case when (${used}) >= ${TOTAL_DAILY_LIMIT} then 'retry' else 'queued' end,
+			case when (${used}) >= ${TOTAL_DAILY_LIMIT} then ${later} else null end
+		where (${today}) < ${DAILY_LIMIT} and (${active}) < ${ACTIVE_LIMIT}`);
+	if (!saved.meta.changes) {
+		// Another screenshot took the last place between the checks and here
+		const [t] = await today;
+		return { message: (t?.n ?? 0) >= DAILY_LIMIT ? TODAY_FULL : ACTIVE_FULL };
+	}
+	const row = await db.select({ status: importJobs.status }).from(importJobs).where(eq(importJobs.id, id)).get();
+	return { id, deferred: row?.status === 'retry' };
 }
+
+const TODAY_FULL = `読み込みは1日${DAILY_LIMIT}回までです。明日またやり直してください`;
+const ACTIVE_FULL = '読み込み中のものが終わってから、次の画像を送ってください';
+const CROWDED = '読み込みが混み合っています。しばらくたってから、もう一度やり直してください';
 
 /** Hands the job to the queue, or in development (no consumer runs) reads it right away. */
 export async function enqueue(

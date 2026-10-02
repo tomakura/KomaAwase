@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
 import { groupBans, groupMembers, groupRequests, groups, universities, users } from './db/schema';
@@ -13,13 +13,36 @@ export function readGroupName(input: FormDataEntryValue | null) {
 	return name && [...name].length <= GROUP_NAME_MAX ? name : null;
 }
 
-export async function createGroup(db: Db, ownerId: string, name: string) {
+// How many groups one person may have made and still own, and make in a day
+export const GROUPS_OWNED_MAX = 30;
+export const GROUPS_A_DAY = 5;
+const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Makes a group with its maker in it, or says which limit it is over. The limits are checked
+ * in the statement that saves the group, so two made at once can't pass them together.
+ */
+export async function createGroup(db: Db, ownerId: string, name: string): Promise<{ id: string } | { limit: 'owned' | 'day' }> {
 	const id = crypto.randomUUID();
-	await db.batch([
-		db.insert(groups).values({ id, name, ownerId, inviteCode: randomCode() }),
-		db.insert(groupMembers).values({ groupId: id, userId: ownerId, shareTimetable: true })
-	]);
-	return id;
+	const owned = db.select({ n: count() }).from(groups).where(eq(groups.ownerId, ownerId));
+	const today = db
+		.select({ n: count() })
+		.from(groups)
+		.where(and(eq(groups.ownerId, ownerId), gte(groups.createdAt, new Date(Date.now() - DAY))));
+	const made = await db.run(sql`insert into ${groups} (id, name, owner_id, invite_code)
+		select ${id}, ${name}, ${ownerId}, ${randomCode()}
+		where (${owned}) < ${GROUPS_OWNED_MAX} and (${today}) < ${GROUPS_A_DAY}`);
+	if (made.meta.changes) {
+		try {
+			await db.insert(groupMembers).values({ groupId: id, userId: ownerId, shareTimetable: true });
+		} catch (e) {
+			await db.delete(groups).where(eq(groups.id, id));
+			throw e;
+		}
+		return { id };
+	}
+	const [n] = await owned;
+	return { limit: (n?.n ?? 0) >= GROUPS_OWNED_MAX ? 'owned' : 'day' };
 }
 
 export function findGroupByInvite(db: Db, code: string) {
@@ -40,15 +63,21 @@ export async function isBanned(db: Db, groupId: string, userId: string) {
 	return !!row;
 }
 
+// Adds a member unless the group is full, counted in the same statement so two joining at
+// once can't both take the last place. Whether they were added.
+async function addMember(db: Db, groupId: string, userId: string, share: boolean) {
+	const added = await db.all<{ user_id: string }>(sql`insert into ${groupMembers} (group_id, user_id, share_timetable)
+		select ${groupId}, ${userId}, ${share ? 1 : 0}
+		where (select count(*) from ${groupMembers} where group_id = ${groupId}) < ${GROUP_MEMBERS_MAX}
+		on conflict do nothing
+		returning user_id`);
+	return added.length > 0;
+}
+
 /** 'full', or whether they were already in. Joining twice keeps the first choice of sharing. */
 export async function joinGroup(db: Db, groupId: string, userId: string, share: boolean) {
-	if ((await memberCount(db, groupId)) >= GROUP_MEMBERS_MAX) return 'full';
-	const added = await db
-		.insert(groupMembers)
-		.values({ groupId, userId, shareTimetable: share })
-		.onConflictDoNothing()
-		.returning({ userId: groupMembers.userId });
-	return added.length ? 'joined' : 'member';
+	if (await addMember(db, groupId, userId, share)) return 'joined';
+	return (await membership(db, groupId, userId)) ? 'member' : 'full';
 }
 
 /** Everyone in the group but this person, for telling them someone joined */
@@ -193,11 +222,8 @@ export async function cancelRequest(db: Db, groupId: string, userId: string) {
 export async function approveRequest(db: Db, groupId: string, userId: string) {
 	const request = await requestOf(db, groupId, userId);
 	if (!request) return 'gone';
-	if ((await memberCount(db, groupId)) >= GROUP_MEMBERS_MAX) return 'full';
-	await db.batch([
-		db.insert(groupMembers).values({ groupId, userId, shareTimetable: request.shareTimetable }).onConflictDoNothing(),
-		db.delete(groupRequests).where(and(eq(groupRequests.groupId, groupId), eq(groupRequests.userId, userId)))
-	]);
+	if (!(await addMember(db, groupId, userId, request.shareTimetable)) && !(await membership(db, groupId, userId))) return 'full';
+	await db.delete(groupRequests).where(and(eq(groupRequests.groupId, groupId), eq(groupRequests.userId, userId)));
 	return 'joined';
 }
 
