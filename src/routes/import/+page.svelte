@@ -183,7 +183,7 @@
 				<h2>読み込む前に</h2>
 				<div class="item">
 					<span class="num">1</span>
-					<span>読み取りはAIが行います。間違えることがあるので、保存する前に必ず見直してください。</span>
+					<span>読み取りはAIが行います。読み取り結果には誤りが含まれることがあります。保存する前に、授業名・曜日・時限・教室を確認してください。</span>
 				</div>
 				<div class="item">
 					<span class="num">2</span>
@@ -210,7 +210,7 @@
 
 			{#if message}<p class="error" role="alert">{message}</p>{/if}
 			<button class="btn btn-primary" type="button" disabled={!src || !agreed || sending} onclick={start}>
-				{sending ? '送っています…' : '読み込みをはじめる'}
+				{sending ? '送っています…' : '同意して読み込む'}
 			</button>
 			<p class="ui-note">
 				1日{data.dailyLimit}回まで読み込めます。見つからない授業は <a href="/courses/new">自分で入力</a> できます。個人情報の扱いは、<a href="/privacy">プライバシーポリシー</a>をご覧ください。

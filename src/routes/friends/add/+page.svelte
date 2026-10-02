@@ -36,7 +36,7 @@
 			</div>
 			<div class="buttons">
 				<button class="btn btn-primary" type="button" onclick={share}><Icon name="share" size={18} />共有する</button>
-				<button class="btn" type="button" onclick={copy}><Icon name="copy" size={18} />コピー</button>
+				<button class="btn" type="button" onclick={copy}><Icon name="copy" size={18} />リンクをコピー</button>
 				<button class="btn" type="button" aria-expanded={showQr} onclick={() => (showQr = !showQr)}>
 					<Icon name="qr" size={18} />QR
 				</button>

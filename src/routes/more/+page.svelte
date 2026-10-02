@@ -142,7 +142,10 @@
 					</span>
 				</a>
 				<a class="ui-row" href="/more/data" download data-sveltekit-reload>
-					<span>データの書き出し</span>
+					<span class="share-text">
+						自分のデータを保存（JSON）
+						<span class="share-sub">時間割・メモ・予定などをJSONで保存します。資料のファイル本体は含まれません。</span>
+					</span>
 					<span class="ui-row-value"><Icon name="download" size={16} /></span>
 				</a>
 			</div>

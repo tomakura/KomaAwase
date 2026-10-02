@@ -58,7 +58,7 @@ async function member(event: RequestEvent<{ id: string }>) {
 
 async function owner(event: RequestEvent<{ id: string }>) {
 	const found = await member(event);
-	if (!isOwner(found.group, found.me.id)) error(403, 'グループを作った人だけができます');
+	if (!isOwner(found.group, found.me.id)) error(403, 'グループの管理者だけができます');
 	return found;
 }
 
