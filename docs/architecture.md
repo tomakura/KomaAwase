@@ -12,7 +12,7 @@
 | 実行環境 | Cloudflare Workers（静的アセット配信付き）。Pages ではなく Workers にする |
 | データベース | D1 ＋ Drizzle ORM |
 | ファイル | 資料はシンレンタルサーバー（`relay/files.php`）。R2 は無料枠でもカードの登録が要るので使わない |
-| 順番待ち | Queues（`koma-import`。無料プランは1日10,000操作、保持は24時間） |
+| 順番待ち | Queues（`koma-import` と通知の `koma-push`。無料プランは1日10,000操作、保持は24時間） |
 | 定期実行 | Cron Triggers（毎日 10:00 JST：スクショの再挑戦、後片付け、運営の数字の記録。1分ごと：授業の前の通知と、前の日の20時の通知） |
 | スクショ読み取り | Groq（`qwen/qwen3.8-27b`）、予備に Workers AI（`@cf/meta/llama-4-scout-17b-16e-instruct`） |
 | パスキー | SimpleWebAuthn |
@@ -334,6 +334,7 @@ WAF のルールはダッシュボードで設定していて、リポジトリ�
 | `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | secret | お問い合わせの Turnstile（両方あるときだけ使う。ないと、ボットよけの確認なしで、隠し欄と件数の制限だけで受ける）。`npx wrangler secret put` で入れる。リポジトリには入れない |
 | `SUPPORT_URL` | vars（任意） | 「開発を応援する」のリンク（ないと出さない） |
 | `IMPORT_QUEUE` | Queues | `npx wrangler queues create koma-import` で作っておく |
+| `PUSH_QUEUE` | Queues | `npx wrangler queues create koma-push` で作っておく。1回で送りきれない通知を40台ずつ送る |
 | `AI` | Workers AI | 手元でも本物につながる（`remote: true`）。少し無料枠を使う |
 
 ## プライバシー

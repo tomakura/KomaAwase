@@ -38,9 +38,17 @@
 	],
 	// Screenshot imports: one at a time, so Groq's per-minute limits hold. Jobs live in D1
 	// (import_jobs); a message only names one, and the daily cron re-sends what is due.
+	// Notifications more than one run can send (src/lib/server/push-queue.ts): each message is
+	// up to 40 phones, sent in a run of its own. Create it once with `npx wrangler queues create koma-push`.
 	"queues": {
-		"producers": [{ "binding": "IMPORT_QUEUE", "queue": "koma-import" }],
-		"consumers": [{ "queue": "koma-import", "max_batch_size": 1, "max_batch_timeout": 5, "max_retries": 10, "max_concurrency": 1 }]
+		"producers": [
+			{ "binding": "IMPORT_QUEUE", "queue": "koma-import" },
+			{ "binding": "PUSH_QUEUE", "queue": "koma-push" }
+		],
+		"consumers": [
+			{ "queue": "koma-import", "max_batch_size": 1, "max_batch_timeout": 5, "max_retries": 10, "max_concurrency": 1 },
+			{ "queue": "koma-push", "max_batch_size": 1, "max_batch_timeout": 1, "max_retries": 3 }
+		]
 	},
 	// 10:00 Japan time, an hour after the AI quotas reset (9:00): retries, cleanup of old images and sessions.
 	// And every minute from 06:00 to 22:59 Japan time: the class reminders. worker/entry.js

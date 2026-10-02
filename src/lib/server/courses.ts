@@ -7,7 +7,7 @@ import type { Db } from './db';
 import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
 import { deleteCourseFiles } from './files';
 import { loadNotes } from './notes';
-import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, writeShared, type SharedCourse } from './shared-courses';
+import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, syncedValues, writeShared, type SharedCourse } from './shared-courses';
 import { loadShape, shapeQueries } from './timetable';
 import { sharedAccess } from './verify';
 
@@ -289,9 +289,16 @@ export async function commitCourses(db: Db, prepared: PreparedCourse[], first: B
 	return null;
 }
 
-/** Every other course's slots in the timetable, with their terms: what a new length must not run into */
+/**
+ * Every other course's slots in the timetable, with their terms: what a new length must not
+ * run into. A synced course's are the shared course's, as the timetable shows them.
+ */
 export async function otherSlots(db: Db, timetableId: string, exceptCourseId: string | null) {
-	const [slots, terms] = await db.batch([
+	const [rows, slots, terms] = await db.batch([
+		db
+			.select({ id: courses.id, syncMode: courses.syncMode, sharedCourseId: courses.sharedCourseId })
+			.from(courses)
+			.where(eq(courses.timetableId, timetableId)),
 		db
 			.select({
 				courseId: courseSlots.courseId,
@@ -309,9 +316,16 @@ export async function otherSlots(db: Db, timetableId: string, exceptCourseId: st
 			.innerJoin(courses, eq(courses.id, courseTerms.courseId))
 			.where(eq(courses.timetableId, timetableId))
 	]);
-	return slots
-		.filter((s) => s.courseId !== exceptCourseId)
-		.map(({ courseId, ...s }) => ({ ...s, termIds: terms.filter((t) => t.courseId === courseId).map((t) => t.termId) }));
+	const others = rows.filter((c) => c.id !== exceptCourseId);
+	const shared = await syncedValues(db, others);
+	return others.flatMap((c) => {
+		const synced = c.syncMode === 'synced' && c.sharedCourseId ? shared.get(c.sharedCourseId) : undefined;
+		const own = synced
+			? synced.values.slots.map(({ weekday, period, span, week }) => ({ weekday, period, span, week }))
+			: slots.filter((s) => s.courseId === c.id).map(({ courseId: _, ...s }) => s);
+		const termIds = terms.filter((t) => t.courseId === c.id).map((t) => t.termId);
+		return own.map((s) => ({ ...s, termIds }));
+	});
 }
 
 // The course, only if it is in one of the user's timetables
@@ -396,9 +410,13 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	};
 }
 
+/**
+ * Deletes the course once its files are gone. 'more' when it has more files than one request
+ * can delete: those deleted so far are gone, the rest and the course are still there.
+ */
 export async function deleteCourse(env: Env, db: Db, userId: string, courseId: string) {
 	if (!(await findOwnedCourse(db, userId, courseId))) return false;
-	await deleteCourseFiles(env, db, courseId);
+	if ((await deleteCourseFiles(env, db, courseId)) > 0) return 'more';
 	await db.delete(courses).where(eq(courses.id, courseId));
 	return true;
 }

@@ -4,6 +4,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import SharedLock from '$lib/components/SharedLock.svelte';
+	import { IMPORT_CONSENT_VERSION } from '$lib/import-consent';
 	import { nextRetryTime } from '$lib/import-quota';
 	import { monthDay, tokyoTime } from '$lib/time';
 
@@ -37,7 +38,7 @@
 			const res = await fetch('/import/upload', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ ...cropped, term: data.term, agreed })
+				body: JSON.stringify({ ...cropped, term: data.term, agreed, consent: IMPORT_CONSENT_VERSION })
 			});
 			const body = (await res.json().catch(() => null)) as { message?: string } | null;
 			if (!res.ok) {
@@ -188,7 +189,7 @@
 				<div class="item">
 					<span class="num">2</span>
 					<span>
-						画像は米国の Groq と Cloudflare に送られ、AIが読み取ります。米国には日本のような全国共通の個人情報保護法がありません。両社は画像を学習に使わず、読み取ったらすぐに消します（読み取れなかったときも3日で消します）。<a
+						画像は米国の Groq と Cloudflare に送られ、AIが読み取ります。米国には日本のような全国共通の個人情報保護法がありません。両社は画像を学習に使いません。コマあわせに届いた画像は、読み取ったらすぐに消します（読み取れなかったときも、4日以内に消します）。<a
 							href="/privacy#foreign">くわしく見る</a
 						>
 					</span>

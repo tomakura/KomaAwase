@@ -52,6 +52,21 @@ export type SharedCourse = {
 	values: SharedValues;
 };
 
+/**
+ * A course's name as the timetable shows it, in a query that reads `courses` (unaliased): the
+ * shared course's when it is synced, else its own.
+ */
+export const shownTitle = sql<string>`coalesce((select sc.title from shared_courses sc
+	where "courses"."sync_mode" = 'synced' and sc.id = "courses"."shared_course_id"), "courses"."title")`;
+
+/** The shared courses of the synced ones among these, by id; any other gets its own values */
+export async function syncedValues(db: Db, rows: { syncMode: 'synced' | 'personal'; sharedCourseId: string | null }[]) {
+	return loadSharedCourses(
+		db,
+		rows.flatMap((r) => (r.syncMode === 'synced' && r.sharedCourseId ? [r.sharedCourseId] : []))
+	);
+}
+
 // D1 takes at most 100 bound values per query, so many ids are read 90 at a time.
 const CHUNK = 90;
 

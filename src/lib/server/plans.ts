@@ -1,8 +1,9 @@
-import { and, eq, gte, or } from 'drizzle-orm';
+import { and, asc, eq, gte, or, sql } from 'drizzle-orm';
 import type { Plan } from '$lib/plans';
 import { addDays, academicYear, isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseNotes, courses, events, timetables } from './db/schema';
+import { shownTitle } from './shared-courses';
 
 const TITLE_MAX = 100;
 const PLACE_MAX = 50;
@@ -46,11 +47,11 @@ export function parseEvent(form: FormData): { event: EventInput } | { message: s
 // The classes of this year's timetable, for choosing which one a homework or event belongs to
 export function listCourseChoices(db: Db, userId: string, today: string) {
 	return db
-		.select({ id: courses.id, title: courses.title })
+		.select({ id: courses.id, title: shownTitle })
 		.from(courses)
 		.innerJoin(timetables, eq(courses.timetableId, timetables.id))
 		.where(and(eq(timetables.userId, userId), eq(timetables.year, academicYear(today))))
-		.orderBy(courses.title)
+		.orderBy(shownTitle)
 		.all();
 }
 
@@ -64,7 +65,7 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 				date: courseNotes.due,
 				done: courseNotes.done,
 				courseId: courses.id,
-				course: courses.title
+				course: shownTitle
 			})
 			.from(courseNotes)
 			.innerJoin(courses, eq(courseNotes.courseId, courses.id))
@@ -78,6 +79,8 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 					or(eq(courseNotes.done, false), gte(courseNotes.due, since))
 				)
 			)
+			// What is kept when there are more: not done first, the nearest due date first
+			.orderBy(asc(courseNotes.done), sql`${courseNotes.due} is null`, asc(courseNotes.due))
 			.limit(500)
 			.all(),
 		db
@@ -90,11 +93,13 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 				place: events.place,
 				memo: events.memo,
 				courseId: events.courseId,
-				course: courses.title
+				course: sql<string | null>`${shownTitle}`
 			})
 			.from(events)
 			.leftJoin(courses, eq(events.courseId, courses.id))
 			.where(and(eq(events.userId, userId), gte(events.date, since)))
+			// What is kept when there are more: from today on first, the nearest first
+			.orderBy(sql`${events.date} < ${today}`, asc(events.date))
 			.limit(500)
 			.all()
 	]);

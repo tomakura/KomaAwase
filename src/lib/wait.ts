@@ -3,7 +3,8 @@
 // written to the same document, which is how a browser reads a stream: the second <!doctype>
 // is ignored, and the second <html>, <head> and <body> add their attributes to the ones there
 // (so data-theme and data-cached-at arrive) and keep their contents where they are.
-// Nothing here may touch the page: it runs in the service worker.
+// Nothing here may touch the page: it runs in the service worker. The scripts carry the nonce
+// the service worker sent its policy with (see src/lib/security.ts), as the page's own do.
 import { CACHED_AT_ATTRIBUTE } from './offline';
 
 export const WAIT_ID = 'koma-wait';
@@ -26,7 +27,7 @@ export function themeOf(html: string): Theme {
 }
 
 /** The start of the stream: a spinner over the whole screen, in the colors of the user's theme */
-export function waitShell(theme: Theme) {
+export function waitShell(theme: Theme, nonce: string) {
 	const colors =
 		theme === 'dark'
 			? `#${WAIT_ID}{${vars(COLORS.dark)}}`
@@ -43,20 +44,30 @@ export function waitShell(theme: Theme) {
 		`@media (prefers-reduced-motion:reduce){#${WAIT_ID} i{animation:koma-pulse 1.6s ease-in-out infinite}@keyframes koma-pulse{50%{opacity:.35}}}` +
 		`</style><div id="${WAIT_ID}" role="status" aria-label="読み込み中"><i></i></div>` +
 		// If the rest never comes whole, the half that did is better than a spinner for ever
-		`<script>setTimeout(function(){var e=document.getElementById("${WAIT_ID}");e&&e.remove()},30000)</script>`
+		`<script nonce="${nonce}">setTimeout(function(){var e=document.getElementById("${WAIT_ID}");e&&e.remove()},30000)</script>`
 	);
 }
 
 /** The end of the stream, once the page is all there: the spinner goes (its stylesheets have loaded by now) */
-export const WAIT_DONE = `<script>var e=document.getElementById("${WAIT_ID}");e&&e.remove()</script>`;
+export const waitDone = (nonce: string) => `<script nonce="${nonce}">var e=document.getElementById("${WAIT_ID}");e&&e.remove()</script>`;
 
 /** For an answer that is a redirect, which a stream can't pass on: go where it goes */
-export function leaveScript(url: string) {
+export function leaveScript(url: string, nonce: string) {
 	// "</script>" or "<!--" in an address must not end the script
-	return `<script>location.replace(${JSON.stringify(url).replace(/</g, '\\u003c')})</script>`;
+	return `<script nonce="${nonce}">location.replace(${JSON.stringify(url).replace(/</g, '\\u003c')})</script>`;
 }
 
 /** A saved page, marked with the time it was saved (see CACHED_AT_ATTRIBUTE) */
 export function stampHtml(html: string, savedAt: string) {
 	return /^\d+$/.test(savedAt) ? html.replace('<html', `<html ${CACHED_AT_ATTRIBUTE}="${savedAt}"`) : html;
+}
+
+/**
+ * A page from the server (or a saved copy of one), for the document the service worker
+ * started: its scripts carry the server's nonce, which the document's policy doesn't know,
+ * so they are given the service worker's. Only tags carrying the server's nonce get it, and
+ * that nonce was never in anything a page could have been made to show.
+ */
+export function renonce(html: string, from: string | null, to: string) {
+	return from ? html.replaceAll(`nonce="${from}"`, `nonce="${to}"`) : html;
 }

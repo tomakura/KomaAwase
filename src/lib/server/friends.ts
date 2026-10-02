@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import { compareJa } from '$lib/sort';
 import type { Db } from './db';
@@ -104,16 +104,18 @@ export async function sendRequest(db: Db, meId: string, targetId: string): Promi
 			.where(eq(friendships.id, existing.id));
 		return 'accepted';
 	}
-	const [pending] = await db
+	// Counted as it is saved, so requests sent at once can't pass the limit together
+	const pending = db
 		.select({ n: count() })
 		.from(friendships)
 		.where(and(eq(friendships.requesterId, meId), eq(friendships.status, 'pending')));
-	if ((pending?.n ?? 0) >= PENDING_MAX) return 'limit';
-	await db
-		.insert(friendships)
-		.values({ requesterId: meId, addresseeId: targetId, pair: pairKey(meId, targetId) })
-		.onConflictDoNothing({ target: friendships.pair });
-	return 'sent';
+	const saved = await db.run(sql`insert into ${friendships} (id, requester_id, addressee_id, pair)
+		select ${crypto.randomUUID()}, ${meId}, ${targetId}, ${pairKey(meId, targetId)}
+		where (${pending}) < ${PENDING_MAX}
+		on conflict (pair) do nothing`);
+	if (saved.meta.changes) return 'sent';
+	// Not saved: over the limit, or the two asked each other at the same moment (then this answers theirs)
+	return (await friendshipBetween(db, meId, targetId)) ? sendRequest(db, meId, targetId) : 'limit';
 }
 
 /** True when there was a request from them to accept */

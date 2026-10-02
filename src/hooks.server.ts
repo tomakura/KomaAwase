@@ -1,20 +1,12 @@
 import type { Handle } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { SESSION_COOKIE, clearSessionCookie, setSessionCookie, validateSession } from '$lib/server/auth/session';
+import { SECURITY_HEADERS } from '$lib/security';
 import { themeColorTags } from '$lib/theme';
 import { academicYear, tokyoTime } from '$lib/time';
 
-// On every response: no framing by other sites, no guessing at content types, only the
-// origin as the referrer elsewhere, HTTPS from then on, and no camera, microphone or location.
-// The Content-Security-Policy for pages is SvelteKit's (the csp option in vite.config.ts).
-const SECURITY_HEADERS = {
-	'x-frame-options': 'DENY',
-	'x-content-type-options': 'nosniff',
-	'referrer-policy': 'strict-origin-when-cross-origin',
-	'strict-transport-security': 'max-age=31536000',
-	'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
-};
-
+// On every response (src/lib/security.ts). The Content-Security-Policy for pages is SvelteKit's
+// (the csp option in vite.config.ts).
 function secured(response: Response) {
 	// A response passed through from fetch() can't be changed, so it's copied first
 	try {

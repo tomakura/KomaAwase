@@ -48,13 +48,13 @@ export const actions: Actions = {
 		if (!locals.user) redirect(303, '/login');
 		if (!platform) error(500);
 		try {
-			if (!(await deleteCourse(platform.env, locals.db, locals.user.id, params.id))) {
-				error(404, '授業が見つかりません');
-			}
+			const deleted = await deleteCourse(platform.env, locals.db, locals.user.id, params.id);
+			if (!deleted) error(404, '授業が見つかりません');
+			if (deleted === 'more') return fail(409, { message: '資料が多いので、一部だけ消しました。もう一度「この授業を消す」を押してください' });
 		} catch (e) {
 			if (isHttpError(e)) throw e;
 			console.error('course delete failed', e);
-			return fail(502, { message: '資料を消せなかったので、授業も消していません。時間をおいてもう一度やり直してください' });
+			return fail(502, { message: '資料を消している途中で止まりました。授業と、まだ消していない資料は残っています。時間をおいてもう一度やり直してください' });
 		}
 		redirect(303, timetableHref(url.searchParams.get('term')));
 	}

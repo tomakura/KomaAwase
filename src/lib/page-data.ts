@@ -5,7 +5,10 @@
 // SvelteKit reads window.fetch each time it needs a page's data (…/__data.json), so a stand-in
 // can hand back the copy kept from the last visit. Only a navigation through history uses a
 // copy; every other visit asks the server, and any request that changes something drops all
-// the copies. They live in memory, so a reload or signing out clears them.
+// the copies. They live in memory, so a reload or signing out clears them. Pages the service
+// worker never keeps (the admin pages, sign-in, …: neverKept) get no copy here either, so
+// they are always asked for and never shown without the server's say.
+import { neverKept } from './offline';
 
 const SUFFIX = '/__data.json';
 const MAX_COPIES = 24;
@@ -79,6 +82,7 @@ export function pageData(
 
 		const key = url.href;
 		const path = trimmed(url.pathname.slice(0, -SUFFIX.length));
+		if (neverKept(path)) return original(input, init);
 		const back = returning === path;
 		if (back) returning = null;
 		const shown = back ? copies.get(key) : undefined;

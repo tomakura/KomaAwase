@@ -52,8 +52,10 @@ export const users = sqliteTable('users', {
 	suspendedAt: integer('suspended_at', { mode: 'timestamp_ms' }),
 	// Whether the cancellations this person marks on a synced course count for others
 	shareCancellations: integer('share_cancellations', { mode: 'boolean' }).notNull().default(true),
-	// When they agreed to send screenshots to the AI services abroad, the first time they import
+	// When they last agreed to send screenshots to the AI services abroad (each import asks)
 	importConsentAt: integer('import_consent_at', { mode: 'timestamp_ms' }),
+	// Which wording of 読み込む前に they agreed to then (IMPORT_CONSENT_VERSION in src/lib/import-consent.ts)
+	importConsentVersion: text('import_consent_version'),
 	createdAt: createdAt()
 });
 
@@ -651,6 +653,8 @@ export const importJobs = sqliteTable(
 		tiled: integer('tiled', { mode: 'boolean' }).notNull().default(false),
 		// The term that was showing when the screenshot was sent; the review starts with it chosen
 		termId: text('term_id'),
+		// The wording of 読み込む前に that was agreed to for this screenshot (IMPORT_CONSENT_VERSION)
+		consentVersion: text('consent_version'),
 		provider: text('provider', { enum: ['groq', 'workers-ai'] }),
 		result: text('result', { mode: 'json' }).$type<import('$lib/import').ImportedCourse[]>(),
 		error: text('error'),

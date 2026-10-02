@@ -140,12 +140,15 @@ export async function openFile(env: Env, db: Db, courseId: string, fileId: strin
 			'content-disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
 			...(file.mime === 'application/pdf' ? {} : { 'content-security-policy': 'sandbox' }),
 			'x-content-type-options': 'nosniff',
-			'cache-control': 'private, max-age=3600'
+			// Not kept by the browser: who may open it is asked each time, and a copy would stay
+			// on the device after signing out or another account signing in
+			'cache-control': 'private, no-store'
 		}
 	});
 }
 
 // Removes the stored bytes first, so a failure never leaves a file nobody can see or delete.
+// Bytes already gone count as removed (files.php answers ok), so trying again is safe.
 async function removeStored(env: Env, keys: string[]) {
 	for (const key of keys) {
 		const res = await storage(env, 'delete', key);
@@ -164,17 +167,23 @@ export async function deleteFile(env: Env, db: Db, courseId: string, fileId: str
 	await db.delete(courseFiles).where(eq(courseFiles.id, fileId));
 }
 
-// Before a course is deleted
-export async function deleteCourseFiles(env: Env, db: Db, courseId: string) {
+/**
+ * Before a course is deleted: up to `limit` of its files, each one's row going with its stored
+ * bytes, so a failure part way leaves the course with exactly the files that are still there
+ * (and doing it again carries on). Says how many are left. One call stays under the Free
+ * plan's 50 outside requests.
+ */
+export async function deleteCourseFiles(env: Env, db: Db, courseId: string, limit = 40) {
 	const files = await db
-		.select({ storageKey: courseFiles.storageKey })
+		.select({ id: courseFiles.id, storageKey: courseFiles.storageKey })
 		.from(courseFiles)
-		.where(eq(courseFiles.courseId, courseId));
-	if (!files.length) return;
-	await removeStored(
-		env,
-		files.map((f) => f.storageKey)
-	);
+		.where(eq(courseFiles.courseId, courseId))
+		.limit(limit + 1);
+	for (const file of files.slice(0, limit)) {
+		await removeStored(env, [file.storageKey]);
+		await db.delete(courseFiles).where(eq(courseFiles.id, file.id));
+	}
+	return Math.max(files.length - limit, 0);
 }
 
 /**

@@ -54,6 +54,16 @@ async function visited() {
 }
 
 describe('pageData', () => {
+	it('never keeps a copy of the admin pages: going back asks the server and shows what it says', async () => {
+		const pages: Record<string, string | undefined> = { '/admin/users': 'A' };
+		const s = setup(pages);
+		await s.get('/admin/users');
+		await settle();
+		// Signed in too long ago: the server no longer shows it
+		pages['/admin/users'] = 'refused';
+		expect(await s.back('/admin/users')).toBe('refused');
+	});
+
 	it('shows the copy when going back, and asks the server behind it', async () => {
 		const { s } = await visited();
 		s.asked.length = 0;

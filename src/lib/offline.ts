@@ -2,6 +2,26 @@
 // timetable, so they are dropped whenever the sign-in page shows (after signing out or leaving).
 export const PAGE_CACHE_PREFIX = 'pages-';
 
+// Never kept, by the service worker or by the copies kept for going back (src/lib/page-data.ts):
+// sign-in, anything that changes data, files, the Worker's own routes, the admin pages (other
+// people's reports and feedback), and the pages that show an email address or the devices
+const NEVER_KEPT =
+	/^\/(login|logout|auth|api|internal|verify|admin|contact|feedback|import\/upload|more\/(data|delete|verify|sessions|passkeys)|courses\/[^/]+\/files)(\/|$)/;
+
+export const neverKept = (pathname: string) => NEVER_KEPT.test(pathname);
+
+// Pages that show other people (friends, groups, the overlay, shared courses): a copy of one
+// is shown for this long at most, so someone who stopped sharing doesn't stay on the device.
+// The user's own pages are kept until a new version of the app or signing out.
+const OTHERS = /^\/(friends|groups|overlay|shared|join)(\/|$)/;
+export const OTHERS_MAX_AGE = 3 * 24 * 60 * 60 * 1000;
+
+/** How long a page's copy may still be shown after it was saved */
+export const copyMaxAge = (pathname: string) => (OTHERS.test(pathname) ? OTHERS_MAX_AGE : Infinity);
+
+// The account the copies on this device were made for (see forgetOtherAccount)
+const OWNER_KEY = 'koma:owner';
+
 // The service worker stamps each copy with the time it was saved (milliseconds), and hands it
 // back on the copy it serves, so the page can say how old what it shows is. A page opened from
 // a copy also carries the time on <html>, since a document's own response headers can't be read.
@@ -17,6 +37,7 @@ export const FRESH_KEY = 'koma:fresh';
 export async function clearPageCaches() {
 	try {
 		localStorage.removeItem(FRESH_KEY);
+		localStorage.removeItem(OWNER_KEY);
 	} catch {
 		// Storage can be off; the copies below are what matter
 	}
@@ -59,5 +80,26 @@ export async function cachedKeys(): Promise<Set<string> | null> {
 		return keys;
 	} catch {
 		return null;
+	}
+}
+
+/**
+ * Drops the copies when the page is opened by another account than the one they were made
+ * for, whichever way it signed in. Signing out clears them already; this also covers a
+ * session that changed without passing the sign-in page.
+ */
+export async function forgetOtherAccount(userId: string) {
+	let before: string | null;
+	try {
+		before = localStorage.getItem(OWNER_KEY);
+	} catch {
+		return;
+	}
+	if (before === userId) return;
+	if (before !== null) await clearPageCaches().catch(() => {});
+	try {
+		localStorage.setItem(OWNER_KEY, userId);
+	} catch {
+		// Storage can be off
 	}
 }

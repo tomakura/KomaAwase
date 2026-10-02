@@ -20,6 +20,14 @@ const person = (id: string, courses: OverlayPerson['courses'], periods = dhw, un
 const at = (weekday: number, period: number, span = 1, room: string | null = null) => ({ weekday, period, span, room });
 
 describe('overlay', () => {
+	it('says which classes meet only in odd or even weeks', () => {
+		const { cells } = overlay(dhw, [1], [
+			person('me', [{ title: '演習', sharedCourseId: 's1', slots: [{ ...at(1, 1), week: 'odd' }] }]),
+			person('mio', [{ title: '演習', sharedCourseId: 's1', slots: [{ ...at(1, 1), week: 'every' }] }])
+		]);
+		expect(cells.get(cellKey(1, 1))![0].people.map((p) => p.week)).toEqual(['odd', undefined]);
+	});
+
 	it('puts people taking the same shared course under one title', () => {
 		const { cells } = overlay(dhw, [1], [
 			person('me', [{ title: '経済学概論', sharedCourseId: 's1', slots: [at(1, 2, 1, 'A-1')] }]),
@@ -70,6 +78,11 @@ describe('termOn', () => {
 	it('uses dates, then the next term during a break', () => {
 		expect(termOn(quarters, '2026-10-01', null)?.id).toBe('q3');
 		expect(termOn(quarters, '2026-09-01', null)?.id).toBe('q3');
+	});
+
+	it('has no term on a day of a break that is today', () => {
+		expect(termOn(quarters, '2026-10-01', null, true)?.id).toBe('q3');
+		expect(termOn(quarters, '2026-09-01', null, true)).toBeUndefined();
 	});
 
 	it('falls back to the viewer term name without dates', () => {
