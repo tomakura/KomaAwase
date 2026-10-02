@@ -410,9 +410,13 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	};
 }
 
+/**
+ * Deletes the course once its files are gone. 'more' when it has more files than one request
+ * can delete: those deleted so far are gone, the rest and the course are still there.
+ */
 export async function deleteCourse(env: Env, db: Db, userId: string, courseId: string) {
 	if (!(await findOwnedCourse(db, userId, courseId))) return false;
-	await deleteCourseFiles(env, db, courseId);
+	if ((await deleteCourseFiles(env, db, courseId)) > 0) return 'more';
 	await db.delete(courses).where(eq(courses.id, courseId));
 	return true;
 }
