@@ -87,7 +87,7 @@
 		{#if passkeyResult === 'failed'}
 			<p class="error" role="alert">パスキーでログインできませんでした。もう一度試すか、メールでログインしてください。</p>
 		{:else if passkeyResult === 'none'}
-			<p class="hint" role="status">パスキーを使用できません。もう一度試すか、他の方法でログインしてください。</p>
+			<p class="hint" role="status">パスキーでログインを完了できませんでした。もう一度試すか、他の方法でログインしてください。</p>
 		{/if}
 
 		<div class="divider"><span>{data.reauth ? 'パスキーがないとき' : 'はじめての人・パスキーがない人'}</span></div>
