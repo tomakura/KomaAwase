@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WAIT_DONE, WAIT_ID, leaveScript, stampHtml, themeOf, waitShell } from './wait';
+import { WAIT_ID, leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from './wait';
 
 // What a page from the server starts with
 const page = (theme: string) => `<!doctype html>\n<html lang="ja" data-theme="${theme}">\n<head><meta charset="utf-8"></head><body></body></html>`;
@@ -22,7 +22,7 @@ describe('themeOf', () => {
 
 describe('waitShell', () => {
 	it('is a spinner over the whole screen, in a document that the page can follow', () => {
-		const shell = waitShell('system');
+		const shell = waitShell('system', 'n0');
 		expect(shell.startsWith('<!doctype html><html lang="ja">')).toBe(true);
 		expect(shell).toContain(`id="${WAIT_ID}"`);
 		expect(shell).toContain('position:fixed;inset:0');
@@ -33,38 +33,52 @@ describe('waitShell', () => {
 	});
 
 	it('has the colors of the theme, or follows the device for the system theme', () => {
-		expect(waitShell('dark')).toContain('#1c1a18');
-		expect(waitShell('dark')).not.toContain('#f6f2ea');
-		expect(waitShell('light')).toContain('#f6f2ea');
-		expect(waitShell('light')).not.toContain('#1c1a18');
-		expect(waitShell('light')).not.toContain('prefers-color-scheme');
-		const system = waitShell('system');
+		expect(waitShell('dark', 'n0')).toContain('#1c1a18');
+		expect(waitShell('dark', 'n0')).not.toContain('#f6f2ea');
+		expect(waitShell('light', 'n0')).toContain('#f6f2ea');
+		expect(waitShell('light', 'n0')).not.toContain('#1c1a18');
+		expect(waitShell('light', 'n0')).not.toContain('prefers-color-scheme');
+		const system = waitShell('system', 'n0');
 		expect(system).toContain('#f6f2ea');
 		expect(system).toContain('@media (prefers-color-scheme:dark)');
 		expect(system).toContain('#1c1a18');
 	});
 
 	it('stops turning for people who ask for less motion, and is not left up for ever', () => {
-		const shell = waitShell('system');
+		const shell = waitShell('system', 'n0');
 		expect(shell).toContain('prefers-reduced-motion:reduce');
 		expect(shell).toContain('setTimeout');
 	});
 });
 
-describe('WAIT_DONE', () => {
+describe('waitDone', () => {
 	it('takes the spinner away', () => {
-		expect(WAIT_DONE).toContain(`getElementById("${WAIT_ID}")`);
-		expect(WAIT_DONE).toContain('.remove()');
+		expect(waitDone('n0')).toContain(`getElementById("${WAIT_ID}")`);
+		expect(waitDone('n0')).toContain('.remove()');
+	});
+});
+
+describe('nonces', () => {
+	it('puts the nonce on every script the service worker writes', () => {
+		for (const html of [waitShell('system', 'n0'), waitDone('n0'), leaveScript('/x', 'n0')]) {
+			expect(html.match(/<script/g)?.length).toBe(html.match(/<script nonce="n0">/g)?.length);
+		}
+	});
+
+	it("gives the page's scripts the document's nonce, and nothing else", () => {
+		const html = '<script nonce="srv">a</script><p>nonce="other"</p><script nonce="srv">b</script>';
+		expect(renonce(html, 'srv', 'sw')).toBe('<script nonce="sw">a</script><p>nonce="other"</p><script nonce="sw">b</script>');
+		expect(renonce(html, null, 'sw')).toBe(html);
 	});
 });
 
 describe('leaveScript', () => {
 	it('goes to the address', () => {
-		expect(leaveScript('https://koma.test/login')).toBe('<script>location.replace("https://koma.test/login")</script>');
+		expect(leaveScript('https://koma.test/login', 'n0')).toBe('<script nonce="n0">location.replace("https://koma.test/login")</script>');
 	});
 
 	it('cannot be broken out of by the address', () => {
-		const script = leaveScript('https://koma.test/</script><script>alert(1)</script>');
+		const script = leaveScript('https://koma.test/</script><script>alert(1)</script>', 'n0');
 		// One script: the only </script> is the last thing
 		expect(script.indexOf('</script>')).toBe(script.length - '</script>'.length);
 		expect(script).not.toContain('<script><');

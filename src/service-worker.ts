@@ -7,10 +7,13 @@
 // seen on this device. The fallback comes when the network fails and also when it is too slow
 // (SLOW_MS), since a bad connection often doesn't fail, it just never answers. A page that is
 // being awaited shows a spinner instead of nothing (see waiting). The page copies hold the
-// user's timetable, so signing out clears them (see PAGE_CACHE_PREFIX).
+// user's timetable, so signing out clears them (see PAGE_CACHE_PREFIX). A copy goes when the
+// server says the page is gone or no longer the user's, and copies of pages that show other
+// people are only shown for a few days (copyMaxAge).
 import { build, files, version } from '$service-worker';
-import { PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER } from '$lib/offline';
-import { WAIT_DONE, leaveScript, stampHtml, themeOf, waitShell } from '$lib/wait';
+import { PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER, copyMaxAge, neverKept } from '$lib/offline';
+import { SECURITY_HEADERS, cspHeader, nonceOf } from '$lib/security';
+import { leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from '$lib/wait';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 const ASSETS = `assets-${version}`;
@@ -27,9 +30,8 @@ const SLOW_MS = 4000;
 const GRACE_MS = 700;
 const sleep = (ms: number) => new Promise<null>((resolve) => setTimeout(resolve, ms, null));
 
-// Never kept: sign-in, anything that changes data, files, the Worker's own routes, and the
-// admin page (other people's reports and feedback)
-const NETWORK_ONLY = /^\/(login|logout|auth|api|internal|verify|admin|import\/upload|more\/data|courses\/[^/]+\/files)(\/|$)/;
+// What the server answers when a page isn't the user's to see (any more), or not there
+const REFUSED = new Set([401, 403, 404, 410]);
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -49,7 +51,7 @@ sw.addEventListener('activate', (event) => {
 	);
 });
 
-const OFFLINE = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>オフライン · コマあわせ</title><style>body{margin:0;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#f6f2ea;color:#2b2824;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box}p{margin:0;font-size:15px;line-height:1.8;text-wrap:balance}div{display:flex;gap:12px}button,a{min-height:48px;box-sizing:border-box;display:flex;align-items:center;padding:0 20px;border:1px solid currentColor;border-radius:14px;background:none;color:inherit;font:inherit;font-weight:700;text-decoration:none;cursor:pointer}@media (prefers-color-scheme:dark){body{background:#1c1a18;color:#eee7da}}</style><body><p>インターネットにつながっていません。<br>電波のよいところで、もう一度開いてください。</p><div><button onclick="location.reload()">もう一度開く</button><a href="/">時間割へ</a></div>`;
+const OFFLINE = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>オフライン · コマあわせ</title><style>body{margin:0;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#f6f2ea;color:#2b2824;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box}p{margin:0;font-size:15px;line-height:1.8;text-wrap:balance}div{display:flex;gap:12px}button,a{min-height:48px;box-sizing:border-box;display:flex;align-items:center;padding:0 20px;border:1px solid currentColor;border-radius:14px;background:none;color:inherit;font:inherit;font-weight:700;text-decoration:none;cursor:pointer}@media (prefers-color-scheme:dark){body{background:#1c1a18;color:#eee7da}}</style><body><p>インターネットにつながっていません。<br>電波のよいところで、もう一度開いてください。</p><div><a href="">もう一度開く</a><a href="/">時間割へ</a></div>`;
 
 // SvelteKit's data requests say which parts to reload in x-sveltekit-invalidated; the page is
 // the same whatever it says, so it's kept under one key. Any other query must match exactly.
@@ -59,14 +61,50 @@ function pageKey(request: Request) {
 	return url.href;
 }
 
-// A copy is kept with the time it was saved, which is passed on when it is shown
+// A page's data that says it can't be shown: a redirect (to sign in, say), or a part of it that
+// failed with one of the REFUSED statuses (SvelteKit answers those with 200 and says so inside)
+function refusedData(body: string) {
+	try {
+		const message = JSON.parse(body);
+		return (
+			message?.type === 'redirect' ||
+			(Array.isArray(message?.nodes) && message.nodes.some((n: { type?: string; status?: number } | null) => n?.type === 'error' && REFUSED.has(n.status ?? 0)))
+		);
+	} catch {
+		return false;
+	}
+}
+
+// A copy is kept with the time it was saved, which is passed on when it is shown. An answer
+// that refuses the page drops the copy kept of it, so it isn't shown offline afterwards.
 async function save(cache: Cache, key: string, response: Response) {
 	// Cache-Control isn't read: SvelteKit marks every __data.json no-store (for HTTP caches),
-	// and this copy is the app's own, dropped at sign-out. Pages never to keep are NETWORK_ONLY.
-	if (!response.ok || response.type !== 'basic' || response.redirected) return;
+	// and this copy is the app's own, dropped at sign-out. Pages never to keep are neverKept.
+	if (response.type !== 'basic') return;
+	if (REFUSED.has(response.status) || response.redirected) {
+		await cache.delete(key);
+		return;
+	}
+	if (!response.ok) return;
 	const headers = new Headers(response.headers);
 	headers.set(SAVED_AT_HEADER, String(Date.now()));
+	if (new URL(key).pathname.endsWith('/__data.json')) {
+		const body = await response.text();
+		if (refusedData(body)) await cache.delete(key);
+		else await cache.put(key, new Response(body, { status: response.status, statusText: response.statusText, headers }));
+		return;
+	}
 	await cache.put(key, new Response(response.body, { status: response.status, statusText: response.statusText, headers }));
+}
+
+// The copy kept under the key, unless it is older than its page may be shown (copyMaxAge)
+async function copyOf(cache: Cache, key: string) {
+	const copy = await cache.match(key);
+	if (!copy) return undefined;
+	const savedAt = Number(copy.headers.get(SAVED_AT_HEADER));
+	if (Date.now() - savedAt <= copyMaxAge(new URL(key).pathname)) return copy;
+	await cache.delete(key).catch(() => {});
+	return undefined;
 }
 
 // A page opened from a copy says so on <html>, with the time it was saved (the page can't read
@@ -96,7 +134,7 @@ function nearKey(request: Request) {
 
 function unavailable(request: Request) {
 	if (request.mode === 'navigate') {
-		return new Response(OFFLINE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8' } });
+		return new Response(OFFLINE, { status: 503, headers: { ...SECURITY_HEADERS, 'content-security-policy': cspHeader(), 'content-type': 'text/html; charset=utf-8' } });
 	}
 	throw new Error('offline');
 }
@@ -114,9 +152,9 @@ async function networkFirst(event: FetchEvent) {
 		return response;
 	});
 	event.waitUntil(network.then(() => saved, () => {}));
-	const copy = await cache.match(key);
+	const copy = await copyOf(cache, key);
 	// Only for when the network fails: a slow answer is waited for, not swapped for another view
-	const near = copy ? undefined : await cache.match(nearKey(request));
+	const near = copy ? undefined : await copyOf(cache, nearKey(request));
 	try {
 		if (request.mode === 'navigate') {
 			// A quick answer goes straight through; for a slow one the screen gets a spinner
@@ -135,10 +173,17 @@ async function networkFirst(event: FetchEvent) {
 // A page still awaited after GRACE_MS: the answer starts with a spinner (src/lib/wait.ts), which
 // is the first thing on screen, and the page follows on the same document. Without this a slow
 // connection leaves the screen blank. With a copy to show, the network gets SLOW_MS in all.
+// The document goes out before the server's headers are known, so it carries the same
+// security headers and policy as the server's pages (src/lib/security.ts), under a nonce of its
+// own that the page's scripts are given as they pass (renonce). Its status is always 200: an
+// error page still comes in it, as the page that says so.
 function waiting(event: FetchEvent, network: Promise<Response>, copy: Response | undefined, near: Response | undefined) {
 	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-	event.waitUntil(follow(event.request, writable, network, copy, near));
-	return new Response(readable, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+	const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+	event.waitUntil(follow(event.request, writable, network, copy, near, nonce));
+	return new Response(readable, {
+		headers: { ...SECURITY_HEADERS, 'content-security-policy': cspHeader(nonce), 'content-type': 'text/html; charset=utf-8' }
+	});
 }
 
 async function follow(
@@ -146,7 +191,8 @@ async function follow(
 	writable: WritableStream<Uint8Array>,
 	network: Promise<Response>,
 	copy: Response | undefined,
-	near: Response | undefined
+	near: Response | undefined,
+	nonce: string
 ) {
 	const out = writable.getWriter();
 	const encoder = new TextEncoder();
@@ -155,8 +201,8 @@ async function follow(
 		// What is shown if the network gives nothing: the copy of the page, else of its near kin
 		const shown = copy ?? near;
 		const savedAt = shown?.headers.get(SAVED_AT_HEADER) ?? '';
-		const html = shown ? await shown.text() : '';
-		await write(waitShell(themeOf(html)));
+		const html = shown ? renonce(await shown.text(), nonceOf(shown.headers.get('content-security-policy')), nonce) : '';
+		await write(waitShell(themeOf(html), nonce));
 
 		const answer = await (copy ? Promise.race([network, sleep(SLOW_MS - GRACE_MS)]) : network).catch(() => null);
 		if (answer?.type === 'opaqueredirect') {
@@ -168,14 +214,14 @@ async function follow(
 				},
 				() => null
 			);
-			await write(target ? leaveScript(target) : OFFLINE);
+			await write(target ? leaveScript(target, nonce) : OFFLINE);
 		} else if (answer?.body) {
-			const reader = answer.body.getReader();
-			for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) await out.write(chunk.value);
+			// Read whole to give its scripts the nonce (a tag can be split between two chunks)
+			await write(renonce(await answer.text(), nonceOf(answer.headers.get('content-security-policy')), nonce));
 		} else {
 			await write(shown ? stampHtml(html, savedAt) : OFFLINE);
 		}
-		await write(WAIT_DONE);
+		await write(waitDone(nonce));
 	} catch {
 		// The page was left before it came
 	} finally {
@@ -207,7 +253,7 @@ sw.addEventListener('fetch', (event) => {
 	const { request } = event;
 	if (request.method !== 'GET') return;
 	const url = new URL(request.url);
-	if (url.origin !== sw.location.origin || NETWORK_ONLY.test(url.pathname)) return;
+	if (url.origin !== sw.location.origin || neverKept(url.pathname)) return;
 
 	if (precached.has(url.pathname)) {
 		event.respondWith(caches.match(request).then((cached) => cached ?? fetch(request)));

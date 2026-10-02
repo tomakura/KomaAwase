@@ -16,6 +16,7 @@
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
 	import { connection } from '$lib/connection.svelte';
+	import { forgetOtherAccount } from '$lib/offline';
 	import { pageData } from '$lib/page-data';
 
 	let { data, children } = $props();
@@ -48,6 +49,11 @@
 		};
 		document.addEventListener('visibilitychange', changed);
 		return () => document.removeEventListener('visibilitychange', changed);
+	});
+
+	// The copies of pages kept on this device are one account's (see src/lib/offline.ts)
+	$effect(() => {
+		if (data.me) void forgetOtherAccount(data.me);
 	});
 
 	// Friend requests waiting, on the app's icon on the home screen. A push sets it while the

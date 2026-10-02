@@ -1,6 +1,7 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, type Plugin } from 'vite';
+import { CSP_DIRECTIVES } from './src/lib/security.ts';
 
 // Fontsource's CSS offers each font as woff2 with a woff fallback. Every browser the app
 // runs in takes woff2, so the woff copies are left out of the build.
@@ -26,26 +27,8 @@ export default defineConfig({
 				config: 'svelte-kit.wrangler.jsonc',
 				platformProxy: { configPath: 'wrangler.jsonc', envFiles: ['.dev.local.vars'] }
 			}),
-			// Pages load only this site's scripts, plus Turnstile on お問い合わせ. SvelteKit adds a
-			// nonce for its own inline script; inline styles stay allowed for Svelte's transitions.
-			csp: {
-				mode: 'auto',
-				directives: {
-					'default-src': ['self'],
-					'script-src': ['self', 'https://challenges.cloudflare.com'],
-					'style-src': ['self', 'unsafe-inline'],
-					'img-src': ['self', 'data:', 'blob:'],
-					'font-src': ['self'],
-					'connect-src': ['self'],
-					'frame-src': ['https://challenges.cloudflare.com'],
-					'worker-src': ['self'],
-					'manifest-src': ['self'],
-					'object-src': ['none'],
-					'base-uri': ['self'],
-					'form-action': ['self'],
-					'frame-ancestors': ['none']
-				}
-			}
+			// The policy is in src/lib/security.ts, where the service worker reads it too
+			csp: { mode: 'auto', directives: CSP_DIRECTIVES }
 		})
 	]
 });

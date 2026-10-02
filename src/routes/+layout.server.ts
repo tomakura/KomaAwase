@@ -8,6 +8,8 @@ import type { LayoutServerLoad } from './$types';
 export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	return {
 		signedIn: !!locals.user,
+		// Whose copies of pages this device may keep (forgetOtherAccount)
+		me: locals.user?.id ?? null,
 		// For the screen that suggests turning notifications on (NotifyPrompt)
 		setupDone: !!locals.user?.setupAt,
 		pushKey: locals.user && pushEnabled(platform?.env) ? (platform?.env.VAPID_PUBLIC_KEY ?? null) : null,
