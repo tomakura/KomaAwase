@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import SharedLock from '$lib/components/SharedLock.svelte';
@@ -37,15 +38,16 @@
 	// svelte-ignore state_referenced_locally
 	let query = $state(data.q);
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	// The address is this page's as it is when typing, so a search that fires after leaving
+	// can't take another page's; leaving cancels it anyway
 	function search(delay: number) {
 		clearTimeout(timer);
-		timer = setTimeout(() => {
-			const url = new URL(page.url);
-			if (query.trim()) url.searchParams.set('q', query.trim());
-			else url.searchParams.delete('q');
-			goto(url, { keepFocus: true, replaceState: true, noScroll: true });
-		}, delay);
+		const url = new URL(page.url);
+		if (query.trim()) url.searchParams.set('q', query.trim());
+		else url.searchParams.delete('q');
+		timer = setTimeout(() => goto(url, { keepFocus: true, replaceState: true, noScroll: true }), delay);
 	}
+	onDestroy(() => clearTimeout(timer));
 </script>
 
 <svelte:head>

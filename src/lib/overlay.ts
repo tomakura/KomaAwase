@@ -1,5 +1,6 @@
 // Laying several people's timetables over the viewer's. Friends at other universities have
 // other period times, so classes are placed by clock time, not by period number.
+import type { WeekPattern } from './courses';
 import { currentTerm } from './terms';
 import { toMinutes } from './time';
 
@@ -7,7 +8,7 @@ import { toMinutes } from './time';
 export const OVERLAY_COOKIE = 'overlay_with';
 
 export type OverlayPeriod = { number: number; start: string; end: string };
-export type OverlaySlot = { weekday: number; period: number; span: number; room: string | null };
+export type OverlaySlot = { weekday: number; period: number; span: number; room: string | null; week?: WeekPattern };
 export type OverlayCourse = { title: string; sharedCourseId: string | null; slots: OverlaySlot[] };
 export type OverlayPerson = {
 	id: string;
@@ -19,7 +20,8 @@ export type OverlayPerson = {
 export type OverlayGroup = {
 	key: string;
 	title: string;
-	people: { id: string; room: string | null; time: string }[];
+	// `week`: odd or even weeks only; shown as a class every week, the overlay being a usual week
+	people: { id: string; room: string | null; time: string; week?: WeekPattern }[];
 };
 
 export const cellKey = (weekday: number, period: number) => `${weekday}-${period}`;
@@ -79,7 +81,12 @@ export function overlay(viewerPeriods: OverlayPeriod[], days: number[], people: 
 						groups.push(group);
 					}
 					if (!group.people.some((p) => p.id === person.id)) {
-						group.people.push({ id: person.id, room: slot.room, time: `${time(person.periods[first].start)}〜${time(last.end)}` });
+						group.people.push({
+							id: person.id,
+							room: slot.room,
+							time: `${time(person.periods[first].start)}〜${time(last.end)}`,
+							...(slot.week && slot.week !== 'every' ? { week: slot.week } : {})
+						});
 					}
 					cells.set(cell, groups);
 				}
@@ -97,10 +104,15 @@ type Term = { id: string; name: string; startDate: string | null; endDate: strin
 
 /**
  * A person's term for the day being looked at: by dates when their terms have them,
- * else the term with the same name as the viewer's, else their first.
+ * else the term with the same name as the viewer's, else their first. On a day of a break
+ * between their terms, `today` says whether that day is now: then they have no classes (none,
+ * not the next term's); a term the viewer looks at ahead starts on a day that may fall in their
+ * break, and their next term is the one to compare.
  */
-export function termOn<T extends Term>(terms: T[], date: string, viewerTermName: string | null): T | undefined {
-	if (terms.some((t) => t.startDate && t.endDate)) return currentTerm(terms, date);
+export function termOn<T extends Term>(terms: T[], date: string, viewerTermName: string | null, today = false): T | undefined {
+	if (terms.some((t) => t.startDate && t.endDate)) {
+		return today ? terms.find((t) => t.startDate && t.endDate && t.startDate <= date && date <= t.endDate) : currentTerm(terms, date);
+	}
 	return terms.find((t) => t.name === viewerTermName) ?? terms[0];
 }
 

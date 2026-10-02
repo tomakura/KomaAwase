@@ -2,7 +2,7 @@ import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or,
 import { readImport } from '$lib/import';
 import { RETRY_AFTER_RESET, TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } from '$lib/import-quota';
 import type { Db } from '../db';
-import { authChallenges, emailTokens, importJobs, sessions } from '../db/schema';
+import { authChallenges, emailTokens, importJobs, sessions, verifyTokens } from '../db/schema';
 import { notify } from '../notify';
 import { Busy, OutOfQuota, readWithGroq, readWithWorkersAi } from './providers';
 
@@ -272,7 +272,9 @@ export async function unreviewedImport(db: Db, userId: string) {
 
 /**
  * Once a day: jobs put off until today go back in the queue, stuck ones too, jobs older
- * than three days are given up (their images with them), and expired sign-in leftovers go.
+ * than three days are given up (their images with them), results go after 30 days, and
+ * expired sign-in and enrollment-check links go. Run once a day, so an image waits at most
+ * four days in all, as the privacy policy says.
  */
 export async function dailySweep(env: Env, db: Db) {
 	const now = new Date();
@@ -291,7 +293,8 @@ export async function dailySweep(env: Env, db: Db) {
 		db.delete(importJobs).where(lt(importJobs.createdAt, new Date(now.getTime() - 30 * DAY))),
 		db.delete(sessions).where(lt(sessions.expiresAt, now)),
 		db.delete(emailTokens).where(lt(emailTokens.expiresAt, now)),
-		db.delete(authChallenges).where(lt(authChallenges.expiresAt, now))
+		db.delete(authChallenges).where(lt(authChallenges.expiresAt, now)),
+		db.delete(verifyTokens).where(lt(verifyTokens.expiresAt, now))
 	]);
 
 	const due = await db

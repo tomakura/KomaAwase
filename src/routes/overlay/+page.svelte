@@ -8,7 +8,7 @@
 	import { connection } from '$lib/connection.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
-	import { DAY_NAMES } from '$lib/courses';
+	import { DAY_NAMES, weekLabel } from '$lib/courses';
 	import { freeText } from '$lib/free-text';
 	import { glide } from '$lib/glide';
 	import { iconOf } from '$lib/icons';
@@ -72,7 +72,7 @@
 			const tt = data.timetables[id];
 			const person = people.get(id);
 			if (!tt || !person) return [];
-			const t = termOn(tt.terms, date, term?.name ?? null);
+			const t = termOn(tt.terms, date, term?.name ?? null, date === today);
 			return [
 				{
 					id,
@@ -272,7 +272,7 @@
 						<span class="who">
 							<UserIcon user={personOf(x.id)} size={22} short />
 							<span>{personOf(x.id).nickname}</span>
-							<span class="meta">{[differs(x) ? x.time : null, x.room].filter(Boolean).join(' · ')}</span>
+							<span class="meta">{[differs(x) ? x.time : null, x.room, weekLabel(x.week)].filter(Boolean).join(' · ')}</span>
 						</span>
 					{/each}
 				</div>
