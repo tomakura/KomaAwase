@@ -6,6 +6,11 @@ import { defineConfig } from 'vitest/config';
 // plugin is here for the .svelte.ts modules (state written with runes).
 export default defineConfig({
 	plugins: [svelte()],
-	resolve: { alias: { $lib: fileURLToPath(new URL('./src/lib', import.meta.url)) } },
+	resolve: {
+		alias: {
+			$lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
+			'$app/environment': fileURLToPath(new URL('./src/test/app-environment.ts', import.meta.url))
+		}
+	},
 	test: { include: ['src/**/*.test.ts'] }
 });

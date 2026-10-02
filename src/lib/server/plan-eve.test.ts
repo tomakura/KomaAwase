@@ -49,6 +49,16 @@ async function fire(w: ReturnType<typeof world>, time: number) {
 }
 
 describe('sendPlanEve', () => {
+	it("names a synced class by the shared course's name", async () => {
+		const w = world();
+		w.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
+		w.run(`INSERT INTO shared_courses (id, university_id, year, title, source) VALUES ('sc1', 'uni', 2026, '新しい名前', 'user')`);
+		w.run(`UPDATE courses SET sync_mode = 'synced', shared_course_id = 'sc1' WHERE id = 'c1'`);
+		w.run(`INSERT INTO course_notes (id, course_id, kind, body, due) VALUES ('n1', 'c1', 'task', 'レポート', '2026-09-30')`);
+		const { sent } = await fire(w, at(20, eveSlot('u1')));
+		expect(sent.map((s) => s.body)).toEqual(['新しい名前']);
+	});
+
 	it('tells about homework due tomorrow, in the person\'s own minute', async () => {
 		const w = world();
 		w.run(`INSERT INTO course_notes (id, course_id, kind, body, due) VALUES ('n1', 'c1', 'task', 'レポート', '2026-09-30')`);

@@ -1,6 +1,6 @@
-// The reminder tests run the real migrations on Node's own SQLite (node:sqlite, Node 22.13
-// or later) and read them from disk. @types/node isn't installed, so this declares just
-// the parts they use.
+// The database tests (src/test/db.ts, the reminders) run the real migrations on Node's own SQLite
+// (node:sqlite, Node 22.13 or later) and read them from disk. @types/node isn't installed, so
+// this declares just the parts they use.
 declare module 'node:sqlite' {
 	export class DatabaseSync {
 		constructor(path: string);
@@ -9,6 +9,7 @@ declare module 'node:sqlite' {
 			all(...values: unknown[]): unknown[];
 			get(...values: unknown[]): unknown;
 			run(...values: unknown[]): unknown;
+			setReturnArrays(on: boolean): void;
 		};
 	}
 }

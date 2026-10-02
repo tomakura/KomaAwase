@@ -2,10 +2,7 @@ import { eq, inArray } from 'drizzle-orm';
 import type { NotifyKind } from '$lib/notify';
 import type { Db } from './db';
 import { pushSubscriptions, users } from './db/schema';
-import { PUSH_SUBJECT, sendPush } from './push';
-
-// The Free plan allows 50 outside requests per invocation; the rest of the work needs a few
-const SENDS_MAX = 40;
+import { deliver } from './push-queue';
 
 // `badge`: the number to show on the app's icon, for when the app isn't open
 export type PushMessage = { title: string; body?: string; url: string; tag?: string; badge?: number };
@@ -15,37 +12,37 @@ export function pushEnabled(env: Env | undefined) {
 }
 
 /**
- * Sends the message to the browsers of these people that want this kind. Subscriptions the
- * browser has let go (404/410) are removed. Failures are logged, never thrown.
+ * Sends the message to the browsers of these people that want this kind; more than one run of
+ * the Worker can send go through the push queue (push-queue.ts). Subscriptions the browser
+ * has let go (404/410) are removed. Failures are logged, never thrown.
  */
 export async function notify(env: Env, db: Db, userIds: string[], kind: NotifyKind | null, message: PushMessage) {
 	if (!pushEnabled(env) || !userIds.length) return;
 	try {
-		const rows = await db
-			.select({
-				id: pushSubscriptions.id,
-				endpoint: pushSubscriptions.endpoint,
-				p256dh: pushSubscriptions.p256dh,
-				auth: pushSubscriptions.auth,
-				settings: users.notify
-			})
-			.from(pushSubscriptions)
-			.innerJoin(users, eq(users.id, pushSubscriptions.userId))
-			.where(inArray(pushSubscriptions.userId, [...new Set(userIds)].slice(0, 90)));
+		// D1 takes at most 100 bound values per query
+		const ids = [...new Set(userIds)];
+		const rows = [];
+		for (let i = 0; i < ids.length; i += 90) {
+			rows.push(
+				...(await db
+					.select({
+						id: pushSubscriptions.id,
+						endpoint: pushSubscriptions.endpoint,
+						p256dh: pushSubscriptions.p256dh,
+						auth: pushSubscriptions.auth,
+						settings: users.notify
+					})
+					.from(pushSubscriptions)
+					.innerJoin(users, eq(users.id, pushSubscriptions.userId))
+					.where(inArray(pushSubscriptions.userId, ids.slice(i, i + 90))))
+			);
+		}
 		// kind null: a test from the settings page, which always goes
-		const wanted = rows.filter((r) => !kind || r.settings?.[kind] !== false).slice(0, SENDS_MAX);
-		const keys = { publicKey: env.VAPID_PUBLIC_KEY!, privateKey: env.VAPID_PRIVATE_KEY! };
-		const gone: string[] = [];
-		await Promise.all(
-			wanted.map(async (r) => {
-				try {
-					if ((await sendPush(r, message, keys, PUSH_SUBJECT)) === 'gone') gone.push(r.id);
-				} catch (e) {
-					console.error('push failed', e);
-				}
-			})
-		);
-		if (gone.length) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
+		const expires = Date.now() + 24 * 60 * 60 * 1000;
+		const items = rows
+			.filter((r) => !kind || r.settings?.[kind] !== false)
+			.map((r) => ({ deviceId: r.id, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, message, expires }));
+		await deliver(env, items);
 	} catch (e) {
 		console.error('notify failed', e);
 	}

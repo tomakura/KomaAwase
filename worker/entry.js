@@ -3,6 +3,7 @@
 // from outside can never carry (see src/lib/server/internal.ts).
 import sveltekit from '../.svelte-kit/cloudflare/_worker.js';
 import { sendPlanEve } from '../src/lib/server/plan-eve.ts';
+import { sendPart } from '../src/lib/server/push-queue.ts';
 import { sendDueReminders } from '../src/lib/server/reminders.ts';
 
 // The cron in wrangler.jsonc that runs every minute; the other one is the daily sweep
@@ -27,13 +28,26 @@ export default {
 	fetch: sveltekit.fetch,
 
 	/**
-	 * One screenshot at a time (max_concurrency 1 in wrangler.jsonc), to stay within Groq's
+	 * Screenshots, one at a time (max_concurrency 1 in wrangler.jsonc), to stay within Groq's
 	 * per-minute limits. A busy Groq means waiting a little and trying the same message again.
-	 * @param {MessageBatch<{ jobId: string }>} batch
+	 * And notifications, up to 40 phones a message (src/lib/server/push-queue.ts), which sends
+	 * the failed ones again itself.
+	 * @param {MessageBatch<any>} batch
 	 * @param {Env} env
 	 * @param {ExecutionContext} ctx
 	 */
 	async queue(batch, env, ctx) {
+		if (batch.queue === 'koma-push') {
+			for (const message of batch.messages) {
+				try {
+					await sendPart(env, message.body);
+				} catch (e) {
+					console.error('push message failed', e);
+				}
+				message.ack();
+			}
+			return;
+		}
 		for (const message of batch.messages) {
 			try {
 				const res = await internal(env, ctx, '/internal/import', message.body);

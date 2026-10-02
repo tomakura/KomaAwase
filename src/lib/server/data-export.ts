@@ -19,6 +19,7 @@ import {
 	users
 } from './db/schema';
 import { listFriendships } from './friends';
+import { syncedValues } from './shared-courses';
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -109,8 +110,12 @@ export async function exportData(db: Db, user: { id: string }) {
 			})()
 		]);
 
+	// A synced course is written as the timetable shows it: with the shared course's values
+	const shared = await syncedValues(db, courseRows.map((r) => r.course));
+	const sharedOf = (c: (typeof courseRows)[number]['course']) =>
+		c.syncMode === 'synced' && c.sharedCourseId ? shared.get(c.sharedCourseId) : undefined;
 	const termName = new Map(termRows.map((t) => [t.id, t.name]));
-	const courseTitle = new Map(courseRows.map((r) => [r.course.id, r.course.title]));
+	const courseTitle = new Map(courseRows.map((r) => [r.course.id, sharedOf(r.course)?.values.title ?? r.course.title]));
 	const by = <T extends { courseId: string }>(rows: T[], courseId: string) => rows.filter((r) => r.courseId === courseId);
 
 	const groupList = new Map<string, { name: string; owner: boolean; members: string[] }>();
@@ -133,26 +138,40 @@ export async function exportData(db: Db, user: { id: string }) {
 			periods: periodRows.filter((x) => x.timetableId === t.id).map(({ number, start, end }) => ({ number, start, end })),
 			courses: courseRows
 				.filter((r) => r.course.timetableId === t.id)
-				.map(({ course: c }) => ({
-					title: c.title,
-					color: c.color,
-					shared: c.syncMode === 'synced',
-					delivery: c.delivery,
-					intensiveFrom: c.intensiveFrom,
-					intensiveTo: c.intensiveTo,
-					credits: c.credits,
-					absenceLimit: c.absenceLimit,
-					absences: by(absences, c.id).map((a) => a.date),
-					terms: termLinks.filter((l) => l.courseId === c.id).map((l) => termName.get(l.termId) ?? ''),
-					slots: slots
-						.filter((s) => s.slot.courseId === c.id)
-						.map(({ slot: s }) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, week: s.weekPattern, room: s.room })),
-					teachers: by(teachers, c.id).map((x) => x.name),
-					notes: notes
-						.filter((n) => n.note.courseId === c.id)
-						.map(({ note: n }) => ({ kind: n.kind, date: n.date, body: n.body, due: n.due, done: n.done })),
-					files: by(files, c.id).map(({ name, mime, size }) => ({ name, mime, size }))
-				}))
+				.map(({ course: c }) => {
+					const synced = sharedOf(c);
+					const v = synced?.values ?? {
+						title: c.title,
+						delivery: c.delivery,
+						intensiveFrom: c.intensiveFrom,
+						intensiveTo: c.intensiveTo,
+						credits: c.credits,
+						slots: slots
+							.filter((s) => s.slot.courseId === c.id)
+							.map(({ slot: s }) => ({ weekday: s.weekday, period: s.periodNumber, span: s.span, week: s.weekPattern, room: s.room })),
+						teachers: by(teachers, c.id).map((x) => x.name)
+					};
+					return {
+						title: v.title,
+						color: c.color,
+						shared: c.syncMode === 'synced',
+						// Which shared course, and its version, when the values are its
+						sharedCourse: synced ? { id: synced.id, version: synced.version } : null,
+						delivery: v.delivery,
+						intensiveFrom: v.intensiveFrom,
+						intensiveTo: v.intensiveTo,
+						credits: v.credits,
+						absenceLimit: c.absenceLimit,
+						absences: by(absences, c.id).map((a) => a.date),
+						terms: termLinks.filter((l) => l.courseId === c.id).map((l) => termName.get(l.termId) ?? ''),
+						slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, week: s.week, room: s.room })),
+						teachers: v.teachers,
+						notes: notes
+							.filter((n) => n.note.courseId === c.id)
+							.map(({ note: n }) => ({ kind: n.kind, date: n.date, body: n.body, due: n.due, done: n.done })),
+						files: by(files, c.id).map(({ name, mime, size }) => ({ name, mime, size }))
+					};
+				})
 		})),
 		events: eventRows.map((e) => ({
 			title: e.title,

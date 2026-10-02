@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
+import type { PushPart } from './push-queue';
 import { sendDueReminders, type D1Like } from './reminders';
 
 // The real schema: every migration, in order, on an in-memory SQLite
@@ -180,11 +181,40 @@ describe('sendDueReminders', () => {
 		expect([count, sent]).toEqual([0, []]);
 	});
 
-	it('sends at most 40 in a minute', async () => {
+	it('sends 40 in the minute and hands the rest to the queue, none left out', async () => {
 		const w = world();
-		for (let i = 0; i < 60; i++) {
+		// 41 phones in all
+		for (let i = 0; i < 40; i++) {
 			w.run(`INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth) VALUES (?, 'u1', ?, 'k', 'a')`, `x${i}`, `https://push.example.test/x${i}`);
 		}
-		expect((await fire(w, TUESDAY_1230)).count).toBe(40);
+		const queued: PushPart[] = [];
+		const sent: string[] = [];
+		const count = await sendDueReminders(
+			{ DB: d1(w.db), VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv', PUSH_QUEUE: { send: async (part) => queued.push(part) } },
+			TUESDAY_1230,
+			async (s) => (sent.push(s.endpoint), 'sent')
+		);
+		expect(count).toBe(41);
+		expect(sent).toHaveLength(40);
+		expect(queued).toHaveLength(1);
+		expect(queued[0].items).toHaveLength(1);
+		expect(new Set([...sent, ...queued[0].items.map((i) => i.endpoint)]).size).toBe(41);
+		// Too late once the class has started (12:40)
+		expect(queued[0].items[0].expires).toBe(at(12, 41));
+	});
+
+	it('reads a synced course from the shared data, as the timetable shows it', async () => {
+		const w = world();
+		w.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
+		w.run(`INSERT INTO shared_courses (id, university_id, year, title, source) VALUES ('sc1', 'uni', 2026, '新しい名前', 'user')`);
+		// Someone else moved it from Tuesday 3rd in E10 to Friday 3rd in room 202
+		w.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span, room) VALUES ('ss1', 'sc1', 5, 3, 1, '202')`);
+		w.run(`UPDATE courses SET sync_mode = 'synced', shared_course_id = 'sc1' WHERE id = 'c1'`);
+		expect((await fire(w, TUESDAY_1230)).count).toBe(0);
+		const { sent } = await fire(w, at(12, 30, 2, 10));
+		expect(sent.map((s) => [s.message.title, s.message.body])).toEqual([['3限 新しい名前 が10分後に始まります', '12:40開始 · 202']]);
+		// Its own copy again once it is no longer synced
+		w.run(`UPDATE courses SET sync_mode = 'personal' WHERE id = 'c1'`);
+		expect((await fire(w, TUESDAY_1230)).sent.map((s) => s.message.title)).toEqual(['3限 サンプル演習 II が10分後に始まります']);
 	});
 });

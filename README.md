@@ -41,7 +41,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 
 1. はじめての本番なら、データベースを `npx wrangler d1 create komaawase` で作り、表示された ID を `wrangler.jsonc` の `database_id` に入れる
 2. D1 にマイグレーションを当てる：`npx wrangler d1 migrations apply DB --remote`（前に Time Travel の時刻を控えておく）
-3. スクショ読み取りの順番待ちを作る：`npx wrangler queues create koma-import`
+3. 順番待ちを作る：`npx wrangler queues create koma-import`（スクショ読み取り）と `npx wrangler queues create koma-push`（通知）
 4. 秘密の値を入れる：`npx wrangler secret put <名前>`
    - `RELAY_SECRET`、`FILES_SECRET`（メール中継と資料）
    - `GROQ_API_KEY`（任意。Groq のダッシュボードの Data Controls でゼロデータ保持を有効にしてから）
