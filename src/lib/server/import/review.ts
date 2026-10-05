@@ -174,6 +174,7 @@ export async function saveReviewed(
 			// The terms aren't changed; any of the timetable's passes the check
 			fd.set('term', shape.terms[0]?.id ?? '');
 			for (const t of row.teachers) fd.append('teacher', t);
+			if (row.credits !== null) fd.set('credits', String(row.credits));
 			for (const s of row.slots) {
 				// A slot that was there keeps whether it is every week or every other
 				const was = oldSlots.find((o) => o.courseId === course.id && o.weekday === s.weekday && o.periodNumber === s.period);
@@ -181,7 +182,7 @@ export async function saveReviewed(
 			}
 			const parsed = parseCourseForm(fd, shapeOf(shape));
 			if ('message' in parsed) return fail(400, { message: `${label(course.title)}：${parsed.message}` });
-			const { slots, teachers } = parsed.input;
+			const { slots, teachers, credits } = parsed.input;
 			updates.push(
 				db.delete(courseSlots).where(eq(courseSlots.courseId, course.id)),
 				db.delete(courseTeachers).where(eq(courseTeachers.courseId, course.id))
@@ -196,7 +197,7 @@ export async function saveReviewed(
 			if (teachers.length) {
 				updates.push(db.insert(courseTeachers).values(teachers.map((name, sortOrder) => ({ courseId: course.id, name, sortOrder }))));
 			}
-			if (row.credits !== null) updates.push(db.update(courses).set({ credits: row.credits }).where(eq(courses.id, course.id)));
+			if (credits !== null) updates.push(db.update(courses).set({ credits }).where(eq(courses.id, course.id)));
 			continue;
 		}
 		const linked = row.sharedId ? shared.get(row.sharedId) : undefined;

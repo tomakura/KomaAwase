@@ -66,6 +66,14 @@ describe('restoreBackup', () => {
 		expect(t.rows(`SELECT count(*) AS n FROM events`)[0].n).toBe(1);
 	});
 
+	it('stops a replace when the timetable still has files', async () => {
+		const t = world();
+		const backup = await saved(t);
+		t.run(`INSERT INTO course_files (id, course_id, storage_key, name, mime, size) VALUES ('f1', 'c1', 'k', 'a.pdf', 'application/pdf', 1)`);
+		await expect(restoreBackup(t.db, { id: 'u1', universityId: null }, backup, ['replace'], false)).rejects.toThrow();
+		expect(t.rows(`SELECT count(*) AS n FROM courses WHERE timetable_id = 't1'`)[0].n).toBe(2);
+	});
+
 	it('merges: only courses the timetable lacks', async () => {
 		const t = world();
 		const backup = await saved(t);

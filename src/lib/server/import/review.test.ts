@@ -48,6 +48,18 @@ describe('saveReviewed', () => {
 		expect(t.rows(`SELECT color FROM courses WHERE id = 'c1'`)[0].color).toBe('blue');
 	});
 
+	it('checks the credits of a course it updates', async () => {
+		const t = world();
+		const result = await saveReviewed(
+			t.db,
+			'u1',
+			timetable,
+			form([{ title: '線形代数', teachers: [], slots: [{ weekday: 1, period: 2, span: 1, room: '' }], credits: -5, updateId: 'c1' }])
+		);
+		expect(result).toHaveProperty('status', 400);
+		expect(t.rows(`SELECT credits FROM courses WHERE id = 'c1'`)[0].credits).toBeNull();
+	});
+
 	it('refuses to update a course of another timetable', async () => {
 		const t = world();
 		await expect(

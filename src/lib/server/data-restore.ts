@@ -1,7 +1,7 @@
 // Putting back the file saved from その他 → データの保存と復元 (exportData). Everything in the
 // file is checked and bounded here: it came from the person's device and may have been edited.
 // Nothing is taken from it by id; every row is made new in this account.
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { getTableColumns } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
@@ -244,7 +244,14 @@ export async function restoreBackup(
 			skipTitles = new Set(titleRows.map((r) => normalizeTitle(r.title)));
 		} else {
 			if (mode === 'replace') {
+				// Files should be gone already (the page clears them first). One added since then
+				// stops the batch, so its bytes are never left without a row. The id is ours, a UUID.
+				if (!/^[0-9a-zA-Z-]{1,64}$/.test(timetableId)) throw new Error('timetable id');
 				statements.push(
+					db.run(
+						sql.raw(`select json(case when (select count(*) from course_files f join courses c on c.id = f.course_id
+						where c.timetable_id = '${timetableId}') = 0 then 'true' else 'files left' end)`)
+					),
 					db.delete(courses).where(eq(courses.timetableId, timetableId)),
 					db.delete(terms).where(eq(terms.timetableId, timetableId)),
 					db.delete(periods).where(eq(periods.timetableId, timetableId)),

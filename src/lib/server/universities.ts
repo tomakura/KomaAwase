@@ -105,6 +105,13 @@ export async function deleteUniversity(db: Db, id: string) {
 	// Raw statements in a D1 batch can't take bound values, so the id goes in as text: ids are
 	// UUIDs, and anything else is refused
 	if (!/^[0-9a-zA-Z-]{1,64}$/.test(id)) return;
+	// A preset university is never touched, nor anything that points at it
+	const target = await db
+		.select({ id: universities.id })
+		.from(universities)
+		.where(and(eq(universities.id, id), eq(universities.source, 'user')))
+		.get();
+	if (!target) return;
 	const shared = db.select({ id: sharedCourses.id }).from(sharedCourses).where(eq(sharedCourses.universityId, id));
 	const synced = `select c.id from courses c join shared_courses s on s.id = c.shared_course_id
 		where s.university_id = '${id}' and c.sync_mode = 'synced'`;

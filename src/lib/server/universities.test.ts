@@ -42,8 +42,12 @@ describe('deleteUniversity', () => {
 
 	it('leaves a preset university alone', async () => {
 		const t = world();
+		t.run(`UPDATE users SET university_id = 'pre' WHERE id = 'u2'`);
+		t.run(`INSERT INTO shared_courses (id, university_id, year, title, source) VALUES ('sc2', 'pre', 2026, 'もとからの授業', 'syllabus')`);
 		await deleteUniversity(t.db, 'pre');
 		expect(t.rows(`SELECT id FROM universities WHERE id = 'pre'`)).toHaveLength(1);
+		expect(t.rows(`SELECT university_id FROM users WHERE id = 'u2'`)[0].university_id).toBe('pre');
+		expect(t.rows(`SELECT id FROM shared_courses WHERE id = 'sc2'`)).toHaveLength(1);
 	});
 });
 
