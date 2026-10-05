@@ -11,6 +11,7 @@ import { loadShape, loadTimetable } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
 import { currentTerm } from '$lib/terms';
 import { tokyoTime } from '$lib/time';
+import { notifySharedChanged } from '$lib/server/shared-notify';
 import type { Actions, PageServerLoad } from './$types';
 
 async function ownJob(db: App.Locals['db'], userId: string, id: string) {
@@ -104,7 +105,7 @@ type Row = {
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export const actions: Actions = {
-	save: async ({ locals, params, url, request }) => {
+	save: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const { job, timetable } = await ownJob(locals.db, me.id, params.id);
 		if (job.closedAt) redirect(303, '/');
@@ -183,6 +184,7 @@ export const actions: Actions = {
 			throw e;
 		}
 		if (failed) return fail(409, failed);
+		notifySharedChanged(platform, locals.db, me.id, prepared.map((p) => p.changedShared));
 		redirect(303, termIds[0] ? `/?term=${encodeURIComponent(termIds[0])}` : '/');
 	},
 	dismiss: async ({ locals, params, url }) => {

@@ -4,6 +4,7 @@ import { nextColor, otherSlots, parseCourseForm, saveCourse, shapeOf } from '$li
 import { loadSharedCourse } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
+import { notifySharedChanged } from '$lib/server/shared-notify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -66,7 +67,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ locals, request, url }) => {
+	default: async ({ locals, platform, request, url }) => {
 		if (!locals.user) redirect(303, '/login');
 		const timetable = await currentTimetable(locals.db, locals.user);
 		const shape = await loadShape(locals.db, timetable.id);
@@ -80,6 +81,7 @@ export const actions: Actions = {
 			input: parsed.input
 		});
 		if ('message' in saved) return fail(409, { message: saved.message });
+		notifySharedChanged(platform, locals.db, locals.user.id, [saved.changedShared]);
 		redirect(303, timetableHref(url.searchParams.get('term')));
 	}
 };

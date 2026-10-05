@@ -1,7 +1,7 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { courseAbsences, courseNotes } from '$lib/server/db/schema';
-import { findOwnedCourse, loadCourse } from '$lib/server/courses';
+import { findOwnedCourse, keepBeforeChanges, loadCourse, markSharedSeen } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
 import { addEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
@@ -136,6 +136,16 @@ export const actions: Actions = {
 		const courseId = await ownCourse(event);
 		const form = await event.request.formData();
 		return { undo: await deleteNoteKept(event.locals.db, event.locals.user!.id, courseId, String(form.get('id'))) };
+	},
+	// 確認した on the shared course's changes
+	seenShared: async (event) => {
+		const courseId = await ownCourse(event);
+		await markSharedSeen(event.locals.db, courseId);
+	},
+	// 自分用に切り替える: stops syncing, with the values from before the changes
+	keepBefore: async (event) => {
+		const courseId = await ownCourse(event);
+		await keepBeforeChanges(event.locals.db, event.locals.user!.id, courseId);
 	},
 	removeFile: async (event) => {
 		const courseId = await ownCourse(event);

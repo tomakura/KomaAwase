@@ -282,6 +282,34 @@
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
 			{/if}
+			{#if course.syncMode === 'synced' && data.shared}
+				<span class="source">{data.shared.sourceText}</span>
+			{/if}
+			{#if course.syncMode === 'synced' && data.shared?.changes.length}
+				<div class="changed" role="status">
+					<p class="changed-title">ほかの人がこの授業の内容を直しました</p>
+					<ul>
+						{#each data.shared.changes as c (c.label)}
+							<li><b>{c.label}</b>{c.before} → {c.after}</li>
+						{/each}
+					</ul>
+					<div class="changed-actions">
+						<form method="POST" action={actionHref('seenShared', data.termParam)} use:enhance={() => async ({ update }) => settle(update)}>
+							<button class="btn btn-primary" type="submit">確認した</button>
+						</form>
+						<form
+							method="POST"
+							action={actionHref('keepBefore', data.termParam)}
+							use:enhance={async ({ cancel }) => {
+								if (!(await ask({ message: '直される前の内容で、自分だけで使う授業にします。この授業の同期は止まります', ok: '切り替える' }))) return cancel();
+								return async ({ update }) => settle(update);
+							}}
+						>
+							<button class="btn" type="submit">自分用に切り替える</button>
+						</form>
+					</div>
+				</div>
+			{/if}
 			{#if data.shared && data.shareable}
 				<a class="shared-link" href="/shared/{data.shared.id}?back={encodeURIComponent(courseHref(course.id, data.termParam))}">
 					みんなの授業データ（変更の履歴・報告）
@@ -786,6 +814,56 @@
 	.shared-link {
 		align-self: flex-start;
 		font-size: 12px;
+	}
+
+	.source {
+		font-size: 12px;
+		color: var(--ink-sub);
+	}
+
+	.changed {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 14px;
+		border: 1px solid var(--shu);
+		border-radius: 12px;
+		background: var(--surface);
+	}
+
+	.changed-title {
+		margin: 0;
+		font-size: 13px;
+		font-weight: 700;
+	}
+
+	.changed ul {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: 13px;
+	}
+
+	.changed b {
+		margin-right: 8px;
+		color: var(--ink-sub);
+		font-weight: 500;
+	}
+
+	.changed-actions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+
+	.changed-actions .btn {
+		width: 100%;
+		min-height: 40px;
+		padding: 0 10px;
+		font-size: 13px;
 	}
 
 	.add-heading,

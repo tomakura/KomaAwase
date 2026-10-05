@@ -3,6 +3,7 @@ import { courseHref, timetableHref } from '$lib/courses';
 import { deleteCourse, loadCourse, otherSlots, parseCourseForm, saveCourse, shapeOf } from '$lib/server/courses';
 import { canEditShared } from '$lib/server/shared-courses';
 import { sharedAccess } from '$lib/server/verify';
+import { notifySharedChanged } from '$lib/server/shared-notify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -28,7 +29,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 
 export const actions: Actions = {
-	save: async ({ locals, params, request, url }) => {
+	save: async ({ locals, platform, params, request, url }) => {
 		if (!locals.user) redirect(303, '/login');
 		const loaded = await loadCourse(locals.db, locals.user.id, params.id);
 		if (!loaded) error(404, '授業が見つかりません');
@@ -42,6 +43,7 @@ export const actions: Actions = {
 			input: parsed.input
 		});
 		if ('message' in saved) return fail(409, { message: saved.message });
+		notifySharedChanged(platform, locals.db, locals.user.id, [saved.changedShared]);
 		redirect(303, courseHref(params.id, url.searchParams.get('term')));
 	},
 	delete: async ({ locals, params, url, platform }) => {

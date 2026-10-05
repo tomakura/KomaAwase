@@ -1,5 +1,5 @@
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, desc, eq, inArray, lt, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, sql, type SQLWrapper } from 'drizzle-orm';
 import { MAYBE_MIN } from '$lib/cancellations';
 import { DEFAULT_PERIODS, termTemplate, type PeriodInput, type TermInput } from '$lib/presets';
 import { remapTerm } from '$lib/terms';
@@ -234,6 +234,15 @@ export async function loadShape(db: Db, timetableId: string) {
 
 // `today` (YYYY-MM-DD) picks the cancellations still to come.
 // `viewerId` adds `maybeCancels`: days other people syncing the class have marked as 休講.
+/**
+ * Whether the shared course of a synced course (in a query that reads `courses`) has been
+ * changed by someone other than this user since they last saw it (courses.shared_seen_at)
+ */
+export const sharedChangedSql = (userId: string) => sql<number>`exists (select 1 from shared_course_edits e
+	where "courses"."sync_mode" = 'synced' and e.shared_course_id = "courses"."shared_course_id"
+	and e.created_at > coalesce("courses"."shared_seen_at", "courses"."created_at")
+	and (e.user_id is null or e.user_id <> ${userId}))`;
+
 export async function loadTimetable(db: Db, timetableId: string, today: string, viewerId?: string) {
 	// Synced courses show the shared title, slots and rooms, read in the same batch.
 	const syncedIds = db
@@ -253,7 +262,9 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 				intensiveTo: courses.intensiveTo,
 				credits: courses.credits,
 				syncMode: courses.syncMode,
-				sharedCourseId: courses.sharedCourseId
+				sharedCourseId: courses.sharedCourseId,
+				// Someone else changed the shared course since its owner last looked (only for them)
+				changed: viewerId ? sharedChangedSql(viewerId) : sql<number>`0`
 			})
 			.from(courses)
 			.where(eq(courses.timetableId, timetableId))
@@ -307,6 +318,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 				credits: values.credits,
 				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
 				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : [])),
+				sharedChanged: !!synced && !!c.changed,
 				// Not the ones this person already marked themselves
 				maybeCancels: votes
 					.filter((v) => syncMode === 'synced' && v.sharedCourseId === sharedCourseId && v.n >= MAYBE_MIN)

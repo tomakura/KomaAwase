@@ -11,6 +11,8 @@
 		cancels?: string[];
 		// Days other people syncing the class have marked as cancelled (a guess, not the owner's own)
 		maybeCancels?: string[];
+		// Someone else changed the shared course since the owner last looked
+		sharedChanged?: boolean;
 	};
 </script>
 
@@ -142,6 +144,7 @@
 		{#key course.title}
 			<span class="title" use:wrapTitle={course.title}>{course.title}</span>
 		{/key}
+		{#if course.sharedChanged}<span class="changed" title="ほかの人が内容を直しました" aria-label="内容が変わりました"></span>{/if}
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
 		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{:else if maybe}<span class="cancel maybe" title="{monthDay(maybe)}に休講と入れている人がいます">休講かも</span>{/if}
 		{#if slot.room && week}
@@ -332,6 +335,17 @@
 		color: var(--ink);
 		text-decoration: none;
 		overflow: hidden;
+		position: relative;
+	}
+
+	.changed {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--shu);
 	}
 
 	.stacked .course {

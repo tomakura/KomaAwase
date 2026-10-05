@@ -28,4 +28,6 @@ ALTER TABLE `courses` ADD `shared_seen_at` integer;--> statement-breakpoint
 ALTER TABLE `feedback` ADD `reply` text;--> statement-breakpoint
 ALTER TABLE `feedback` ADD `replied_at` integer;--> statement-breakpoint
 ALTER TABLE `push_subscriptions` ADD `last_ok_at` integer;--> statement-breakpoint
-ALTER TABLE `push_subscriptions` ADD `last_failed_at` integer;
+ALTER TABLE `push_subscriptions` ADD `last_failed_at` integer;--> statement-breakpoint
+-- Synced courses so far count as seen now, so old changes don't all show as new
+UPDATE `courses` SET `shared_seen_at` = unixepoch() * 1000 WHERE `sync_mode` = 'synced';
