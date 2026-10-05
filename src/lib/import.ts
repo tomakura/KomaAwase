@@ -1,5 +1,6 @@
 // Reading a timetable screenshot with an AI: what it is asked for, and how its answer is
 // checked before anyone sees it. Both providers get the same schema, so either can be swapped.
+import { CREDITS_MAX } from './courses';
 import { normalizeTitle } from './overlay';
 
 export type ImportedCourse = {
@@ -11,6 +12,10 @@ export type ImportedCourse = {
 	teachers: string[];
 	// Read from a row whose cells didn't match the weekday headings: the weekday is a guess
 	check?: true;
+	// The cells of a double class gave different rooms: one of them is likely misread
+	roomCheck?: true;
+	// Only from a CSV; a screenshot doesn't show them
+	credits?: number;
 };
 
 // The AI copies the table out row by row, cell by cell, as it looks; weekdays and periods
@@ -272,7 +277,10 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 						.filter(Boolean)
 						.slice(0, TEACHERS_MAX)
 				: [],
-			...(c.check === true ? { check: true as const } : {})
+			...(c.check === true ? { check: true as const } : {}),
+			...(typeof c.credits === 'number' && c.credits >= 0 && c.credits <= CREDITS_MAX && Number.isInteger(c.credits * 2)
+				? { credits: c.credits }
+				: {})
 		});
 	}
 
@@ -288,6 +296,7 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 			prev.span + c.span <= SPAN_MAX
 		) {
 			prev.span += c.span;
+			if (prev.room && c.room && prev.room !== c.room) prev.roomCheck = true;
 			prev.room ||= c.room;
 			prev.teachers = [...new Set([...prev.teachers, ...c.teachers])].slice(0, TEACHERS_MAX);
 			if (c.check) prev.check = true;
@@ -303,11 +312,20 @@ export function readImport(raw: unknown): ImportedCourse[] | null {
 // Courses that meet several times a week are one course with several slots.
 export function groupImported(courses: ImportedCourse[]) {
 	const key = normalizeTitle;
-	const groups = new Map<string, { title: string; teachers: string[]; slots: Omit<ImportedCourse, 'title' | 'teachers'>[] }>();
+	type Slot = Omit<ImportedCourse, 'title' | 'teachers' | 'credits'>;
+	const groups = new Map<string, { title: string; teachers: string[]; credits: number | null; slots: Slot[] }>();
 	for (const c of courses) {
-		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], slots: [] };
+		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], credits: null, slots: [] };
 		group.teachers = [...new Set([...group.teachers, ...c.teachers])];
-		group.slots.push({ weekday: c.weekday, period: c.period, span: c.span, room: c.room, ...(c.check ? { check: true as const } : {}) });
+		group.credits ??= c.credits ?? null;
+		group.slots.push({
+			weekday: c.weekday,
+			period: c.period,
+			span: c.span,
+			room: c.room,
+			...(c.check ? { check: true as const } : {}),
+			...(c.roomCheck ? { roomCheck: true as const } : {})
+		});
 		groups.set(key(c.title), group);
 	}
 	return [...groups.values()];
