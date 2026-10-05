@@ -230,7 +230,7 @@
 					<input class="title" class:doubt={titleDoubtOf(row)} bind:value={row.title} maxlength="60" aria-label="授業名" />
 				{/if}
 				<span class="badge" class:changed={cmp?.kind === 'changed' || cmp?.kind === 'clash'}>
-					{cmp?.kind === 'new' ? '新しい' : cmp?.kind === 'same' ? '同じ' : cmp?.kind === 'changed' ? '違いあり' : 'かぶる'}
+					{cmp?.kind === 'new' ? '新しい' : cmp?.kind === 'same' ? '同じ' : cmp?.kind === 'changed' ? '違いあり' : '時間が重なる'}
 				</span>
 			</div>
 			{#if titleDoubtOf(row)}
