@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import Icon from '$lib/components/Icon.svelte';
@@ -183,8 +184,8 @@
 				<form
 					method="POST"
 					action="?/remove"
-					use:enhance={({ cancel }) => {
-						if (!confirm(`「${data.course.values.title}」を削除します。変更の履歴と報告も消えて、元に戻せません`)) cancel();
+					use:enhance={async ({ cancel }) => {
+						if (!(await ask({ message: `「${data.course.values.title}」を削除します。変更の履歴と報告も消えて、元に戻せません`, ok: '削除する', danger: true }))) return cancel();
 					}}
 				>
 					{#if form?.message && form.remove}<p class="error" role="alert">{form.message}</p>{/if}
@@ -214,8 +215,8 @@
 						<form
 							method="POST"
 							action="?/restore"
-							use:enhance={({ cancel }) => {
-								if (!confirm('この変更のあとの内容に戻します。同期しているみんなの時間割も変わります')) cancel();
+							use:enhance={async ({ cancel }) => {
+								if (!(await ask({ message: 'この変更のあとの内容に戻します。同期しているみんなの時間割も変わります', ok: '戻す' }))) return cancel();
 							}}
 						>
 							<input type="hidden" name="edit" value={edit.id} />

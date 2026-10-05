@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import CourseForm from '$lib/components/CourseForm.svelte';
 	import { actionHref, courseHref } from '$lib/courses';
@@ -34,8 +35,8 @@
 	class="delete"
 	method="POST"
 	action={actionHref('delete', data.termParam)}
-	use:enhance={({ cancel }) => {
-		if (!confirm(`「${data.course.title}」を時間割から消します。メモや課題も消えます。`)) cancel();
+	use:enhance={async ({ cancel }) => {
+		if (!(await ask({ message: `「${data.course.title}」を時間割から消します。メモや課題も消えます。`, ok: '消す', danger: true }))) return cancel();
 	}}
 >
 	<button class="btn" type="submit">この授業を消す</button>

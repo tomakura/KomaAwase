@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { slide } from 'svelte/transition';
 	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
@@ -52,8 +53,8 @@
 							<form
 								method="POST"
 								action="?/remove"
-								use:enhance={({ cancel }) => {
-									if (!confirm(`${p.nickname}さんからの申請を断ります`)) cancel();
+								use:enhance={async ({ cancel }) => {
+									if (!(await ask({ message: `${p.nickname}さんからの申請を断ります`, ok: '断る', danger: true }))) return cancel();
 								}}
 							>
 								<input type="hidden" name="id" value={p.id} />

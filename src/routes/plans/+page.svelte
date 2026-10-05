@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { slide } from 'svelte/transition';
 	import { enhance } from '$app/forms';
 	import BottomNav from '$lib/components/BottomNav.svelte';
@@ -181,8 +182,8 @@
 			<form
 				method="POST"
 				action="?/removeEvent"
-				use:enhance={({ cancel }) => {
-					if (!confirm(`イベント「${editing?.title}」を消します`)) return cancel();
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: `イベント「${editing?.title}」を消します`, ok: '消す', danger: true }))) return cancel();
 					return async ({ update }) => {
 						await update();
 						open = false;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { slide } from 'svelte/transition';
 	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
@@ -73,8 +74,8 @@
 							<form
 								method="POST"
 								action="?/remove"
-								use:enhance={({ cancel }) => {
-									if (!confirm(`「${key.name ?? 'パスキー'}」を消します。このパスキーではログインできなくなります`)) cancel();
+								use:enhance={async ({ cancel }) => {
+									if (!(await ask({ message: `「${key.name ?? 'パスキー'}」を消します。このパスキーではログインできなくなります`, ok: '消す', danger: true }))) return cancel();
 									return async ({ result, update }) => {
 										await update();
 										if (result.type === 'success' && Number(result.data?.others) > 0) askOthers = true;

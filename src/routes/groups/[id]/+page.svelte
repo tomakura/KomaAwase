@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { tick } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import { motion } from '$lib/motion';
@@ -282,14 +283,14 @@
 		<form
 			method="POST"
 			action="?/leave"
-			use:enhance={({ cancel }) => {
+			use:enhance={async ({ cancel }) => {
 				const next =
 					data.isOwner && data.members.length > 1
 						? data.members.some((m) => m.role === 'admin')
 							? 'グループは管理者に引き継がれます。'
 							: 'グループはいちばん前からいるメンバーに引き継がれます。'
 						: '';
-				if (!confirm(`「${data.group.name}」を抜けます。${next}`)) cancel();
+				if (!(await ask({ message: `「${data.group.name}」を抜けます。${next}`, ok: '抜ける', danger: true }))) return cancel();
 			}}
 		>
 			<button class="ui-row" type="submit"><span>グループを抜ける</span></button>
@@ -298,8 +299,8 @@
 			<form
 				method="POST"
 				action="?/delete"
-				use:enhance={({ cancel }) => {
-					if (!confirm(`「${data.group.name}」を消します。メンバー全員がグループから外れます`)) cancel();
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: `「${data.group.name}」を消します。メンバー全員がグループから外れます`, ok: '消す', danger: true }))) return cancel();
 				}}
 			>
 				<button class="ui-row danger" type="submit"><span>グループを消す</span><Icon name="trash" size={18} /></button>
@@ -373,8 +374,8 @@
 				<form
 					method="POST"
 					action="?/transfer"
-					use:enhance={({ cancel }) => {
-						if (!confirm(`「${data.group.name}」の持ち主を${m.nickname}さんに渡します。あなたは管理者として残ります。`)) cancel();
+					use:enhance={async ({ cancel }) => {
+						if (!(await ask({ message: `「${data.group.name}」の持ち主を${m.nickname}さんに渡します。あなたは管理者として残ります。`, ok: '渡す' }))) return cancel();
 						return async ({ update }) => {
 							await update();
 							memberOpen = false;
@@ -388,8 +389,8 @@
 			<form
 				method="POST"
 				action="?/remove"
-				use:enhance={({ cancel }) => {
-					if (!confirm(`${m.nickname}さんを退出させますか？ 退出させた人は、招待リンクから参加できなくなります。`)) cancel();
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: `${m.nickname}さんを退出させますか？ 退出させた人は、招待リンクから参加できなくなります。`, ok: '退出させる', danger: true }))) return cancel();
 					return async ({ update }) => {
 						await update();
 						memberOpen = false;

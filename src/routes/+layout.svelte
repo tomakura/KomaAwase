@@ -13,6 +13,7 @@
 	import VerifyPrompt from '$lib/components/VerifyPrompt.svelte';
 	import WarningScreen from '$lib/components/WarningScreen.svelte';
 	import { version } from '$app/environment';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
 	import { connection } from '$lib/connection.svelte';
@@ -162,4 +163,5 @@
 
 <VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
 <!-- One screen at a time: the notification one waits while the enrollment one is due -->
+<ConfirmDialog />
 <NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />

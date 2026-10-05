@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { flip } from 'svelte/animate';
 	import { fly, slide } from 'svelte/transition';
 	import { motion, still } from '$lib/motion';
@@ -211,8 +212,8 @@
 	<form
 		method="POST"
 		action={actionHref(action, data.termParam)}
-		use:enhance={({ cancel }) => {
-			if (!confirm(`${label}を消します`)) cancel();
+		use:enhance={async ({ cancel }) => {
+			if (!(await ask({ message: `${label}を消します`, ok: '消す', danger: true }))) return cancel();
 			return ({ update }) => settle(update);
 		}}
 	>
@@ -487,8 +488,8 @@
 							<form
 								method="POST"
 								action={actionHref('reportCancel', data.termParam)}
-								use:enhance={({ cancel }) => {
-									if (!confirm(`${withDay(c.date)}の休講は、まちがいかいたずらだと運営に伝えます`)) cancel();
+								use:enhance={async ({ cancel }) => {
+									if (!(await ask({ message: `${withDay(c.date)}の休講は、まちがいかいたずらだと運営に伝えます`, ok: '伝える' }))) return cancel();
 								}}
 							>
 								<input type="hidden" name="date" value={c.date} />
