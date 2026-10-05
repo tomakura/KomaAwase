@@ -5,7 +5,7 @@
 // failed, and nothing is sent once it is out of date (each phone's `expires`). Sending a part twice only
 // shows the notification again in its place, since notifications of one thing share a tag.
 // Relative imports only, because the Worker's entry file (worker/entry.js) reaches it directly.
-import { METRICS, count } from './metrics';
+import { METRICS, countMetric } from './metrics';
 import { PUSH_SUBJECT, sendPush } from './push';
 
 /** The part of a D1 database this needs, so a test can stand in for it */
@@ -74,8 +74,8 @@ async function sendNow(env: PushEnv, items: PushItem[], send: typeof sendPush) {
 			console.error('push: recording the result failed', e);
 		}
 	}
-	await count(env.DB, METRICS.pushOk, ok.length, 0, now);
-	await count(env.DB, METRICS.pushFailed, failed.length, 0, now);
+	await countMetric(env.DB, METRICS.pushOk, ok.length, 0, now);
+	await countMetric(env.DB, METRICS.pushFailed, failed.length, 0, now);
 	return failed;
 }
 

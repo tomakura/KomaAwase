@@ -6,8 +6,7 @@
 type D1Run = { prepare(sql: string): { bind(...values: unknown[]): { run(): Promise<unknown> } } };
 
 export const METRICS = {
-	// Pages and actions that ended in a server error, and all of them (for the rate)
-	requests: 'requests',
+	// Pages and actions that ended in a server error
 	serverErrors: 'server_errors',
 	// Notifications that reached the push service, and the ones that didn't
 	pushOk: 'push_ok',
@@ -27,7 +26,7 @@ export const METRICS_KEEP_DAYS = 30;
 export const hourOf = (ms: number) => new Date(ms).toISOString().slice(0, 13);
 
 /** Adds to this hour's count. Never throws: counting must not break what it counts. */
-export async function count(db: D1Run, name: MetricName, n = 1, totalMs = 0, now = Date.now()) {
+export async function countMetric(db: D1Run, name: MetricName, n = 1, totalMs = 0, now = Date.now()) {
 	if (n <= 0) return;
 	try {
 		await db

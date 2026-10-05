@@ -15,6 +15,7 @@
 	import { version } from '$app/environment';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
+	import StatusStrip from '$lib/components/StatusStrip.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
 	import { connection } from '$lib/connection.svelte';
@@ -155,6 +156,7 @@
 </svelte:head>
 
 <ConnectionBar />
+<StatusStrip />
 <NavigationWait />
 <!-- Behind a warning nothing can be reached -->
 <div style="display: contents" inert={!!warning}>{@render children()}</div>

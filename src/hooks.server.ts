@@ -1,5 +1,6 @@
 import type { Handle } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
+import { METRICS, countMetric } from '$lib/server/metrics';
 import { SESSION_COOKIE, clearSessionCookie, setSessionCookie, validateSession } from '$lib/server/auth/session';
 import { SECURITY_HEADERS } from '$lib/security';
 import { themeColorTags } from '$lib/theme';
@@ -52,5 +53,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		transformPageChunk: ({ html }) =>
 			html.replace('%koma.theme%', theme).replace('%koma.themeColor%', themeColorTags(theme))
 	});
+	// Counted for 運営 → 数字 and /status, never with who or which page
+	if (response.status >= 500 && event.platform) event.platform.ctx.waitUntil(countMetric(d1, METRICS.serverErrors));
 	return secured(response);
 };

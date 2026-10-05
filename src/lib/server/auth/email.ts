@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { METRICS, countMetric } from '../metrics';
 import { and, count, eq, gt, lt, max } from 'drizzle-orm';
 import type { Db } from '$lib/server/db';
 import { emailTokens } from '$lib/server/db/schema';
@@ -85,7 +86,10 @@ export async function sendRelayMail(env: Env, kind: 'signin' | 'verify', to: str
 		body,
 		signal: AbortSignal.timeout(10_000)
 	});
-	if (!res.ok) throw new Error(`Mail relay responded ${res.status}: ${await res.text()}`);
+	if (!res.ok) {
+		await countMetric(env.DB, METRICS.mailFailed);
+		throw new Error(`Mail relay responded ${res.status}: ${await res.text()}`);
+	}
 }
 
 export const sendSignInEmail = (env: Env, to: string, link: string) => sendRelayMail(env, 'signin', to, link);

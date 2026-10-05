@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { METRICS, countMetric } from '../metrics';
 import { readImport } from '$lib/import';
 import { RETRY_AFTER_RESET, TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } from '$lib/import-quota';
 import type { Db } from '../db';
@@ -164,6 +165,9 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 		throw e;
 	}
 	if (outcome.status === 'done' || outcome.status === 'failed') {
+		// From upload to done, for 運営 → 数字 and /status
+		if (outcome.status === 'done') await countMetric(env.DB, METRICS.importOk, 1, Date.now() - job.createdAt.getTime());
+		else await countMetric(env.DB, METRICS.importFailed);
 		await notify(
 			env,
 			db,

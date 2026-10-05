@@ -44,6 +44,7 @@
 		<h2 class="ui-section-title">数字</h2>
 		<div class="ui-list">
 			{@render link('/admin/stats', '利用の状況（人数・グラフ）')}
+			{@render link('/admin/status', '稼働状況と品質（お知らせ・失敗率）')}
 		</div>
 	</section>
 </div>
