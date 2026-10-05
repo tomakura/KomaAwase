@@ -214,7 +214,7 @@
 				{sending ? '送っています…' : '同意して読み込む'}
 			</button>
 			<p class="ui-note">
-				1日{data.dailyLimit}回まで読み込めます。見つからない授業は <a href="/courses/new">自分で入力</a> できます。個人情報の扱いは、<a href="/privacy">プライバシーポリシー</a>をご覧ください。
+				1日{data.dailyLimit}回まで読み込めます。見つからない授業は <a href="/courses/new">自分で入力</a> するか、<a href="/import/csv">CSV から入力</a> できます。個人情報の扱いは、<a href="/privacy">プライバシーポリシー</a>をご覧ください。
 			</p>
 		{/if}
 	</div>
