@@ -95,9 +95,12 @@ export async function addNote(db: Db, courseId: string, note: NoteInput) {
 // Changes what was written; the kind, the day it was added and the place in the order stay.
 export async function updateNote(db: Db, courseId: string, noteId: string, note: NoteInput) {
 	const { kind, ...fields } = note;
+	// A weekly homework whose due date is taken away leaves its series: without a date it
+	// has no place in it, and 「これ以降ぜんぶ」 couldn't tell what comes after it.
+	const leaves = note.kind === 'task' && !note.due ? { seriesId: null } : {};
 	await db
 		.update(courseNotes)
-		.set(fields)
+		.set({ ...fields, ...leaves })
 		.where(and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId), eq(courseNotes.kind, kind)));
 }
 
