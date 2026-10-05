@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { draft } from '$lib/draft';
 	import { version } from '$app/environment';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Segmented from '$lib/components/Segmented.svelte';
@@ -48,7 +49,7 @@
 			<a class="btn" href={data.from || '/more'}>もどる</a>
 		</div>
 	{:else}
-		<form class="body" method="POST" use:enhance>
+		<form class="body" method="POST" use:enhance use:draft={'feedback'}>
 			<Segmented options={KINDS} bind:value={kind} label="種類" name="kind" />
 			<label class="field">
 				{kind === 'bug' ? '何をしたら、どうなりましたか' : kind === 'request' ? 'ほしい機能や、変えてほしいところ' : '内容'}

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { ask } from '$lib/confirm.svelte';
+	import { offerUndo } from '$lib/toast.svelte';
+	import { draft as keepDraft } from '$lib/draft';
 	import { flip } from 'svelte/animate';
 	import { fly, slide } from 'svelte/transition';
 	import { motion, still } from '$lib/motion';
@@ -214,7 +216,10 @@
 		action={actionHref(action, data.termParam)}
 		use:enhance={async ({ cancel }) => {
 			if (!(await ask({ message: `${label}を消します`, ok: '消す', danger: true }))) return cancel();
-			return ({ update }) => settle(update);
+			return async ({ result, update }) => {
+				await settle(update);
+				offerUndo(result, async () => (refresh ? refresh() : invalidateAll()));
+			};
 		}}
 	>
 		<input type="hidden" name="id" value={id} />
@@ -347,6 +352,7 @@
 				class="add-form"
 				method="POST"
 				action={actionHref(adding === 'event' ? 'event' : 'note', data.termParam)}
+				use:keepDraft={`course:${course.id}:${adding}`}
 				use:enhance={() =>
 					async ({ result, update }) => {
 						await settle(update);

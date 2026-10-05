@@ -153,6 +153,3 @@ export async function updateEvent(db: Db, userId: string, eventId: string, input
 		.where(and(eq(events.id, eventId), eq(events.userId, userId)));
 }
 
-export async function deleteEvent(db: Db, userId: string, eventId: string) {
-	await db.delete(events).where(and(eq(events.id, eventId), eq(events.userId, userId)));
-}

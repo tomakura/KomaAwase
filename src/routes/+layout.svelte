@@ -15,6 +15,7 @@
 	import { version } from '$app/environment';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import ConnectionBar from '$lib/components/ConnectionBar.svelte';
+	import Toast from '$lib/components/Toast.svelte';
 	import NavigationWait from '$lib/components/NavigationWait.svelte';
 	import { connection } from '$lib/connection.svelte';
 	import { forgetOtherAccount } from '$lib/offline';
@@ -164,4 +165,5 @@
 <VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
 <!-- One screen at a time: the notification one waits while the enrollment one is due -->
 <ConfirmDialog />
+<Toast />
 <NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />

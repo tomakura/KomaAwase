@@ -4,8 +4,9 @@ import { courseAbsences, courseNotes } from '$lib/server/db/schema';
 import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
-import { addEvent, deleteEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
-import { addNote, deleteNote, orderMemoIds, parseNote, setTaskDone, updateNote } from '$lib/server/notes';
+import { addEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
+import { deleteEventKept, deleteNoteKept } from '$lib/server/undo';
+import { addNote, orderMemoIds, parseNote, setTaskDone, updateNote } from '$lib/server/notes';
 import { isDate, tokyoTime } from '$lib/time';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
@@ -95,7 +96,7 @@ export const actions: Actions = {
 	removeEvent: async (event) => {
 		await ownCourse(event);
 		const form = await event.request.formData();
-		await deleteEvent(event.locals.db, event.locals.user!.id, String(form.get('id') ?? ''));
+		return { undo: await deleteEventKept(event.locals.db, event.locals.user!.id, String(form.get('id') ?? '')) };
 	},
 	// Today (Japan time); a day already recorded stays one
 	absent: async (event) => {
@@ -134,7 +135,7 @@ export const actions: Actions = {
 	remove: async (event) => {
 		const courseId = await ownCourse(event);
 		const form = await event.request.formData();
-		await deleteNote(event.locals.db, courseId, String(form.get('id')));
+		return { undo: await deleteNoteKept(event.locals.db, event.locals.user!.id, courseId, String(form.get('id'))) };
 	},
 	removeFile: async (event) => {
 		const courseId = await ownCourse(event);

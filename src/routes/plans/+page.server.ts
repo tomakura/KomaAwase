@@ -1,7 +1,8 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { findOwnedCourse } from '$lib/server/courses';
-import { addNote, deleteNote, parseNote, setTaskDone } from '$lib/server/notes';
-import { addEvent, deleteEvent, listCourseChoices, loadPlans, parseEvent, updateEvent } from '$lib/server/plans';
+import { addNote, parseNote, setTaskDone } from '$lib/server/notes';
+import { deleteEventKept, deleteNoteKept } from '$lib/server/undo';
+import { addEvent, listCourseChoices, loadPlans, parseEvent, updateEvent } from '$lib/server/plans';
 import { tokyoTime } from '$lib/time';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -45,7 +46,7 @@ export const actions: Actions = {
 	removeTask: async (event) => {
 		const form = await event.request.formData();
 		const courseId = await ownCourse(event, form);
-		await deleteNote(event.locals.db, courseId, String(form.get('id')));
+		return { undo: await deleteNoteKept(event.locals.db, event.locals.user!.id, courseId, String(form.get('id'))) };
 	},
 	addEvent: async ({ locals, request }) => {
 		if (!locals.user) redirect(303, '/login');
@@ -64,6 +65,6 @@ export const actions: Actions = {
 	},
 	removeEvent: async ({ locals, request }) => {
 		if (!locals.user) redirect(303, '/login');
-		await deleteEvent(locals.db, locals.user.id, String((await request.formData()).get('id') ?? ''));
+		return { undo: await deleteEventKept(locals.db, locals.user.id, String((await request.formData()).get('id') ?? '')) };
 	}
 };

@@ -34,6 +34,17 @@ export const SYNC_HEADER = 'x-koma-sync';
 // version clears the copies)
 export const FRESH_KEY = 'koma:fresh';
 
+// Drafts of what was being typed (src/lib/draft.ts), cleared with the copies
+export const DRAFT_PREFIX = 'koma:draft:';
+
+function clearDrafts() {
+	try {
+		for (const k of Object.keys(localStorage)) if (k.startsWith(DRAFT_PREFIX)) localStorage.removeItem(k);
+	} catch {
+		// Storage can be off
+	}
+}
+
 export async function clearPageCaches() {
 	try {
 		localStorage.removeItem(FRESH_KEY);
@@ -41,6 +52,7 @@ export async function clearPageCaches() {
 	} catch {
 		// Storage can be off; the copies below are what matter
 	}
+	clearDrafts();
 	if (typeof caches === 'undefined') return;
 	const keys = await caches.keys();
 	await Promise.all(keys.filter((k) => k.startsWith(PAGE_CACHE_PREFIX)).map((k) => caches.delete(k)));
