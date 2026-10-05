@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Segmented from '$lib/components/Segmented.svelte';
 	import { spanLabel, type CalendarDay } from '$lib/calendar';
-	import { DAY_NAMES, courseColor } from '$lib/courses';
+	import { DAY_NAMES, courseColor, periodLabel } from '$lib/courses';
 	import { classesOn, type DayCourse } from '$lib/day-classes';
 	import { addDays, monthDay, weekdayOf } from '$lib/time';
 
@@ -32,6 +32,7 @@
 	const date = $derived(which === 'today' ? today : addDays(today, 1));
 	const day = $derived(classesOn(date, { terms, periods, courses, calendar }));
 	const time = (hhmm: string | null) => hhmm?.replace(/^0/, '') ?? '';
+	const periodNumbers = $derived(periods.map((p) => p.number));
 </script>
 
 <section class="day-classes">
@@ -51,7 +52,7 @@
 		<div class="list">
 			{#each day.items as c (`${c.courseId}-${c.period}-${c.status}`)}
 				<a class="row" class:gone={c.status === 'cancel' || c.status === 'away'} href={href(c.courseId)} style:--c={courseColor(c.color)}>
-					<span class="when"><b>{c.period}限</b>{time(c.start)}</span>
+					<span class="when"><b>{periodLabel(c.period, c.span, periodNumbers)}</b>{time(c.start)}</span>
 					<span class="text">
 						<span class="title">{c.title}</span>
 						{#if c.room}<span class="sub">{c.room}</span>{/if}

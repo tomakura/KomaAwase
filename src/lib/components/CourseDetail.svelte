@@ -947,7 +947,7 @@
 	.add-buttons {
 		display: grid;
 		grid-template-columns: repeat(6, minmax(0, 1fr));
-		gap: 6px;
+		gap: 5px;
 		padding: 0 16px;
 	}
 
@@ -963,8 +963,10 @@
 		background: var(--surface);
 		color: var(--ink);
 		font-family: inherit;
-		font-size: 12px;
+		font-size: 11px;
 		font-weight: 700;
+		letter-spacing: -0.04em;
+		white-space: nowrap;
 		cursor: pointer;
 	}
 
