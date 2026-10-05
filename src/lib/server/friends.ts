@@ -202,20 +202,31 @@ export async function pendingRequestCount(db: Db, meId: string) {
 
 const mine = alias(groupMembers, 'mine');
 
+/** How much of someone's timetable a viewer gets: the classes, or only when they are busy */
+export type ShareLevel = 'all' | 'free';
+
 /**
- * The people whose timetables `meId` may see, besides their own: accepted friends and
- * members of a shared group who show it there, minus anyone blocked either way.
+ * The people whose timetables `meId` may see, besides their own, with how much: accepted
+ * friends who show it to friends, and members of a shared group who show it there, minus
+ * anyone blocked either way. Seen both ways, the wider one counts.
  */
-export async function visibleUserIds(db: Db, meId: string): Promise<Set<string>> {
+export async function visibleLevels(db: Db, meId: string): Promise<Map<string, ShareLevel>> {
 	const [friendRows, groupRows, blockRows] = await db.batch([
 		db
-			.select({ requesterId: friendships.requesterId, addresseeId: friendships.addresseeId })
+			.select({ id: users.id, share: users.friendShare })
 			.from(friendships)
+			.innerJoin(
+				users,
+				or(
+					and(eq(friendships.requesterId, meId), eq(users.id, friendships.addresseeId)),
+					and(eq(friendships.addresseeId, meId), eq(users.id, friendships.requesterId))
+				)
+			)
 			.where(
 				and(eq(friendships.status, 'accepted'), or(eq(friendships.requesterId, meId), eq(friendships.addresseeId, meId)))
 			),
 		db
-			.select({ userId: groupMembers.userId })
+			.select({ userId: groupMembers.userId, freeOnly: groupMembers.freeOnly })
 			.from(groupMembers)
 			.innerJoin(mine, and(eq(mine.groupId, groupMembers.groupId), eq(mine.userId, meId)))
 			.where(eq(groupMembers.shareTimetable, true)),
@@ -224,13 +235,25 @@ export async function visibleUserIds(db: Db, meId: string): Promise<Set<string>>
 			.from(blocks)
 			.where(or(eq(blocks.blockerId, meId), eq(blocks.blockedId, meId)))
 	]);
-	const ids = new Set<string>();
-	for (const f of friendRows) ids.add(f.requesterId === meId ? f.addresseeId : f.requesterId);
-	for (const g of groupRows) ids.add(g.userId);
-	for (const b of blockRows) ids.delete(b.blockerId === meId ? b.blockedId : b.blockerId);
-	ids.delete(meId);
-	for (const id of await suspendedIds(db, [...ids])) ids.delete(id);
-	return ids;
+	const levels = new Map<string, ShareLevel>();
+	const see = (id: string, level: ShareLevel) => {
+		if (levels.get(id) !== 'all') levels.set(id, level);
+	};
+	for (const f of friendRows) if (f.share !== 'none') see(f.id, f.share);
+	for (const g of groupRows) see(g.userId, g.freeOnly ? 'free' : 'all');
+	for (const b of blockRows) levels.delete(b.blockerId === meId ? b.blockedId : b.blockerId);
+	levels.delete(meId);
+	for (const id of await suspendedIds(db, [...levels.keys()])) levels.delete(id);
+	return levels;
+}
+
+export async function visibleUserIds(db: Db, meId: string): Promise<Set<string>> {
+	return new Set((await visibleLevels(db, meId)).keys());
+}
+
+/** The people among `levels` who show their classes, not only when they are busy */
+export function showingClasses(levels: Map<string, ShareLevel>) {
+	return new Set([...levels].flatMap(([id, level]) => (level === 'all' ? [id] : [])));
 }
 
 // In chunks, since D1 takes at most 100 bound values per query

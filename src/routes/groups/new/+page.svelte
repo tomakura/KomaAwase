@@ -17,7 +17,7 @@
 			<input name="name" maxlength="30" placeholder="写真部、〇〇ゼミ など" autocomplete="off" required />
 		</label>
 		<p class="ui-note">
-			作ったら招待リンクをメンバーに送ります。参加した人は、このグループに時間割を見せるかを自分で選べます。
+			作ったら招待リンクをメンバーに送ります。参加した人は、このグループへの時間割の見せ方を自分で選べます。
 		</p>
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		<button class="btn btn-primary" type="submit">作る</button>

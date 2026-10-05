@@ -33,10 +33,10 @@ describe('groups', () => {
 			t.run(`INSERT INTO users (id, email, nickname) VALUES (?, ?, 'x')`, `f${i}`, `f${i}@example.test`);
 			t.run(`INSERT INTO group_members (group_id, user_id) VALUES ('g1', ?)`, `f${i}`);
 		}
-		const results = await Promise.all([joinGroup(t.db, 'g1', 'u2', true), joinGroup(t.db, 'g1', 'u3', true)]);
+		const results = await Promise.all([joinGroup(t.db, 'g1', 'u2', 'all'), joinGroup(t.db, 'g1', 'u3', 'all')]);
 		expect(results.sort()).toEqual(['full', 'joined']);
 		expect(t.rows(`SELECT count(*) AS n FROM group_members WHERE group_id = 'g1'`)).toEqual([{ n: GROUP_MEMBERS_MAX }]);
-		expect(await joinGroup(t.db, 'g1', results[0] === 'joined' ? 'u2' : 'u3', true)).toBe('full');
+		expect(await joinGroup(t.db, 'g1', results[0] === 'joined' ? 'u2' : 'u3', 'all')).toBe('full');
 	});
 
 	it('approves only while there is room, and keeps the request when there is none', async () => {

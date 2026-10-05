@@ -52,6 +52,10 @@ export const users = sqliteTable('users', {
 	suspendedAt: integer('suspended_at', { mode: 'timestamp_ms' }),
 	// Whether the cancellations this person marks on a synced course count for others
 	shareCancellations: integer('share_cancellations', { mode: 'boolean' }).notNull().default(true),
+	// What friends see of the timetable: all of it, only when they are busy, or nothing
+	friendShare: text('friend_share', { enum: ['all', 'free', 'none'] })
+		.notNull()
+		.default('all'),
 	// When they last agreed to send screenshots to the AI services abroad (each import asks)
 	importConsentAt: integer('import_consent_at', { mode: 'timestamp_ms' }),
 	// Which wording of 読み込む前に they agreed to then (IMPORT_CONSENT_VERSION in src/lib/import-consent.ts)
@@ -541,6 +545,10 @@ export const groups = sqliteTable('friend_groups', {
 	// Passed to the longest-standing member when the owner leaves
 	ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
 	inviteCode: text('invite_code').notNull().unique(),
+	// Chosen when the invite is made: when it stops working, and how many more people it lets
+	// in (joining or asking to). Null is no limit.
+	inviteExpiresAt: integer('invite_expires_at', { mode: 'timestamp_ms' }),
+	inviteUsesLeft: integer('invite_uses_left'),
 	// Whether the owner approves each person who opens the invite
 	approval: integer('approval', { mode: 'boolean' }).notNull().default(false),
 	createdAt: createdAt()
@@ -557,6 +565,10 @@ export const groupMembers = sqliteTable(
 			.references(() => users.id, { onDelete: 'cascade' }),
 		// Whether the other members see this member's timetable; chosen when joining
 		shareTimetable: integer('share_timetable', { mode: 'boolean' }).notNull().default(true),
+		// With shareTimetable: they see only when this member is busy, not the classes
+		freeOnly: integer('free_only', { mode: 'boolean' }).notNull().default(false),
+		// 'admin': helps the owner let people in and make them leave
+		role: text('role', { enum: ['admin'] }),
 		joinedAt: createdAt()
 	},
 	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_members_user_idx').on(t.userId)]
@@ -573,6 +585,7 @@ export const groupRequests = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		shareTimetable: integer('share_timetable', { mode: 'boolean' }).notNull().default(true),
+		freeOnly: integer('free_only', { mode: 'boolean' }).notNull().default(false),
 		createdAt: createdAt()
 	},
 	(t) => [primaryKey({ columns: [t.groupId, t.userId] }), index('group_requests_user_idx').on(t.userId)]
