@@ -360,7 +360,11 @@ export const courseNotes = sqliteTable(
 		sortOrder: integer('sort_order'),
 		createdAt: createdAt()
 	},
-	(t) => [index('course_notes_course_idx').on(t.courseId)]
+	(t) => [
+		index('course_notes_course_idx').on(t.courseId),
+		// The homework due on a day (the notifications look it up every minute)
+		index('course_notes_due_idx').on(t.due, t.dueTime)
+	]
 );
 
 export type TaskStep = { text: string; done: boolean };

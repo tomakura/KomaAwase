@@ -1,8 +1,8 @@
 import { and, asc, count, eq, gte, or } from 'drizzle-orm';
 import { CALENDAR_MAX, MOVES_MAX, type CalendarDay } from '$lib/calendar';
-import { isDate } from '$lib/time';
+import { academicYear, isDate } from '$lib/time';
 import type { Db } from './db';
-import { calendarEntries, courseMoves, courses, universities } from './db/schema';
+import { calendarEntries, courseMoves, courses, timetables, universities } from './db/schema';
 
 const calendarColumns = {
 	id: calendarEntries.id,
@@ -19,6 +19,24 @@ export function calendarQuery(db: Db, timetableId: string, since?: string) {
 		.from(calendarEntries)
 		.where(and(eq(calendarEntries.timetableId, timetableId), since ? gte(calendarEntries.end, since) : undefined))
 		.orderBy(asc(calendarEntries.start), asc(calendarEntries.end));
+}
+
+// This year's exam periods not over yet, for the 試験 list in 予定
+export function upcomingExamPeriods(db: Db, userId: string, today: string) {
+	return db
+		.select(calendarColumns)
+		.from(calendarEntries)
+		.innerJoin(timetables, eq(calendarEntries.timetableId, timetables.id))
+		.where(
+			and(
+				eq(timetables.userId, userId),
+				eq(timetables.year, academicYear(today)),
+				eq(calendarEntries.kind, 'exam'),
+				gte(calendarEntries.end, today)
+			)
+		)
+		.orderBy(asc(calendarEntries.start))
+		.all();
 }
 
 const moveColumns = {

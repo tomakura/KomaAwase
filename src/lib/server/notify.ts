@@ -1,5 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
-import type { NotifyKind } from '$lib/notify';
+import { isQuiet, wants, type NotifyKind } from '$lib/notify';
+import { tokyoTime } from '$lib/time';
 import type { Db } from './db';
 import { pushSubscriptions, users } from './db/schema';
 import { deliver } from './push-queue';
@@ -37,10 +38,12 @@ export async function notify(env: Env, db: Db, userIds: string[], kind: NotifyKi
 					.where(inArray(pushSubscriptions.userId, ids.slice(i, i + 90))))
 			);
 		}
-		// kind null: a test from the settings page, which always goes
+		// kind null: a test from the settings page, which always goes. In the quiet hours a
+		// person chose nothing goes.
 		const expires = Date.now() + 24 * 60 * 60 * 1000;
+		const minutes = tokyoTime(Date.now()).minutes;
 		const items = rows
-			.filter((r) => !kind || r.settings?.[kind] !== false)
+			.filter((r) => !kind || (wants(r.settings, kind) && !isQuiet(r.settings?.quiet, minutes)))
 			.map((r) => ({ deviceId: r.id, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, message, expires }));
 		await deliver(env, items);
 	} catch (e) {

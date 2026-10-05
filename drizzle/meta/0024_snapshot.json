@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7bf1adfb-6dcc-445a-81dc-b561c4fe0ff8",
+  "id": "d98c1547-25be-4d08-b972-03b267bb1ebe",
   "prevId": "6e22e777-2ca5-4484-94c5-efe6bbe95992",
   "tables": {
     "auth_challenges": {
@@ -728,6 +728,14 @@
           "name": "course_notes_course_idx",
           "columns": [
             "course_id"
+          ],
+          "isUnique": false
+        },
+        "course_notes_due_idx": {
+          "name": "course_notes_due_idx",
+          "columns": [
+            "due",
+            "due_time"
           ],
           "isUnique": false
         }

@@ -13,6 +13,10 @@ const plan = (over: Partial<Plan>): Plan => ({
 	courseId: null,
 	course: null,
 	done: false,
+	steps: null,
+	exam: false,
+	scope: null,
+	bring: null,
 	...over
 });
 

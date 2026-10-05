@@ -27,6 +27,7 @@ ALTER TABLE `course_notes` ADD `due_time` text;--> statement-breakpoint
 ALTER TABLE `course_notes` ADD `submit_to` text;--> statement-breakpoint
 ALTER TABLE `course_notes` ADD `steps` text;--> statement-breakpoint
 ALTER TABLE `course_notes` ADD `series_id` text;--> statement-breakpoint
+CREATE INDEX `course_notes_due_idx` ON `course_notes` (`due`,`due_time`);--> statement-breakpoint
 ALTER TABLE `events` ADD `exam` integer DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE `events` ADD `scope` text;--> statement-breakpoint
 ALTER TABLE `events` ADD `bring` text;--> statement-breakpoint

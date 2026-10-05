@@ -2,6 +2,7 @@
 	import { flip } from 'svelte/animate';
 	import { fly, slide } from 'svelte/transition';
 	import { motion, still } from '$lib/motion';
+	import StepsField from '$lib/components/StepsField.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
@@ -24,6 +25,7 @@
 	import { moveId, orderMemos } from '$lib/notes';
 	import { votesLabel } from '$lib/cancellations';
 	import { whenLabel } from '$lib/plans';
+	import { REPEAT_MAX, stepsDone, submitLink, type TaskStep } from '$lib/tasks';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
 	import type { ActionData, PageData } from '../../routes/courses/[id]/$types';
 
@@ -67,12 +69,14 @@
 	let evStart = $state('');
 	let evEnd = $state('');
 	let evClass = $state(false);
+	let evExam = $state(false);
 	const classTime = $derived(classTimeOn(evDate, course.slots, data.periods));
 
 	function openEvent() {
 		if (adding === 'event') return (adding = null);
 		allDay = false;
 		evClass = false;
+		evExam = false;
 		evDate = data.today;
 		evStart = '';
 		evEnd = '';
@@ -112,6 +116,19 @@
 	);
 	const moves = $derived(data.moves.toSorted((a, b) => a.fromDate.localeCompare(b.fromDate)));
 	const memos = $derived(orderMemos(data.notes.filter((n) => n.kind === 'memo')));
+
+	// Weekly homework: until the end of the course's last term, unless changed
+	let repeat = $state(false);
+	const termEnd = $derived(
+		data.terms
+			.filter((t) => course.termIds.includes(t.id) && t.endDate)
+			.map((t) => t.endDate ?? '')
+			.sort()
+			.at(-1)
+	);
+	// Homework whose steps are open, and the weekly one being deleted (asking which copies)
+	let opened = $state<string[]>([]);
+	let removing = $state<string | null>(null);
 
 	// The note being changed (its form is where the note was)
 	let editing = $state<string | null>(null);
@@ -164,13 +181,34 @@
 	}
 </script>
 
-{#snippet noteFields(kind: 'memo' | 'task' | 'cancel', note?: { date: string | null; body: string; due: string | null })}
+{#snippet noteFields(kind: 'memo' | 'task' | 'cancel', note?: { date: string | null; body: string; due: string | null; dueTime?: string | null; submitTo?: string | null; steps?: TaskStep[] | null })}
 	{#if kind === 'memo'}
 		<label class="field">日付<input type="date" name="date" value={note?.date ?? data.today} required /></label>
 		<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required>{note?.body ?? ''}</textarea></label>
 	{:else if kind === 'task'}
 		<label class="field">課題<input name="body" value={note?.body ?? ''} maxlength="100" required autocomplete="off" /></label>
-		<label class="field">締切（任意）<input type="date" name="due" value={note?.due ?? ''} /></label>
+		<div class="times">
+			<label class="field">締切（任意）<input type="date" name="due" value={note?.due ?? ''} /></label>
+			<label class="field">時刻（任意）<input type="time" name="dueTime" value={note?.dueTime ?? ''} /></label>
+		</div>
+		<label class="field">
+			提出先（任意）
+			<input name="submitTo" value={note?.submitTo ?? ''} maxlength="200" autocomplete="off" placeholder="URL や「レポートボックス」など" />
+		</label>
+		<StepsField steps={note?.steps} />
+		{#if !note}
+			<div class="all-day">
+				<span id="repeat-label">毎週くり返す</span>
+				<Switch bind:checked={repeat} name="repeat" labelledby="repeat-label" />
+			</div>
+			{#if repeat}
+				<label class="field">
+					最後の日
+					<input type="date" name="until" value={termEnd ?? ''} required />
+				</label>
+				<p class="hint">締切の日から毎週、{REPEAT_MAX}回まで作ります。</p>
+			{/if}
+		{/if}
 	{:else}
 		<label class="field">休講の日<input type="date" name="date" value={note?.date ?? nextClassDay} required /></label>
 		<label class="field">
@@ -186,7 +224,7 @@
 	</button>
 {/snippet}
 
-{#snippet editForm(note: { id: string; kind: 'memo' | 'task' | 'cancel'; date: string | null; body: string; due: string | null })}
+{#snippet editForm(note: { id: string; kind: 'memo' | 'task' | 'cancel'; date: string | null; body: string; due: string | null; dueTime?: string | null; submitTo?: string | null; steps?: TaskStep[] | null })}
 	<form
 		class="add-form inline"
 		method="POST"
@@ -403,6 +441,14 @@
 						</div>
 					{/if}
 					<label class="field">場所<input name="place" maxlength="50" autocomplete="off" /></label>
+					<div class="all-day">
+						<span id="exam-label">試験</span>
+						<Switch bind:checked={evExam} name="exam" labelledby="exam-label" />
+					</div>
+					{#if evExam}
+						<label class="field">範囲（任意）<textarea name="scope" rows="2" maxlength="500"></textarea></label>
+						<label class="field">持ち物（任意）<textarea name="bring" rows="2" maxlength="500"></textarea></label>
+					{/if}
 					<label class="field">メモ（任意）<textarea name="memo" rows="3" maxlength="500"></textarea></label>
 				{:else}
 					{@render noteFields(adding)}
@@ -448,6 +494,8 @@
 						{#if editing === task.id}
 							{@render editForm(task)}
 						{:else}
+						{@const link = submitLink(task.submitTo)}
+						{@const progress = stepsDone(task.steps)}
 						<div transition:slide={motion()} class="item" class:done={task.done}>
 							<form
 								method="POST"
@@ -466,15 +514,76 @@
 							</form>
 							<span class="text">
 								<span class="main">{task.body}</span>
-								{#if task.due}<span class="sub">{withDay(task.due)}まで</span>{/if}
+								{#if task.due}<span class="sub">{withDay(task.due)}{task.dueTime ? ` ${task.dueTime.replace(/^0/, '')}` : ''}まで</span>{/if}
+								{#if link}
+									<a class="sub submit" href={link.href} target="_blank" rel="noopener noreferrer">提出先：{link.host}</a>
+								{:else if task.submitTo}
+									<span class="sub">提出先：{task.submitTo}</span>
+								{/if}
+								{#if progress}
+									<button
+										class="steps-toggle"
+										type="button"
+										aria-expanded={opened.includes(task.id)}
+										onclick={() => (opened = opened.includes(task.id) ? opened.filter((id) => id !== task.id) : [...opened, task.id])}
+									>
+										チェック {progress}
+									</button>
+								{/if}
 							</span>
 							{#if task.due && !task.done}
 								{@const due = dueLabel(task.due)}
 								<span class="due" class:late={due.late}>{due.text}</span>
 							{/if}
 							{@render editButton(task.id, `課題「${task.body}」`)}
-							{@render removeButton(task.id, `課題「${task.body}」`)}
+							{#if task.seriesId}
+								<button class="remove" type="button" aria-label="課題「{task.body}」を消す" onclick={() => (removing = removing === task.id ? null : task.id)}>
+									<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+								</button>
+							{:else}
+								{@render removeButton(task.id, `課題「${task.body}」`)}
+							{/if}
 						</div>
+						{#if removing === task.id}
+							<form
+								class="series-remove"
+								method="POST"
+								action={actionHref('remove', data.termParam)}
+								use:enhance={() =>
+									async ({ update }) => {
+										removing = null;
+										await settle(update);
+									}}
+							>
+								<input type="hidden" name="id" value={task.id} />
+								<span>くり返しの課題です。どれを消しますか？</span>
+								<div class="series-actions">
+									<button class="btn" type="submit">この回だけ</button>
+									<button class="btn" type="submit" name="later" value="on">これ以降ぜんぶ</button>
+									<button class="btn" type="button" onclick={() => (removing = null)}>やめる</button>
+								</div>
+							</form>
+						{/if}
+						{#if progress && opened.includes(task.id)}
+							<div class="steps" transition:slide={motion()}>
+								{#each task.steps ?? [] as step, i (i)}
+									<form method="POST" action={actionHref('step', data.termParam)} use:enhance={() => ({ update }) => settle(update)}>
+										<input type="hidden" name="id" value={task.id} />
+										<input type="hidden" name="index" value={i} />
+										<label class="step" class:done={step.done}>
+											<input
+												class="check"
+												type="checkbox"
+												name="done"
+												checked={step.done}
+												onchange={(e) => e.currentTarget.form?.requestSubmit()}
+											/>
+											<span>{step.text}</span>
+										</label>
+									</form>
+								{/each}
+							</div>
+						{/if}
 						{/if}
 					{/each}
 				</section>
@@ -486,8 +595,10 @@
 					{#each data.events as e (e.id)}
 						<div transition:slide={motion()} class="item" class:done={e.date < data.today}>
 							<span class="text">
-								<span class="main">{e.title}</span>
+								<span class="main">{#if e.exam}<b class="exam-tag">試験</b>{/if}{e.title}</span>
 								<span class="sub">{[whenLabel(e), e.place].filter(Boolean).join(' · ')}</span>
+								{#if e.scope}<span class="sub memo-line">範囲：{e.scope}</span>{/if}
+								{#if e.bring}<span class="sub memo-line">持ち物：{e.bring}</span>{/if}
 								{#if e.memo}<span class="sub memo-line">{e.memo}</span>{/if}
 							</span>
 							{@render removeButton(e.id, `イベント「${e.title}」`, 'removeEvent')}
@@ -983,6 +1094,79 @@
 
 	.add-form :global(textarea) {
 		width: 100%;
+	}
+
+	.exam-tag {
+		margin-right: 6px;
+		padding: 1px 6px;
+		border-radius: 6px;
+		background: var(--shu);
+		color: #fff;
+		font-size: 11px;
+	}
+
+	.hint {
+		margin: -4px 0 0;
+		font-size: 12px;
+		color: var(--ink-sub);
+	}
+
+	.submit {
+		color: var(--ink-sub);
+		text-decoration: underline;
+		overflow-wrap: anywhere;
+	}
+
+	.steps-toggle {
+		align-self: flex-start;
+		padding: 2px 8px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: none;
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 12px;
+		cursor: pointer;
+	}
+
+	.steps {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 0 0 8px 40px;
+	}
+
+	.step {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-height: 36px;
+		font-size: 14px;
+	}
+
+	.step.done span {
+		color: var(--ink-sub);
+		text-decoration: line-through;
+	}
+
+	.series-remove {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 10px 0;
+		font-size: 13px;
+	}
+
+	.series-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.series-actions .btn {
+		flex: 1 1 auto;
+		height: 40px;
+		font-size: 13px;
 	}
 
 	.add-form select {
