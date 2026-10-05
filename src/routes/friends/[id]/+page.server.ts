@@ -38,8 +38,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		days: daysShown,
 		terms: loaded?.terms ?? [],
 		periods: loaded?.periods ?? [],
-		// Memos, files, tasks and cancellations stay with their owner.
-		courses: (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, ...c }) => c),
+		// Memos, files, tasks, cancellations and moved classes stay with their owner.
+		courses: (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, moves: ___, ...c }) => c),
 		reportReasons: REPORT_REASONS.user
 	};
 };

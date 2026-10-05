@@ -60,7 +60,7 @@
 	);
 	const delivery = $derived(deliveryLabel(course.delivery, course.intensiveFrom, course.intensiveTo));
 
-	let adding = $state<'memo' | 'task' | 'cancel' | 'event' | null>(null);
+	let adding = $state<'memo' | 'task' | 'cancel' | 'event' | 'move' | null>(null);
 	let allDay = $state(false);
 	// The event's own date and times, which "授業の時間にする" fills in
 	let evDate = $state('');
@@ -110,6 +110,7 @@
 			.filter((n) => n.kind === 'cancel' && n.date)
 			.toSorted((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
 	);
+	const moves = $derived(data.moves.toSorted((a, b) => a.fromDate.localeCompare(b.fromDate)));
 	const memos = $derived(orderMemos(data.notes.filter((n) => n.kind === 'memo')));
 
 	// The note being changed (its form is where the note was)
@@ -321,6 +322,12 @@
 				</svg>
 				休講
 			</button>
+			<button type="button" aria-pressed={adding === 'move'} onclick={() => (adding = adding === 'move' ? null : 'move')}>
+				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5" />
+				</svg>
+				振替
+			</button>
 			<button type="button" aria-pressed={adding === 'event'} onclick={openEvent}>
 				<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
 					<rect x="3.5" y="5" width="17" height="15" rx="2.5" />
@@ -345,15 +352,33 @@
 			<form
 				class="add-form"
 				method="POST"
-				action={actionHref(adding === 'event' ? 'event' : 'note', data.termParam)}
+				action={actionHref(adding === 'event' || adding === 'move' ? adding : 'note', data.termParam)}
 				use:enhance={() =>
 					async ({ result, update }) => {
 						await settle(update);
 						if (result.type === 'success') adding = null;
 					}}
 			>
-				{#if adding !== 'event'}<input type="hidden" name="kind" value={adding} />{/if}
-				{#if adding === 'event'}
+				{#if adding !== 'event' && adding !== 'move'}<input type="hidden" name="kind" value={adding} />{/if}
+				{#if adding === 'move'}
+					<label class="field">もとの日<input type="date" name="from" value={nextClassDay} required /></label>
+					<label class="field">振替の日<input type="date" name="to" required /></label>
+					<div class="times">
+						<label class="field">
+							時限
+							<select name="period" required value={course.slots[0]?.period ?? data.periods[0]?.number}>
+								{#each data.periods as p (p.number)}<option value={p.number}>{p.number}限</option>{/each}
+							</select>
+						</label>
+						<label class="field">
+							コマ数
+							<select name="span" value={course.slots[0]?.span ?? 1}>
+								{#each [1, 2, 3, 4] as n (n)}<option value={n}>{n}コマ</option>{/each}
+							</select>
+						</label>
+					</div>
+					<label class="field">教室（任意）<input name="room" maxlength="50" autocomplete="off" value={course.slots[0]?.room ?? ''} /></label>
+				{:else if adding === 'event'}
 					<label class="field">名前<input name="title" maxlength="100" required autocomplete="off" placeholder="期末試験" /></label>
 					<label class="field">日付<input type="date" name="date" required bind:value={evDate} /></label>
 					<div class="all-day">
@@ -494,6 +519,21 @@
 								<input type="hidden" name="date" value={c.date} />
 								<button class="absent quiet" type="submit" disabled={c.reported}>{c.reported ? '報告ずみ' : 'まちがい'}</button>
 							</form>
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			{#if moves.length}
+				<section>
+					<h2>振替</h2>
+					{#each moves as m (m.id)}
+						<div transition:slide={motion()} class="item" class:done={m.toDate < data.today && m.fromDate < data.today}>
+							<span class="text">
+								<span class="main">{withDay(m.fromDate)} → {withDay(m.toDate)} {periodLabel(m.period, m.span, periodNumbers)}</span>
+								{#if m.room}<span class="sub">{m.room}</span>{/if}
+							</span>
+							{@render removeButton(m.id, `${withDay(m.fromDate)}の振替`, 'removeMove')}
 						</div>
 					{/each}
 				</section>
@@ -795,7 +835,7 @@
 
 	.add-buttons {
 		display: grid;
-		grid-template-columns: repeat(5, minmax(0, 1fr));
+		grid-template-columns: repeat(6, minmax(0, 1fr));
 		gap: 6px;
 		padding: 0 16px;
 	}
@@ -943,6 +983,19 @@
 
 	.add-form :global(textarea) {
 		width: 100%;
+	}
+
+	.add-form select {
+		box-sizing: border-box;
+		width: 100%;
+		height: 48px;
+		padding: 0 12px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 16px;
 	}
 
 	.memo-line {

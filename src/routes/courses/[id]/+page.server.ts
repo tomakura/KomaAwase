@@ -4,6 +4,7 @@ import { courseAbsences, courseNotes } from '$lib/server/db/schema';
 import { findOwnedCourse, loadCourse } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
+import { addMove, deleteMove, parseMove } from '$lib/server/calendar';
 import { addEvent, deleteEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
 import { addNote, deleteNote, orderMemoIds, parseNote, setTaskDone, updateNote } from '$lib/server/notes';
 import { isDate, tokyoTime } from '$lib/time';
@@ -91,6 +92,20 @@ export const actions: Actions = {
 		if ('message' in parsed) return fail(400, { message: parsed.message });
 		await addEvent(event.locals.db, event.locals.user!.id, parsed.event);
 		return { added: true };
+	},
+	// The class held once on another day or in another period
+	move: async (event) => {
+		const courseId = await ownCourse(event);
+		const loaded = await loadCourse(event.locals.db, event.locals.user!.id, courseId);
+		if (!loaded) error(404, '授業が見つかりません');
+		const parsed = parseMove(await event.request.formData(), loaded.periods.map((p) => p.number));
+		if ('message' in parsed) return fail(400, { message: parsed.message });
+		if (!(await addMove(event.locals.db, courseId, parsed.move))) return fail(400, { message: '振替が多すぎます。済んだものを消してください' });
+		return { added: true };
+	},
+	removeMove: async (event) => {
+		const courseId = await ownCourse(event);
+		await deleteMove(event.locals.db, courseId, String((await event.request.formData()).get('id') ?? ''));
 	},
 	removeEvent: async (event) => {
 		await ownCourse(event);

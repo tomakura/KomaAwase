@@ -13,10 +13,29 @@ const createdAt = () =>
 
 // --- accounts & auth ---
 
-// Which notifications to send; a missing key means on
+// Which notifications to send; a missing key means the kind's default (NOTIFY_KINDS in
+// src/lib/notify.ts). `quiet`: the hours (HH:MM, Japan time) nothing is sent, when set.
 export type NotifySettings = Partial<
-	Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'groupRequest' | 'groupApproved' | 'planEve', boolean>
->;
+	Record<
+		| 'friendRequest'
+		| 'friendAccepted'
+		| 'importDone'
+		| 'groupJoin'
+		| 'groupRequest'
+		| 'groupApproved'
+		| 'planEve'
+		| 'taskMorning'
+		| 'taskBefore3h'
+		| 'taskBefore1h',
+		boolean
+	>
+> & { quiet?: { from: string; to: string } };
+
+// A day or days off, or an exam period, in a university's calendar or someone's timetable
+export type CalendarEntry = { kind: 'off' | 'exam'; label: string; start: string; end: string };
+
+// A university's calendar for one academic year, with where it came from and when that was checked
+export type CalendarPreset = { year: number; source: string; checkedAt: string; entries: CalendarEntry[] };
 
 // `photo` is when the user's photo (user_photos) was last set, which also busts caches
 export type UserIcon = { color: string; text: string; photo?: number };
@@ -181,6 +200,8 @@ export const universities = sqliteTable(
 		// Dates are for one academic year and are copied only into a timetable of that year.
 		termPreset: text('term_preset', { mode: 'json' }).$type<TermPreset>(),
 		periodPreset: text('period_preset', { mode: 'json' }).$type<PeriodPreset>(),
+		// Days off and exam periods; offered to people, who add them to their timetable if they want
+		calendarPreset: text('calendar_preset', { mode: 'json' }).$type<CalendarPreset>(),
 		// 'user' for a university someone typed in; it has no presets
 		source: text('source', { enum: ['preset', 'user'] })
 			.notNull()
@@ -327,12 +348,58 @@ export const courseNotes = sqliteTable(
 		date: text('date'),
 		body: text('body').notNull().default(''),
 		due: text('due'), // task, YYYY-MM-DD
+		dueTime: text('due_time'), // task, HH:MM; only with a due date
+		// task: where it is handed in, words or a link
+		submitTo: text('submit_to'),
+		// task: the small steps to check off
+		steps: text('steps', { mode: 'json' }).$type<TaskStep[]>(),
+		// task: the same id on each of a weekly homework's copies, made at once
+		seriesId: text('series_id'),
 		done: integer('done', { mode: 'boolean' }).notNull().default(false),
 		// memo: place in the order the person set by hand (top is smallest); null until they do
 		sortOrder: integer('sort_order'),
 		createdAt: createdAt()
 	},
 	(t) => [index('course_notes_course_idx').on(t.courseId)]
+);
+
+export type TaskStep = { text: string; done: boolean };
+
+// A single class held on another day or in another period: on `fromDate` it doesn't meet,
+// on `toDate` it does, in `period` (and the `span` - 1 after it). Personal, like cancellations.
+export const courseMoves = sqliteTable(
+	'course_moves',
+	{
+		id: id(),
+		courseId: text('course_id')
+			.notNull()
+			.references(() => courses.id, { onDelete: 'cascade' }),
+		fromDate: text('from_date').notNull(), // YYYY-MM-DD
+		toDate: text('to_date').notNull(),
+		period: integer('period').notNull(),
+		span: integer('span').notNull().default(1),
+		room: text('room'),
+		createdAt: createdAt()
+	},
+	(t) => [index('course_moves_course_idx').on(t.courseId)]
+);
+
+// Days off (holidays, the university's breaks) and exam periods in a timetable. Off days have
+// no classes. One row may cover several days (start to end, both included).
+export const calendarEntries = sqliteTable(
+	'calendar_entries',
+	{
+		id: id(),
+		timetableId: text('timetable_id')
+			.notNull()
+			.references(() => timetables.id, { onDelete: 'cascade' }),
+		kind: text('kind', { enum: ['off', 'exam'] }).notNull(),
+		label: text('label').notNull(),
+		start: text('start_date').notNull(), // YYYY-MM-DD
+		end: text('end_date').notNull(),
+		createdAt: createdAt()
+	},
+	(t) => [index('calendar_entries_timetable_idx').on(t.timetableId, t.start)]
 );
 
 // The days a class was missed, by date, so a mistake can be taken back. Personal: never shared.
@@ -390,6 +457,10 @@ export const events = sqliteTable(
 		memo: text('memo'),
 		// A class it belongs to, such as its test; it stays when the class is deleted
 		courseId: text('course_id').references(() => courses.id, { onDelete: 'set null' }),
+		// An exam, with what it covers and what to bring
+		exam: integer('exam', { mode: 'boolean' }).notNull().default(false),
+		scope: text('scope'),
+		bring: text('bring'),
 		createdAt: createdAt()
 	},
 	(t) => [index('events_user_date_idx').on(t.userId, t.date)]

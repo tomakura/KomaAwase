@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	import type { CalendarDay, ClassMove } from '$lib/calendar';
 	import type { WeekPattern } from '$lib/courses';
 
 	export type GridSlot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
@@ -11,11 +12,14 @@
 		cancels?: string[];
 		// Days other people syncing the class have marked as cancelled (a guess, not the owner's own)
 		maybeCancels?: string[];
+		// Single classes held on another day; only the owner's own timetable has them
+		moves?: ClassMove[];
 	};
 </script>
 
 <script lang="ts">
 	import { wrapTitle } from '$lib/wrap-title';
+	import { offOn } from '$lib/calendar';
 	import { DAY_NAMES, courseColor, meetsInWeek } from '$lib/courses';
 	import { addDays, monthDay, toMinutes, type TokyoTime, weekdayOf } from '$lib/time';
 
@@ -30,7 +34,9 @@
 		slotLabel = (day: number, period: number) => `${DAY_NAMES[day]}曜${period}限に授業を追加`,
 		showToday = true,
 		termStart = null,
-		stagger = false
+		stagger = false,
+		calendar = [],
+		dayHref
 	}: {
 		periods: { number: number; start: string; end: string }[];
 		days: number[];
@@ -48,6 +54,10 @@
 		termStart?: string | null;
 		// The cells appear one after another from the top left, once (a term just chosen)
 		stagger?: boolean;
+		// Days off and exam periods; a day off in the coming week shows on its column
+		calendar?: CalendarDay[];
+		// A link for the weekday headings
+		dayHref?: (day: number) => string;
 	} = $props();
 
 	const rowOf = $derived(new Map(periods.map((p, i) => [p.number, i + 2])));
@@ -55,6 +65,9 @@
 	const lastRow = $derived(periods.length + 1);
 	const todayShown = $derived(showToday && colOf.has(clock.weekday));
 	const isToday = (day: number) => showToday && day === clock.weekday;
+	// The date of a weekday in the coming week (today included)
+	const dateOf = (weekday: number) => addDays(clock.date, (weekday - clock.weekday + 7) % 7);
+	const offDay = (weekday: number) => (showToday ? offOn(calendar, dateOf(weekday)) : undefined);
 	const isNow = (start: string, end: string) =>
 		toMinutes(start) <= clock.minutes && clock.minutes < toMinutes(end);
 
@@ -79,6 +92,10 @@
 		maybe: string | null;
 		// False for a slot on alternate weeks that doesn't meet this week
 		meets: boolean;
+		// A day off, or the class held on another day (away) or moved here (moved)
+		off?: string | null;
+		away?: string | null;
+		moved?: string | null;
 	};
 
 	const cells = $derived(
@@ -99,11 +116,30 @@
 							.filter((d) => weekdayOf(d) === slot.weekday && d >= clock.date && d <= addDays(clock.date, 6))
 							.sort()[0] ?? null);
 				const meets = meetsInWeek(slot.week, termStart, clock.date);
-				const live = cancel === clock.date || !meets ? null : session(slot.weekday, row, span);
-				return [{ course, slot, row, col, span, live, cancel, maybe, meets }];
-			})
+				const date = dateOf(slot.weekday);
+				const off = offDay(slot.weekday) ? date : null;
+				const away = course.moves?.some((m) => m.fromDate === date) ? date : null;
+				const live = cancel === clock.date || off || away === clock.date || !meets ? null : session(slot.weekday, row, span);
+				return [{ course, slot, row, col, span, live, cancel, maybe, meets, off, away }];
+			}).concat(movedHere(course))
 		)
 	);
+
+	// Classes moved to a day of the coming week, in the period they moved to
+	function movedHere(course: GridCourse): Cell[] {
+		if (!showToday) return [];
+		return (course.moves ?? []).flatMap((m) => {
+			if (m.toDate < clock.date || m.toDate > addDays(clock.date, 6)) return [];
+			const weekday = weekdayOf(m.toDate);
+			const row = rowOf.get(m.period);
+			const col = colOf.get(weekday);
+			if (!row || !col) return [];
+			const span = Math.min(m.span, lastRow - row + 1);
+			const slot = { weekday, period: m.period, span: m.span, room: m.room };
+			const live = m.toDate === clock.date ? session(weekday, row, span) : null;
+			return [{ course, slot, row, col, span, live, cancel: null, maybe: null, meets: true, moved: m.toDate }];
+		});
+	}
 
 	// Courses that share a slot (a mistake, or classes on alternate weeks) are stacked in it
 	// instead of covering each other.
@@ -126,13 +162,13 @@
 	const time = (hhmm: string) => hhmm.replace(/^0/, '');
 </script>
 
-{#snippet course({ course, slot, live, cancel, maybe, meets }: Cell)}
+{#snippet course({ course, slot, live, cancel, maybe, meets, off, away, moved }: Cell)}
 	{@const week = slot.week === 'odd' ? '奇' : slot.week === 'even' ? '偶' : null}
 	<svelte:element
 		this={courseHref ? 'a' : 'div'}
 		class="course"
 		class:live
-		class:offweek={!meets}
+		class:offweek={!meets || !!off || !!away}
 		title={meets ? undefined : '今週はありません'}
 		href={courseHref?.(course.id)}
 		style:--c={courseColor(course.color)}
@@ -143,7 +179,7 @@
 			<span class="title" use:wrapTitle={course.title}>{course.title}</span>
 		{/key}
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
-		{#if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{:else if maybe}<span class="cancel maybe" title="{monthDay(maybe)}に休講と入れている人がいます">休講かも</span>{/if}
+		{#if off}<span class="cancel">休み {monthDay(off)}</span>{:else if away}<span class="cancel">振替 {monthDay(away)}</span>{:else if moved}<span class="cancel moved">振替 {monthDay(moved)}</span>{:else if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{:else if maybe}<span class="cancel maybe" title="{monthDay(maybe)}に休講と入れている人がいます">休講かも</span>{/if}
 		{#if slot.room && week}
 			<span class="room"><b class="week" aria-label="{week}数週">{week}</b>{slot.room}</span>
 		{:else if slot.room || week}
@@ -154,13 +190,23 @@
 
 <div class="grid" class:stagger style:--days={days.length} style:--periods={periods.length}>
 	{#each days as day, i (day)}
-		<div class="day" style:grid-column={i + 2} style:--n={i}>
+		{@const off = offDay(day)}
+		<svelte:element
+			this={dayHref ? 'a' : 'div'}
+			class="day"
+			class:off
+			href={dayHref?.(day)}
+			title={off ? `${monthDay(dateOf(day))} ${off.label}` : undefined}
+			style:grid-column={i + 2}
+			style:--n={i}
+		>
 			{#if isToday(day)}
 				<span class="today-mark" aria-label="{DAY_NAMES[day]}曜日（今日）">{DAY_NAMES[day]}</span>
 			{:else}
 				{DAY_NAMES[day]}
 			{/if}
-		</div>
+			{#if off}<span class="off-mark">休</span>{/if}
+		</svelte:element>
 	{/each}
 
 	{#each periods as p, i (p.number)}
@@ -227,9 +273,20 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		gap: 2px;
 		font-size: 12px;
 		font-weight: 500;
 		color: var(--ink-sub);
+		text-decoration: none;
+	}
+
+	.day.off {
+		color: var(--shu);
+	}
+
+	.off-mark {
+		font-size: 10px;
+		font-weight: 700;
 	}
 
 	.period {
@@ -379,6 +436,11 @@
 		font-size: 10px;
 		font-weight: 700;
 		white-space: nowrap;
+	}
+
+	.cancel.moved {
+		background: var(--shu);
+		color: #fff;
 	}
 
 	.cancel.maybe {
