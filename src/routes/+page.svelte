@@ -159,6 +159,10 @@
 						<span><b>自分で入力する</b></span>
 					</a>
 				{/if}
+				<a class="way" href="/import/csv{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
+					<Icon name="download" size={22} />
+					<span><b>CSV から入力</b>表計算ソフトの一覧からまとめて登録</span>
+				</a>
 				<p class="ui-note">下の時間割の空いているコマを押しても追加できます。</p>
 			</section>
 		{/if}

@@ -156,6 +156,14 @@ async function removeStored(env: Env, keys: string[]) {
 	}
 }
 
+/** Deletes these files, bytes first; for emptying a timetable before it is restored over */
+export async function deleteFiles(env: Env, db: Db, files: { id: string; storageKey: string }[]) {
+	for (const file of files) {
+		await removeStored(env, [file.storageKey]);
+		await db.delete(courseFiles).where(eq(courseFiles.id, file.id));
+	}
+}
+
 export async function deleteFile(env: Env, db: Db, courseId: string, fileId: string) {
 	const file = await db
 		.select({ storageKey: courseFiles.storageKey })
