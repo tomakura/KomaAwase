@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "49e171c1-d0c3-4a0e-bd56-bb6557cd6bfa",
-  "prevId": "d98c1547-25be-4d08-b972-03b267bb1ebe",
+  "id": "d98c1547-25be-4d08-b972-03b267bb1ebe",
+  "prevId": "6e22e777-2ca5-4484-94c5-efe6bbe95992",
   "tables": {
     "auth_challenges": {
       "name": "auth_challenges",
@@ -1595,21 +1595,6 @@
           "autoincrement": false,
           "default": true
         },
-        "free_only": {
-          "name": "free_only",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1692,14 +1677,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": true
-        },
-        "free_only": {
-          "name": "free_only",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1788,20 +1765,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "invite_expires_at": {
-          "name": "invite_expires_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "invite_uses_left": {
-          "name": "invite_uses_left",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "approval": {
@@ -3331,14 +3294,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": true
-        },
-        "friend_share": {
-          "name": "friend_share",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'all'"
         },
         "import_consent_at": {
           "name": "import_consent_at",

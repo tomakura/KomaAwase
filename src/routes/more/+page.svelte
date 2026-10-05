@@ -87,6 +87,7 @@
 				</form>
 				{@render link('/more/periods', '時限と時刻', data.periodsLabel)}
 				{@render link('/more/terms', '学期の区切り', data.termsLabel)}
+				{@render link('/calendar?back=/more', '日程（休み・試験期間）')}
 			</div>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		</section>

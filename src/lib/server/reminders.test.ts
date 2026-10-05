@@ -217,4 +217,24 @@ describe('sendDueReminders', () => {
 		w.run(`UPDATE courses SET sync_mode = 'personal' WHERE id = 'c1'`);
 		expect((await fire(w, TUESDAY_1230)).sent.map((s) => s.message.title)).toEqual(['3限 サンプル演習 II が10分後に始まります']);
 	});
+
+	it('sends nothing on a day off, and follows a class moved to another day', async () => {
+		const w = world();
+		w.run(`INSERT INTO calendar_entries (id, timetable_id, kind, label, start_date, end_date) VALUES ('e1', 't1', 'off', '休み', '2026-09-28', '2026-09-30')`);
+		expect((await fire(w, TUESDAY_1230)).count).toBe(0);
+		w.run(`DELETE FROM calendar_entries`);
+		// Tuesday's class held on Thursday 10/1 in the 5th period (16:00) instead
+		w.run(`INSERT INTO course_moves (id, course_id, from_date, to_date, period, span, room) VALUES ('m1', 'c1', '2026-09-29', '2026-10-01', 5, 1, 'B2')`);
+		expect((await fire(w, TUESDAY_1230)).count).toBe(0);
+		const { sent } = await fire(w, at(15, 50, 1, 10));
+		expect(sent.map((s) => [s.message.title, s.message.body])).toEqual([['5限 サンプル演習 II が10分後に始まります', '16:00開始 · B2']]);
+	});
+
+	it('sends nothing in the quiet hours the person chose', async () => {
+		const w = world();
+		w.run(`UPDATE users SET notify = '{"quiet":{"from":"12:00","to":"13:00"}}' WHERE id = 'u1'`);
+		expect((await fire(w, TUESDAY_1230)).count).toBe(0);
+		w.run(`UPDATE users SET notify = '{"quiet":{"from":"23:00","to":"07:00"}}' WHERE id = 'u1'`);
+		expect((await fire(w, TUESDAY_1230)).count).toBe(1);
+	});
 });

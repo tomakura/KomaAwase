@@ -1,5 +1,6 @@
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
+import { STEPS_MAX, STEP_TEXT_MAX, SUBMIT_TO_MAX, weeklyDates, type TaskStep } from '$lib/tasks';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseNotes, courses } from './db/schema';
@@ -10,10 +11,23 @@ const CANCEL_NOTE_MAX = 100;
 
 type NoteInput =
 	| { kind: 'memo'; date: string; body: string }
-	| { kind: 'task'; body: string; due: string | null }
+	| { kind: 'task'; body: string; due: string | null; dueTime: string | null; submitTo: string | null; steps: TaskStep[] | null }
 	| { kind: 'cancel'; date: string; body: string };
 
 const length = (s: string) => [...s].length;
+const isTime = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+
+// The steps as the form sends them: their texts, and whether each is done ('1') in the same order
+function readSteps(form: FormData): TaskStep[] | { message: string } {
+	const done = form.getAll('stepDone').map(String);
+	const steps = form
+		.getAll('step')
+		.map((text, i) => ({ text: String(text).trim(), done: done[i] === '1' }))
+		.filter((s) => s.text);
+	if (steps.length > STEPS_MAX) return { message: `チェック項目は${STEPS_MAX}個までです` };
+	if (steps.some((s) => length(s.text) > STEP_TEXT_MAX)) return { message: `チェック項目は1つ${STEP_TEXT_MAX}文字までです` };
+	return steps;
+}
 
 export function parseNote(form: FormData): { note: NoteInput } | { message: string } {
 	const kind = form.get('kind');
@@ -28,7 +42,14 @@ export function parseNote(form: FormData): { note: NoteInput } | { message: stri
 		if (!body || length(body) > TASK_MAX) return { message: `課題の名前は1〜${TASK_MAX}文字で入れてください` };
 		const due = String(form.get('due') ?? '') || null;
 		if (due && !isDate(due)) return { message: '締切の日付を確かめてください' };
-		return { note: { kind, body, due } };
+		const dueTime = String(form.get('dueTime') ?? '') || null;
+		if (dueTime && !isTime(dueTime)) return { message: '締切の時刻を確かめてください' };
+		if (dueTime && !due) return { message: '締切の時刻を入れるときは、日付も入れてください' };
+		const submitTo = String(form.get('submitTo') ?? '').trim() || null;
+		if (submitTo && length(submitTo) > SUBMIT_TO_MAX) return { message: `提出先は${SUBMIT_TO_MAX}文字までです` };
+		const steps = readSteps(form);
+		if ('message' in steps) return steps;
+		return { note: { kind, body, due, dueTime, submitTo, steps: steps.length ? steps : null } };
 	}
 	if (kind === 'cancel') {
 		if (!isDate(date)) return { message: '休講の日を入れてください' };
@@ -36,6 +57,30 @@ export function parseNote(form: FormData): { note: NoteInput } | { message: stri
 		return { note: { kind, date, body } };
 	}
 	return { message: '追加するものを選んでください' };
+}
+
+/**
+ * The last due date of a weekly homework, when the form asks for one ('repeat' on). Null when
+ * it doesn't; a message when it can't be.
+ */
+export function parseRepeat(form: FormData, note: NoteInput): { until: string | null } | { message: string } {
+	if (form.get('repeat') !== 'on' || note.kind !== 'task') return { until: null };
+	const until = String(form.get('until') ?? '');
+	if (!note.due) return { message: 'くり返すときは、締切の日付を入れてください' };
+	if (!isDate(until) || until < note.due) return { message: 'くり返す最後の日を確かめてください' };
+	return { until };
+}
+
+/** A weekly homework: one copy a week from its due date to `until`, linked by one series id */
+export async function addWeeklyTask(db: Db, courseId: string, note: Extract<NoteInput, { kind: 'task' }>, until: string) {
+	const seriesId = crypto.randomUUID();
+	const steps = note.steps?.map((s) => ({ ...s, done: false })) ?? null;
+	const rows = weeklyDates(note.due ?? until, until).map((due) => ({ courseId, ...note, due, steps, seriesId }));
+	// D1 takes at most 100 bound values per query
+	const inserts: BatchItem<'sqlite'>[] = [];
+	for (let i = 0; i < rows.length; i += 5) inserts.push(db.insert(courseNotes).values(rows.slice(i, i + 5)));
+	// One batch, so a series is added whole or not at all
+	if (inserts.length) await db.batch(inserts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
 export async function addNote(db: Db, courseId: string, note: NoteInput) {
@@ -50,9 +95,12 @@ export async function addNote(db: Db, courseId: string, note: NoteInput) {
 // Changes what was written; the kind, the day it was added and the place in the order stay.
 export async function updateNote(db: Db, courseId: string, noteId: string, note: NoteInput) {
 	const { kind, ...fields } = note;
+	// A weekly homework whose due date is taken away leaves its series: without a date it
+	// has no place in it, and 「これ以降ぜんぶ」 couldn't tell what comes after it.
+	const leaves = note.kind === 'task' && !note.due ? { seriesId: null } : {};
 	await db
 		.update(courseNotes)
-		.set(fields)
+		.set({ ...fields, ...leaves })
 		.where(and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId), eq(courseNotes.kind, kind)));
 }
 
@@ -82,6 +130,10 @@ export function loadNotes(db: Db, courseId: string) {
 			date: courseNotes.date,
 			body: courseNotes.body,
 			due: courseNotes.due,
+			dueTime: courseNotes.dueTime,
+			submitTo: courseNotes.submitTo,
+			steps: courseNotes.steps,
+			seriesId: courseNotes.seriesId,
 			done: courseNotes.done,
 			sortOrder: courseNotes.sortOrder
 		})
@@ -110,6 +162,42 @@ export async function setTaskDone(db: Db, courseId: string, noteId: string, done
 		.where(and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId), eq(courseNotes.kind, 'task')));
 }
 
-export async function deleteNote(db: Db, courseId: string, noteId: string) {
-	await db.delete(courseNotes).where(and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId)));
+// Checks off (or not) one step of a homework, by its place in the list. Only that step is
+// written, so two quick checks don't undo each other.
+export async function setStepDone(db: Db, courseId: string, noteId: string, index: number, done: boolean) {
+	if (!Number.isInteger(index) || index < 0 || index >= STEPS_MAX) return;
+	const path = `$[${index}].done`;
+	await db
+		.update(courseNotes)
+		.set({ steps: sql`json_set(${courseNotes.steps}, ${path}, json(${done ? 'true' : 'false'}))` })
+		.where(
+			and(
+				eq(courseNotes.id, noteId),
+				eq(courseNotes.courseId, courseId),
+				eq(courseNotes.kind, 'task'),
+				sql`${index} < json_array_length(${courseNotes.steps})`
+			)
+		);
+}
+
+// `later`: a weekly homework's copies from this one on go too
+export async function deleteNote(db: Db, courseId: string, noteId: string, later = false) {
+	const own = and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId));
+	if (later) {
+		const note = await db.select({ seriesId: courseNotes.seriesId, due: courseNotes.due }).from(courseNotes).where(own).get();
+		if (note?.seriesId && note.due) {
+			await db
+				.delete(courseNotes)
+				.where(
+					and(
+						eq(courseNotes.courseId, courseId),
+						eq(courseNotes.seriesId, note.seriesId),
+						isNotNull(courseNotes.due),
+						gte(courseNotes.due, note.due)
+					)
+				);
+			return;
+		}
+	}
+	await db.delete(courseNotes).where(own);
 }

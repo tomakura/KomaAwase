@@ -63,6 +63,7 @@
 			{@render link('/more/university', '大学', data.universityName ?? '未設定')}
 			{@render link('/more/terms', '学期の区切り', data.termsLabel)}
 			{@render link('/more/periods', '時限と時刻', data.periodsLabel)}
+			{@render link('/calendar?back=/more/timetable', '日程（休み・試験期間）')}
 		</div>
 	</section>
 

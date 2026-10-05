@@ -19,6 +19,8 @@ erDiagram
   COURSES ||--o{ COURSE_NOTES : has
   COURSES ||--o{ COURSE_FILES : has
   COURSES ||--o{ COURSE_ABSENCES : has
+  COURSES ||--o{ COURSE_MOVES : has
+  TIMETABLES ||--o{ CALENDAR_ENTRIES : has
   USERS ||--o{ EVENTS : has
   COURSES |o--o{ EVENTS : "belongs to"
   SHARED_COURSES ||--o{ COURSES : "synced from"
@@ -33,10 +35,12 @@ erDiagram
 | `COURSE_TERMS` | course_id, term_id | 授業と学期は多対多。「Q1とQ2」「通年」を表せる |
 | `COURSE_SLOTS` | course_id, weekday, period_number, span, week_pattern, room | 週2回なら2行。`span` は連続コマ数、`week_pattern` は毎週（`every`）・奇数週（`odd`）・偶数週（`even`）。週は学期の始まる週を1週目として数える。**教室は枠ごと**。枠が0行の授業はオンデマンド・集中講義 |
 | `COURSE_TEACHERS` | course_id, name, sort_order | 先生は何人でも |
-| `COURSE_NOTES` | course_id, kind, date, body, due, done, sort_order | `kind` は `memo`・`task`・`cancel`。`date` はメモの日付か休講の日、`due` は課題の締切。授業につながるので、どの枠から開いても同じ。`sort_order` はメモを手で並べたときの順（小さいほど上）で、メモだけが使う。並べていなければ null で、日付の新しい順・同じ日は足した順の新しい方が上（`src/lib/notes.ts` の `orderMemos`）。並べたあとに足したメモは、いちばん上の数より小さい値を付けて先頭に置く。書いた中身（メモ・課題の名前と締切・休講の日とメモ）は直せて、直しても種類・足した日・順は変わらない |
+| `COURSE_NOTES` | course_id, kind, date, body, due, due_time, submit_to, steps, series_id, done, sort_order | `kind` は `memo`・`task`・`cancel`。`date` はメモの日付か休講の日、`due` は課題の締切。授業につながるので、どの枠から開いても同じ。`sort_order` はメモを手で並べたときの順（小さいほど上）で、メモだけが使う。並べていなければ null で、日付の新しい順・同じ日は足した順の新しい方が上（`src/lib/notes.ts` の `orderMemos`）。並べたあとに足したメモは、いちばん上の数より小さい値を付けて先頭に置く。書いた中身（メモ・課題の名前と締切・休講の日とメモ）は直せて、直しても種類・足した日・順は変わらない。課題は締切の時刻（`due_time`、日付があるときだけ）、提出先（`submit_to`、文字でも URL でもよく、`https://` で始まるものだけリンクにする）、チェック項目（`steps`、`[{text, done}]` の JSON、100個まで）を持てる。毎週くり返す課題は、締切の日から1週ごとに最大20件を一度に作り、同じ `series_id` を付ける（消すとき「これ以降ぜんぶ」で使う） |
 | `COURSE_FILES` | course_id, storage_key, name, mime, size | 資料。実体はシンレンタルサーバー（`relay/files.php`）に `storage_key` の名前で置く。本人しか見られない |
+| `COURSE_MOVES` | course_id, from_date, to_date, period, span, room | 授業ごとの振替。`from_date` はその授業がない日（休講と同じ扱い）、`to_date` の `period` から `span` コマに1回だけある。本人のもので、友だちや画像の書き出しには出さない |
+| `CALENDAR_ENTRIES` | timetable_id, kind, label, start_date, end_date | 時間割の日程。`kind` は `off`（休みの日。授業を出さず、授業前の通知も送らない）か `exam`（試験期間。印を出すだけ）。1行で数日をまとめられる。祝日は `src/lib/holidays.ts` で計算して入れる（外のサービスには取りに行かない）。大学の日程は `universities.calendar_preset` から、使う人が選んだときだけ写す |
 | `COURSE_ABSENCES` | course_id, date | 欠席した日。1つの授業で1日1行（course_id と date で一意）。本人のもので、共有しない |
-| `EVENTS` | user_id, title, date, start_time, end_time, place, memo, course_id | 予定のイベント。`start_time` が null なら終日。`course_id` は授業のイベント（試験など）で、授業を消すと null になり、イベントは残る。課題は `COURSE_NOTES` のままで、予定のタブが両方を並べる |
+| `EVENTS` | user_id, title, date, start_time, end_time, place, memo, course_id, exam, scope, bring | 予定のイベント。`start_time` が null なら終日。`course_id` は授業のイベント（試験など）で、授業を消すと null になり、イベントは残る。課題は `COURSE_NOTES` のままで、予定のタブが両方を並べる。`exam` が試験で、`scope`（範囲）と `bring`（持ち物）を持てる。予定のタブの「試験」で近い順に並ぶ |
 
 同期している授業（`synced`）は、授業名・先生・曜日時限・教室・隔週・授業の形を `SHARED_COURSES` から読む。単位数も共有授業から読む。色・取る学期・メモ・資料・課題・休講・欠席・欠席できる回数は本人のもの。休講は、同期しているほかの人に人数だけ見せる（[運営まわり](#運営まわり)の `CANCELLATION_HIDES`、`src/lib/server/cancellations.ts`）。
 
@@ -58,7 +62,7 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `UNIVERSITIES` | name, email_domains, term_preset, period_preset, source | `name` は一意。`source` は `preset`（ひな形あり）か `user`（だれかが入力した名前。ひな形なし）。入力候補に出るのは `preset` と、`users.university_id` で選んでいる人が3人以上（`SUGGEST_MIN_USERS`）の大学だけ。`user` の名前は、入力した本人はそのまま使えるが、3人に届くまでほかの人の候補には出ない（`/admin` の「利用者が作った大学」で人数を見られる）。`email_domains` は在籍確認に使い、完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する） |
+| `UNIVERSITIES` | name, email_domains, term_preset, period_preset, calendar_preset, source | `name` は一意。`source` は `preset`（ひな形あり）か `user`（だれかが入力した名前。ひな形なし）。入力候補に出るのは `preset` と、`users.university_id` で選んでいる人が3人以上（`SUGGEST_MIN_USERS`）の大学だけ。`user` の名前は、入力した本人はそのまま使えるが、3人に届くまでほかの人の候補には出ない（`/admin` の「利用者が作った大学」で人数を見られる）。`email_domains` は在籍確認に使い、完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する）。`calendar_preset` はある1年度の休み・試験期間（`{year, source, checkedAt, entries}`、`source` は出典の URL、`checkedAt` は確認した日）。学期のひな形と同じくマイグレーションで入れる |
 | `SHARED_COURSES` | university_id, year, code, title, terms, delivery, intensive_from, intensive_to, credits, source, version | `credits` は単位数で、同期しているみんなで同じ値。`code` はシラバスの授業コード。`source` は `syllabus` か `user`。`terms` は開講する学期の名前（Q3 など）で、登録したときの値のまま変えない（Q3 だけ取る人の保存で「Q3・Q4 の授業」が書き換わらないように）。「授業をさがす」で学期をしぼるのに使う |
 | `SHARED_COURSE_SLOTS` | shared_course_id, weekday, period_number, span, week_pattern, room | シラバスに教室がない大学は、みんなの登録で埋める |
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |

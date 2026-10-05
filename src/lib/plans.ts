@@ -7,13 +7,18 @@ export type Plan = {
 	id: string;
 	title: string;
 	date: string | null; // a task may have no due date
-	start: string | null;
+	start: string | null; // a task's due time
 	end: string | null;
 	place: string | null;
 	memo: string | null;
 	courseId: string | null;
 	course: string | null;
 	done: boolean;
+	// A task's steps done, as 2/3
+	steps: string | null;
+	exam: boolean;
+	scope: string | null;
+	bring: string | null;
 };
 
 export const SECTIONS = [
