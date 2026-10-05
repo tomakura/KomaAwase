@@ -84,7 +84,7 @@ export async function exportData(db: Db, user: { id: string }) {
 				.where(eq(timetables.userId, me))
 				.orderBy(asc(courseNotes.createdAt)),
 			db
-				.select({ courseId: courseFiles.courseId, name: courseFiles.name, mime: courseFiles.mime, size: courseFiles.size })
+				.select({ id: courseFiles.id, courseId: courseFiles.courseId, name: courseFiles.name, mime: courseFiles.mime, size: courseFiles.size })
 				.from(courseFiles)
 				.innerJoin(courses, eq(courses.id, courseFiles.courseId))
 				.innerJoin(timetables, own(courses))
@@ -169,7 +169,8 @@ export async function exportData(db: Db, user: { id: string }) {
 						notes: notes
 							.filter((n) => n.note.courseId === c.id)
 							.map(({ note: n }) => ({ kind: n.kind, date: n.date, body: n.body, due: n.due, done: n.done })),
-						files: by(files, c.id).map(({ name, mime, size }) => ({ name, mime, size }))
+						// Where the file itself is read from, for a backup that includes the files (backup.ts)
+						files: by(files, c.id).map(({ id, name, mime, size }) => ({ name, mime, size, url: `/courses/${c.id}/files/${id}` }))
 					};
 				})
 		})),
