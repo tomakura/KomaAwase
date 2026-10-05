@@ -48,6 +48,32 @@ describe('restoreBackup', () => {
 		expect(t.rows(`SELECT course_id FROM events WHERE user_id = 'u2'`)).toEqual([{ course_id: id }]);
 	});
 
+	it('brings back days off, moves, the task details and exams', async () => {
+		const t = world();
+		t.run(`UPDATE course_notes SET due_time = '23:59', submit_to = 'https://lms.example.test', steps = '[{"text":"下書き","done":true}]' WHERE id = 'n1'`);
+		t.run(`INSERT INTO calendar_entries (id, timetable_id, kind, label, start_date, end_date) VALUES ('ce1', 't1', 'off', '秋休み', '2026-09-20', '2026-09-30')`);
+		t.run(`INSERT INTO course_moves (id, course_id, from_date, to_date, period, span, room) VALUES ('m1', 'c1', '2026-10-12', '2026-10-17', 1, 2, 'B201')`);
+		t.run(`UPDATE events SET exam = 1, scope = '1〜5章', bring = '電卓' WHERE id = 'e1'`);
+		const backup = await saved(t);
+		const { courseIds } = await restoreBackup(t.db, { id: 'u2', universityId: null }, backup, ['add'], true);
+		const id = courseIds[0][0];
+		expect(t.rows(`SELECT due_time, submit_to, steps FROM course_notes WHERE course_id = ?`, id)).toEqual([
+			{ due_time: '23:59', submit_to: 'https://lms.example.test', steps: '[{"text":"下書き","done":true}]' }
+		]);
+		expect(t.rows(`SELECT from_date, to_date, period, span, room FROM course_moves WHERE course_id = ?`, id)).toEqual([
+			{ from_date: '2026-10-12', to_date: '2026-10-17', period: 1, span: 2, room: 'B201' }
+		]);
+		expect(
+			t.rows(`SELECT ce.kind, ce.label, ce.start_date, ce.end_date FROM calendar_entries ce JOIN timetables tt ON tt.id = ce.timetable_id WHERE tt.user_id = 'u2'`)
+		).toEqual([{ kind: 'off', label: '秋休み', start_date: '2026-09-20', end_date: '2026-09-30' }]);
+		expect(t.rows(`SELECT exam, scope, bring FROM events WHERE user_id = 'u2'`)).toEqual([{ exam: 1, scope: '1〜5章', bring: '電卓' }]);
+
+		// A merge adds only the days off the timetable lacks
+		t.run(`DELETE FROM courses WHERE id = 'c2'`);
+		await restoreBackup(t.db, { id: 'u1', universityId: null }, backup, ['merge'], false);
+		expect(t.rows(`SELECT count(*) AS n FROM calendar_entries WHERE timetable_id = 't1'`)[0].n).toBe(1);
+	});
+
 	it('does not add a year the account has, and skips', async () => {
 		const t = world();
 		const backup = await saved(t);
