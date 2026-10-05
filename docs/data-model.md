@@ -31,7 +31,7 @@ erDiagram
 | `TIMETABLES` | user_id, university_id, year, name, archived | 年度ごとに1つ（user_id と year で一意）。新しい年度を作ると古いものは `archived` になる。はじめの設定で作るか、年度が変わってはじめて開いたときに、大学のひな形（なければ前の年度の形を1年ずらしたもの）から作る |
 | `TERMS` | timetable_id, name, group_name, start_date, end_date, sort_order | 前期・Q1 など。`group_name` はタブの上に出すまとまり（Q1・Q2 なら前期）。本人が変えられる。変えて消えた学期の授業は、日付が重なる学期（なければ1年の中で同じ位置の学期）に移す |
 | `PERIODS` | timetable_id, number, start_time, end_time | 0限から。変えても授業の `period_number` はそのまま残す |
-| `COURSES` | timetable_id, shared_course_id, sync_mode, title, color, delivery, intensive_from, intensive_to, credits, absence_limit | `credits` は単位数（0.5きざみ）で、同期中は共有授業の値を読む。`absence_limit` は欠席できる回数で、本人のもの。どちらも空なら、大学の決まり（`src/lib/courses.ts` の `creditsOf`・`absenceLimitOf`）があればその値を使う。`sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ）。`delivery` は枠のない授業の形（`ondemand` か `intensive`）で、集中講義は期間も持てる。`shared_course_id` は外部キーにしていない（あとから足すとテーブルを作り直すことになるうえ、共有授業は消さないので） |
+| `COURSES` | timetable_id, shared_course_id, sync_mode, title, color, delivery, intensive_from, intensive_to, credits, absence_limit, shared_seen_at | `credits` は単位数（0.5きざみ）で、同期中は共有授業の値を読む。`absence_limit` は欠席できる回数で、本人のもの。どちらも空なら、大学の決まり（`src/lib/courses.ts` の `creditsOf`・`absenceLimitOf`）があればその値を使う。`sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ）。`delivery` は枠のない授業の形（`ondemand` か `intensive`）で、集中講義は期間も持てる。`shared_course_id` は外部キーにしていない（あとから足すとテーブルを作り直すことになるうえ、共有授業は消さないので） |
 | `COURSE_TERMS` | course_id, term_id | 授業と学期は多対多。「Q1とQ2」「通年」を表せる |
 | `COURSE_SLOTS` | course_id, weekday, period_number, span, week_pattern, room | 週2回なら2行。`span` は連続コマ数、`week_pattern` は毎週（`every`）・奇数週（`odd`）・偶数週（`even`）。週は学期の始まる週を1週目として数える。**教室は枠ごと**。枠が0行の授業はオンデマンド・集中講義 |
 | `COURSE_TEACHERS` | course_id, name, sort_order | 先生は何人でも |
@@ -49,6 +49,7 @@ erDiagram
 - 編集画面は開いたときの `version` を送る。保存するときにもう進んでいたら、だれかの変更を見ないまま上書きしないように、保存を止めて読み込み直してもらう。更新そのものも `version` が一致するときだけ行い、ずれていたら batch ごと失敗させる（D1 の batch は途中で失敗すると全部取り消される）
 - 「自分だけで使う」から同期に戻すと、フォームは共有授業の値に戻る。自分用に変えた内容で共有データを上書きしないため
 - 自分で入力した授業も、初期値は「みんなと同期する」。同じ大学の人が「授業をさがす」で選べるようになる
+- `shared_seen_at` は、その人が共有授業の変更を最後に見た時刻。保存したときと「確認した」を押したときに入る。これより後のほかの人の変更は、詳細に前後の値を出し、時間割のマスに印を付ける（`src/lib/server/courses.ts` の `unseenChanges`）。「自分用に切り替える」は、見ていなかった最初の変更の前の値で「自分だけで使う」にする。変更は通知（種類 `sharedChange`）でも知らせる
 
 ## 共有授業データ
 
@@ -112,7 +113,8 @@ erDiagram
 | テーブル | 主な列 | メモ |
 |---|---|---|
 | `SESSIONS` | id, user_id, expires_at, created_at, last_used_at, user_agent, authed_at | ログインしている端末ごとに1行。`id` は Cookie の値の SHA-256。有効は30日で、残りが15日を切ると延ばす。`last_used_at` は最後に使った時刻（更新は1時間に1回まで）、`user_agent` は「iPhone・Safari」のような端末の名前を出すために持つ（400文字まで）。`authed_at` はその端末で最後にログインした時刻で、退会と運営の画面が「もう一度ログイン」を求めるか決めるのに使う。この列を持つ前のログインは null で、「不明な端末」と出す |
-| `PUSH_SUBSCRIPTIONS` | user_id, endpoint, p256dh, auth, session_id | 通知を受け取る端末。`session_id` は通知をオンにしたときのログイン（外部キーにはしていない。前からある行は null）。そのログインが終わる（ログアウト、「ログイン中の端末」から外す）と、この行も消える |
+| `PUSH_SUBSCRIPTIONS` | user_id, endpoint, p256dh, auth, session_id, last_ok_at, last_failed_at | 通知を受け取る端末。`session_id` は通知をオンにしたときのログイン（外部キーにはしていない。前からある行は null）。そのログインが終わる（ログアウト、「ログイン中の端末」から外す）と、この行も消える。`last_ok_at`・`last_failed_at` は最後に届けた時刻と届けられなかった時刻で、「通知 → 届かないときは」に出す |
+| `UNDO_ITEMS` | user_id, kind, row, expires_at | 消したメモ・課題（`note`）と予定（`event`）を、「元に戻す」のために10分だけ行ごと持っておく。古いものは毎日の Cron で消す |
 | `RATE_COUNTS` | key, n, expires_at | アプリ全体で数える回数。今はメールの送信数だけ（キーは `mail:h:<時間>` と `mail:d:<日本時間の日>`）。`expires_at` を過ぎた行は毎日の Cron で消す |
 
 ## 運営まわり
@@ -124,7 +126,9 @@ erDiagram
 | `WARNINGS` | user_id, body, sent_by, acknowledged_at | 運営からの警告。`acknowledged_at` が null のあいだ、本人の画面いっぱいに出る（古いものから1つずつ）。送った運営が退会すると `sent_by` だけ null になる |
 | `DAILY_STATS` | date, users, active_day, active_week, verified | 毎日の Cron が1日1行書く（日本時間の日付）。開いた人の数はあとから数え直せないので、`/admin/stats` のグラフのために残す |
 | `IMPORT_JOBS` | user_id, timetable_id, status, image, provider, result, error, attempts, retry_at, finished_at, closed_at | スクショ読み取りの順番待ちの正本。`status` は `queued`・`processing`・`retry`（翌日に再挑戦）・`done`・`failed`。`image` は切り抜いた画像（JPEG の data URL、1.4MB まで）で、読み終わるか、あきらめた時点で消す。`closed_at` は結果を保存したか閉じた時刻 |
-| `FEEDBACK` | user_id, kind, body, env, status | 不具合・要望。`env` は送る人が見て付けることを選んだ端末の情報だけ |
+| `FEEDBACK` | user_id, kind, body, env, status, reply, replied_at | 不具合・要望。`env` は送る人が見て付けることを選んだ端末の情報だけ。`status` は `open`（受付）・`doing`（対応中）・`closed`（対応済み）・`declined`（見送り）。`reply` は運営からのひと言で、送った人が「送ったもの」で見られる |
+| `STATUS_NOTES` | level, body, created_at, resolved_at | `/status` とアプリの上の帯に出す運営のお知らせ。`level` は `trouble`（障害）か `info`。「解決」にすると `resolved_at` が入り、1週間は「解決したこと」に出る |
+| `METRICS` | hour, name, n, total_ms | 品質の数字。1時間ごと（UTC）に、件数と合計時間だけを数える（エラー、通知の成否、読み取りの成否と時間、メールの失敗）。だれのものか、どのページかは持たない。30日で消す |
 | `CONTACT_MESSAGES` | name, email, body, status | お問い合わせ（`/contact`）。ログインしていない人も送れるので、`users` とはつなげない。`status` は `open` か `closed`（`/admin` で対応済み）。直近24時間で、全体で50件、1つのアドレスで3件まで |
 
 ## 退会したとき

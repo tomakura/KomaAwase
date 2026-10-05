@@ -1,14 +1,15 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, count, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { ABSENCE_LIMIT_MAX, COURSE_COLORS, CREDITS_MAX, isCourseColor, readNumber, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
-import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, timetables } from './db/schema';
+import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, sharedCourseEdits, timetables } from './db/schema';
+import { sharedChanges, sharedSource, type SharedChange } from '$lib/shared-changes';
 import { deleteCourseFiles } from './files';
 import { courseMovesQuery } from './calendar';
 import { loadNotes } from './notes';
-import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, syncedValues, writeShared, type SharedCourse } from './shared-courses';
+import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, syncedValues, writeShared, type SharedCourse, type SharedValues } from './shared-courses';
 import { loadShape, shapeQueries } from './timetable';
 import { sharedAccess } from './verify';
 
@@ -151,7 +152,8 @@ type SaveArgs = {
 	sharedAllowed?: boolean;
 };
 
-type PreparedCourse = { id: string; existing: SharedCourse | null; statements: BatchItem<'sqlite'>[] };
+// changedShared: the shared course this save changes for everyone, if any
+type PreparedCourse = { id: string; existing: SharedCourse | null; changedShared: string | null; statements: BatchItem<'sqlite'>[] };
 
 // Saves the course in the timetable. A synced course also adds itself to the shared data, or
 // updates the shared course it is linked to. The local copy is always written, so switching to
@@ -160,7 +162,7 @@ type PreparedCourse = { id: string; existing: SharedCourse | null; statements: B
 export async function saveCourse(db: Db, args: SaveArgs) {
 	const prepared = await prepareCourse(db, args);
 	if ('message' in prepared) return prepared;
-	return (await commitCourses(db, [prepared])) ?? { id: prepared.id };
+	return (await commitCourses(db, [prepared])) ?? { id: prepared.id, changedShared: prepared.changedShared };
 }
 
 /** The statements that save one course, so several can go in one batch (commitCourses). */
@@ -190,6 +192,7 @@ export async function prepareCourse(
 	}
 
 	let sharedCourseId = existing?.id ?? null;
+	let changedShared: string | null = null;
 	let syncMode = input.syncMode;
 	const shared: BatchItem<'sqlite'>[] = [];
 	if (syncMode === 'synced' && !existing && !(await allowed())) syncMode = 'personal';
@@ -213,6 +216,7 @@ export async function prepareCourse(
 		} else {
 			sharedCourseId = written.id;
 			shared.push(...written.statements);
+			if (written.changed && existing) changedShared = existing.id;
 		}
 	}
 
@@ -226,7 +230,9 @@ export async function prepareCourse(
 		credits: input.credits,
 		absenceLimit: input.absenceLimit,
 		syncMode,
-		sharedCourseId
+		sharedCourseId,
+		// What the form showed is what they have seen of the shared course
+		sharedSeenAt: new Date()
 	};
 	const rest: BatchItem<'sqlite'>[] = [];
 	if (courseId) {
@@ -261,6 +267,7 @@ export async function prepareCourse(
 	return {
 		id,
 		existing,
+		changedShared,
 		statements: [
 			courseId
 				? db.update(courses).set(values).where(eq(courses.id, id))
@@ -395,6 +402,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 		credits: course.credits
 	};
 	const values = course.syncMode === 'synced' && shared ? shared.values : local;
+	const changes = course.syncMode === 'synced' && shared ? await unseenChanges(db, userId, course, shared) : [];
 	return {
 		timetable,
 		...shape,
@@ -408,9 +416,90 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 		},
 		absences,
 		moves,
-		shared: shared && { id: shared.id, source: shared.source, version: shared.version, values: shared.values },
+		shared: shared && {
+			id: shared.id,
+			source: shared.source,
+			// Where the values come from and when, as shown
+			sourceText: sharedSource(shared),
+			version: shared.version,
+			values: shared.values,
+			// What others changed since this person last looked, field by field
+			changes
+		},
 		notes
 	};
+}
+
+// The shared values before the first change by someone else since the course's owner last
+// looked; null when nobody else has changed it since
+async function unseenBefore(db: Db, userId: string, course: { sharedCourseId: string; sharedSeenAt: Date | null; createdAt: Date }) {
+	const first = await db
+		.select({ diff: sharedCourseEdits.diff })
+		.from(sharedCourseEdits)
+		.where(
+			and(
+				eq(sharedCourseEdits.sharedCourseId, course.sharedCourseId),
+				gt(sharedCourseEdits.createdAt, course.sharedSeenAt ?? course.createdAt),
+				or(isNull(sharedCourseEdits.userId), ne(sharedCourseEdits.userId, userId))
+			)
+		)
+		.orderBy(asc(sharedCourseEdits.createdAt), asc(sql`rowid`))
+		.get();
+	return (first?.diff.before as SharedValues | null | undefined) ?? null;
+}
+
+async function unseenChanges(db: Db, userId: string, course: { sharedSeenAt: Date | null; createdAt: Date }, shared: SharedCourse): Promise<SharedChange[]> {
+	const before = await unseenBefore(db, userId, { ...course, sharedCourseId: shared.id });
+	return before ? sharedChanges(before, shared.values) : [];
+}
+
+/** 確認した: the shared course's changes so far have been seen */
+export async function markSharedSeen(db: Db, courseId: string) {
+	await db.update(courses).set({ sharedSeenAt: new Date() }).where(eq(courses.id, courseId));
+}
+
+/**
+ * 自分用に切り替える: the course stops syncing and keeps the values from before the changes
+ * it hadn't seen. Nothing happens when there are none.
+ */
+export async function keepBeforeChanges(db: Db, userId: string, courseId: string) {
+	const course = await db.select().from(courses).where(eq(courses.id, courseId)).get();
+	if (!course || course.syncMode !== 'synced' || !course.sharedCourseId) return;
+	const before = await unseenBefore(db, userId, { ...course, sharedCourseId: course.sharedCourseId });
+	if (!before) return;
+	await db.batch([
+		db
+			.update(courses)
+			.set({
+				syncMode: 'personal',
+				title: before.title,
+				delivery: before.delivery,
+				intensiveFrom: before.intensiveFrom,
+				intensiveTo: before.intensiveTo,
+				credits: before.credits ?? null,
+				sharedSeenAt: new Date()
+			})
+			.where(eq(courses.id, courseId)),
+		db.delete(courseSlots).where(eq(courseSlots.courseId, courseId)),
+		db.delete(courseTeachers).where(eq(courseTeachers.courseId, courseId)),
+		...(before.slots.length
+			? [
+					db.insert(courseSlots).values(
+						before.slots.map((s) => ({
+							courseId,
+							weekday: s.weekday,
+							periodNumber: s.period,
+							span: s.span,
+							weekPattern: s.week ?? 'every',
+							room: s.room
+						}))
+					)
+				]
+			: []),
+		...(before.teachers.length
+			? [db.insert(courseTeachers).values(before.teachers.map((name, sortOrder) => ({ courseId, name, sortOrder })))]
+			: [])
+	]);
 }
 
 /**

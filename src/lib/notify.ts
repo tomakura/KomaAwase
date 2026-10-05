@@ -12,7 +12,9 @@ export const NOTIFY_KINDS = [
 	{ id: 'planEve', label: '前の日の20時に、明日の課題と予定を知らせる' },
 	{ id: 'taskMorning', label: '締め切りの日の朝8時に、今日の課題を知らせる', off: true },
 	{ id: 'taskBefore3h', label: '締め切りの3時間前に知らせる', off: true },
-	{ id: 'taskBefore1h', label: '締め切りの1時間前に知らせる', off: true }
+	{ id: 'taskBefore1h', label: '締め切りの1時間前に知らせる', off: true },
+	{ id: 'sharedChange', label: '同期している授業の内容が変わったとき' },
+	{ id: 'feedbackReply', label: '送った要望に運営から返事が来たとき' }
 ] as const;
 
 export type NotifyKind = (typeof NOTIFY_KINDS)[number]['id'];

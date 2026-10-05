@@ -15,7 +15,9 @@ function setup() {
 	const removed: unknown[][] = [];
 	const queued: { part: PushPart; delay?: number }[] = [];
 	const env: PushEnv = {
-		DB: { prepare: () => ({ bind: (...ids) => ({ all: async () => ({ results: [] }), run: async () => removed.push(ids) }) }) },
+		DB: {
+			prepare: (sql) => ({ bind: (...ids) => ({ all: async () => ({ results: [] }), run: async () => sql.startsWith('DELETE') && removed.push(ids) }) })
+		},
 		VAPID_PUBLIC_KEY: 'pub',
 		VAPID_PRIVATE_KEY: 'priv',
 		PUSH_QUEUE: { send: async (part, options) => queued.push({ part, delay: options?.delaySeconds }) }

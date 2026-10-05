@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+	import { ask } from '$lib/confirm.svelte';
+	import { offerUndo } from '$lib/toast.svelte';
+	import { draft } from '$lib/draft';
 	import { slide } from 'svelte/transition';
 	import { enhance } from '$app/forms';
 	import BottomNav from '$lib/components/BottomNav.svelte';
@@ -179,6 +183,7 @@
 			class="add-form"
 			method="POST"
 			action={editing ? '?/updateEvent' : kind === 'task' ? '?/addTask' : '?/addEvent'}
+			use:draft={editing ? null : `plans:${kind}`}
 			use:enhance={() =>
 				async ({ result, update }) => {
 					await update();
@@ -244,11 +249,12 @@
 			<form
 				method="POST"
 				action="?/removeEvent"
-				use:enhance={({ cancel }) => {
-					if (!confirm(`イベント「${editing?.title}」を消します`)) return cancel();
-					return async ({ update }) => {
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: `イベント「${editing?.title}」を消します`, ok: '消す', danger: true }))) return cancel();
+					return async ({ result, update }) => {
 						await update();
 						open = false;
+						offerUndo(result, invalidateAll);
 					};
 				}}
 			>

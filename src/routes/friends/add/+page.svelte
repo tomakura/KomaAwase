@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -73,8 +74,8 @@
 		<form
 			method="POST"
 			action="?/regenerate"
-			use:enhance={({ cancel }) => {
-				if (!confirm('今のリンクとコードは使えなくなります。作り直しますか？')) cancel();
+			use:enhance={async ({ cancel }) => {
+				if (!(await ask({ message: '今のリンクとコードは使えなくなります。作り直しますか？', ok: '作り直す' }))) return cancel();
 			}}
 		>
 			<button class="regenerate" type="submit">リンクとコードを作り直す</button>

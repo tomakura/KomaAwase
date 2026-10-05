@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { requireUser, safeNext } from '$lib/server/auth/next';
 import { feedback } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
@@ -8,9 +8,26 @@ const BODY_MAX = 2000;
 const DAILY_MAX = 10;
 const KINDS = ['bug', 'request', 'other'] as const;
 
-export const load: PageServerLoad = ({ locals, url }) => {
-	requireUser(locals, url);
-	return { from: safeNext(url.searchParams.get('from')) ?? '' };
+// How many of the person's own sends 送ったもの lists
+const SENT_SHOWN = 30;
+
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const me = requireUser(locals, url);
+	const sent = await locals.db
+		.select({
+			id: feedback.id,
+			kind: feedback.kind,
+			body: feedback.body,
+			status: feedback.status,
+			reply: feedback.reply,
+			repliedAt: feedback.repliedAt,
+			createdAt: feedback.createdAt
+		})
+		.from(feedback)
+		.where(eq(feedback.userId, me.id))
+		.orderBy(desc(feedback.createdAt))
+		.limit(SENT_SHOWN);
+	return { from: safeNext(url.searchParams.get('from')) ?? '', sent };
 };
 
 export const actions: Actions = {

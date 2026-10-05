@@ -61,6 +61,7 @@
 				<div class="text">
 					<b>{title}</b>
 					{#if detail}<span>{detail}</span>{/if}
+					{#if link !== 'online'}<a class="status-link" href="/status">稼働状況を見る</a>{/if}
 				</div>
 				{#if link !== 'online'}
 					<button class="refresh" type="button" onclick={() => connection.refresh()} disabled={busy} aria-label="最新の情報に更新">
@@ -155,6 +156,12 @@
 		font-size: 12px;
 		line-height: 1.5;
 		opacity: 0.85;
+	}
+
+	.status-link {
+		align-self: flex-start;
+		font-size: 12px;
+		color: inherit;
 	}
 
 	.refresh {

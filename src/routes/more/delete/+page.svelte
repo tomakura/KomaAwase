@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 
@@ -17,8 +18,8 @@
 		class="body"
 		method="POST"
 		bind:this={formEl}
-		use:enhance={({ cancel }) => {
-			if (!deleting && !confirm('本当に退会しますか？ 元に戻せません')) {
+		use:enhance={async ({ cancel }) => {
+			if (!deleting && !(await ask({ message: '本当に退会しますか？ 元に戻せません', ok: '退会する', danger: true }))) {
 				cancel();
 				return;
 			}

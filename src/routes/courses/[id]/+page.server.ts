@@ -1,11 +1,12 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { courseAbsences, courseNotes } from '$lib/server/db/schema';
-import { findOwnedCourse, loadCourse } from '$lib/server/courses';
+import { findOwnedCourse, keepBeforeChanges, loadCourse, markSharedSeen } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
 import { addMove, deleteMove, parseMove } from '$lib/server/calendar';
-import { addEvent, deleteEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
+import { addEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
+import { deleteEventKept, deleteNoteKept } from '$lib/server/undo';
 import { addNote, addWeeklyTask, deleteNote, orderMemoIds, parseNote, parseRepeat, setStepDone, setTaskDone, updateNote } from '$lib/server/notes';
 import { isDate, tokyoTime } from '$lib/time';
 import { sharedAccess } from '$lib/server/verify';
@@ -114,7 +115,7 @@ export const actions: Actions = {
 	removeEvent: async (event) => {
 		await ownCourse(event);
 		const form = await event.request.formData();
-		await deleteEvent(event.locals.db, event.locals.user!.id, String(form.get('id') ?? ''));
+		return { undo: await deleteEventKept(event.locals.db, event.locals.user!.id, String(form.get('id') ?? '')) };
 	},
 	// Today (Japan time); a day already recorded stays one
 	absent: async (event) => {
@@ -158,7 +159,22 @@ export const actions: Actions = {
 	remove: async (event) => {
 		const courseId = await ownCourse(event);
 		const form = await event.request.formData();
-		await deleteNote(event.locals.db, courseId, String(form.get('id')), form.get('later') === 'on');
+		// A weekly homework's copies from this one on go together, without 元に戻す
+		if (form.get('later') === 'on') {
+			await deleteNote(event.locals.db, courseId, String(form.get('id')), true);
+			return;
+		}
+		return { undo: await deleteNoteKept(event.locals.db, event.locals.user!.id, courseId, String(form.get('id'))) };
+	},
+	// 確認した on the shared course's changes
+	seenShared: async (event) => {
+		const courseId = await ownCourse(event);
+		await markSharedSeen(event.locals.db, courseId);
+	},
+	// 自分用に切り替える: stops syncing, with the values from before the changes
+	keepBefore: async (event) => {
+		const courseId = await ownCourse(event);
+		await keepBeforeChanges(event.locals.db, event.locals.user!.id, courseId);
 	},
 	removeFile: async (event) => {
 		const courseId = await ownCourse(event);

@@ -18,6 +18,7 @@ import {
 	writeShared
 } from '$lib/server/shared-courses';
 import { sharedAccess } from '$lib/server/verify';
+import { notifySharedChanged } from '$lib/server/shared-notify';
 import type { Actions, PageServerLoad } from './$types';
 
 // Shared data is for the university's students with an enrollment check: anyone with a
@@ -82,6 +83,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			id: course.id,
 			source: course.source,
 			version: course.version,
+			createdAt: course.createdAt,
+			updatedAt: course.updatedAt,
 			year: course.year,
 			terms: course.terms,
 			university: university?.name ?? '',
@@ -98,7 +101,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 
 export const actions: Actions = {
-	restore: async ({ locals, params, url, request }) => {
+	restore: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const course = await usable(locals.db, me, params.id);
 		if (!(await canEditShared(locals.db, me.id, course))) {
@@ -112,10 +115,11 @@ export const actions: Actions = {
 			version: Number(form.get('version'))
 		});
 		if ('message' in result) return fail(409, { message: result.message });
+		notifySharedChanged(platform, locals.db, me.id, [course.id]);
 		return { restored: true };
 	},
 	// Whoever runs the app fixes what others registered: the name, the teachers and the rooms
-	edit: async ({ locals, params, url, request }) => {
+	edit: async ({ locals, params, url, request, platform }) => {
 		const me = await requireAdmin(locals, url);
 		const course = await usable(locals.db, me, params.id);
 		const form = await request.formData();
@@ -150,6 +154,7 @@ export const actions: Actions = {
 		} catch {
 			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', edit: true });
 		}
+		notifySharedChanged(platform, locals.db, me.id, [course.id]);
 		return { edited: true };
 	},
 	// Fold this course into another: everyone syncing it syncs the other, and this one is deleted

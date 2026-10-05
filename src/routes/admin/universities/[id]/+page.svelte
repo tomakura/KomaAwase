@@ -1,12 +1,13 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let { data, form } = $props();
 
 	const u = $derived(data.university);
-	const confirmed = (message: string) => (input: { cancel: () => void }) => {
-		if (!confirm(message)) input.cancel();
+	const confirmed = (message: string, ok: string) => async (input: { cancel: () => void }) => {
+		if (!(await ask({ message, ok, danger: true }))) input.cancel();
 	};
 </script>
 
@@ -36,7 +37,7 @@
 		<form
 			method="POST"
 			action="?/remove"
-			use:enhance={confirmed(`「${u.name}」を消します。${u.users}人の大学が未設定に戻り、元に戻せません`)}
+			use:enhance={confirmed(`「${u.name}」を消します。${u.users}人の大学が未設定に戻り、元に戻せません`, '消す')}
 		>
 			<button class="btn danger" type="submit">この大学を消す</button>
 		</form>

@@ -1,42 +1,21 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import ReportForm from '$lib/components/ReportForm.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
-	import { DAY_NAMES, deliveryLabel, weekLabel, type Delivery, type WeekPattern } from '$lib/courses';
+	import { sharedChanges, sharedFields, sharedSource, slotText, type SharedValuesLike } from '$lib/shared-changes';
 	import { tokyoTime } from '$lib/time';
 
 	let { data, form } = $props();
 
-	type Values = {
-		title: string;
-		teachers: string[];
-		slots: { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null }[];
-		delivery: Delivery | null;
-		intensiveFrom: string | null;
-		intensiveTo: string | null;
-		credits?: number | null; // edits from before credits were kept have none
-	};
-
-	const slotText = (s: Values['slots'][number]) =>
-		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}${weekLabel(s.week) ? `（${weekLabel(s.week)}）` : ''}${s.room ? ` ${s.room}` : ''}`;
-	const fields = (v: Values) => ({
-		授業名: v.title,
-		先生: v.teachers.join('・') || 'なし',
-		'曜日・時限': v.slots.map(slotText).join('、') || deliveryLabel(v.delivery, v.intensiveFrom, v.intensiveTo) || 'なし',
-		単位数: v.credits ? `${v.credits}単位` : 'なし'
-	});
-
 	// What an edit changed, field by field
 	function changes(diff: { before: unknown; after: unknown }) {
-		const after = fields(diff.after as Values);
+		const after = sharedFields(diff.after as SharedValuesLike);
 		if (!diff.before) return [{ label: '最初の登録', text: `${after['授業名']} · ${after['曜日・時限']}` }];
-		const before = fields(diff.before as Values);
-		return (Object.keys(after) as (keyof typeof after)[]).flatMap((key) =>
-			before[key] === after[key] ? [] : [{ label: key, text: `${before[key]} → ${after[key]}` }]
-		);
+		return sharedChanges(diff.before as SharedValuesLike, diff.after as SharedValuesLike).map((c) => ({ label: c.label, text: `${c.before} → ${c.after}` }));
 	}
 
 	const when = (d: Date) => {
@@ -45,7 +24,7 @@
 		return `${t.date.replace(/-/g, '/')} ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 	};
 
-	const current = $derived(fields(data.course.values));
+	const current = $derived(sharedFields(data.course.values));
 	// The same page with another page of the history (keeps ?back=)
 	function historyPage(n: number) {
 		const url = new URL(page.url);
@@ -80,10 +59,14 @@
 				<dd>{current['先生']}</dd>
 				<dt>曜日・時限</dt>
 				<dd>{current['曜日・時限']}</dd>
+				<dt>教室</dt>
+				<dd>{current['教室']}</dd>
 				{#if data.course.terms.length}
 					<dt>学期</dt>
 					<dd>{data.course.year}年度 {data.course.terms.join('・')}</dd>
 				{/if}
+				<dt>出どころ</dt>
+				<dd>{sharedSource(data.course)}</dd>
 			</dl>
 			<p class="meta">
 				{data.course.university} · {data.course.source === 'syllabus' ? 'シラバスから' : 'みんなの登録'} · {data.users}人が同期中{data.isAdmin ? `・使用中 ${data.using}人` : ''}
@@ -112,7 +95,7 @@
 				</label>
 				{#each data.course.values.slots as slot, i (i)}
 					<label class="field">
-						教室（{slotText({ ...slot, room: null })}）
+						教室（{slotText(slot)}）
 						<input name="room" value={slot.room ?? ''} maxlength="20" />
 					</label>
 				{/each}
@@ -133,9 +116,9 @@
 						<p>「{data.course.values.title}」を「{target.values.title}」にまとめます。</p>
 						<dl>
 							<dt>まとめる授業</dt>
-							<dd>{fields(data.course.values)['授業名']} · {fields(data.course.values)['先生']} · {fields(data.course.values)['曜日・時限']}</dd>
+							<dd>{sharedFields(data.course.values)['授業名']} · {sharedFields(data.course.values)['先生']} · {sharedFields(data.course.values)['曜日・時限']}</dd>
 							<dt>まとめ先</dt>
-							<dd>{fields(target.values)['授業名']} · {fields(target.values)['先生']} · {fields(target.values)['曜日・時限']}</dd>
+							<dd>{sharedFields(target.values)['授業名']} · {sharedFields(target.values)['先生']} · {sharedFields(target.values)['曜日・時限']}</dd>
 						</dl>
 						<ul>
 							<li>この授業を使っている{data.merge.target.people}人が、まとめ先と同期します。授業名・先生・教室・コマも、まとめ先の内容になります</li>
@@ -163,7 +146,7 @@
 					</form>
 					<div class="ui-list">
 						{#each data.merge.candidates as c (c.id)}
-							{@const v = fields(c.values)}
+							{@const v = sharedFields(c.values)}
 							<a class="candidate" href={mergeHref(data.merge.query, c.id)}>
 								<b>{v['授業名']}</b>
 								<span>{v['先生']} · {v['曜日・時限']} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人</span>
@@ -183,8 +166,8 @@
 				<form
 					method="POST"
 					action="?/remove"
-					use:enhance={({ cancel }) => {
-						if (!confirm(`「${data.course.values.title}」を削除します。変更の履歴と報告も消えて、元に戻せません`)) cancel();
+					use:enhance={async ({ cancel }) => {
+						if (!(await ask({ message: `「${data.course.values.title}」を削除します。変更の履歴と報告も消えて、元に戻せません`, ok: '削除する', danger: true }))) return cancel();
 					}}
 				>
 					{#if form?.message && form.remove}<p class="error" role="alert">{form.message}</p>{/if}
@@ -214,8 +197,8 @@
 						<form
 							method="POST"
 							action="?/restore"
-							use:enhance={({ cancel }) => {
-								if (!confirm('この変更のあとの内容に戻します。同期しているみんなの時間割も変わります')) cancel();
+							use:enhance={async ({ cancel }) => {
+								if (!(await ask({ message: 'この変更のあとの内容に戻します。同期しているみんなの時間割も変わります', ok: '戻す' }))) return cancel();
 							}}
 						>
 							<input type="hidden" name="edit" value={edit.id} />

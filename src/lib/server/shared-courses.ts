@@ -49,6 +49,9 @@ export type SharedCourse = {
 	source: 'syllabus' | 'user';
 	terms: string[];
 	version: number;
+	// When it was added and last changed (ms), for where the values come from (sharedSource)
+	createdAt: number;
+	updatedAt: number;
 	values: SharedValues;
 };
 
@@ -106,6 +109,8 @@ export function sharedCoursesFrom(
 				source: r.source,
 				terms: r.terms,
 				version: r.version,
+				createdAt: r.createdAt.getTime(),
+				updatedAt: r.updatedAt.getTime(),
 				values: normalize({
 					title: r.title,
 					teachers: teachers.filter((t) => t.sharedCourseId === r.id).map((t) => t.name),

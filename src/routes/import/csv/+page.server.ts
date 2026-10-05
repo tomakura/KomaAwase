@@ -3,6 +3,7 @@ import { coursesOfCsv, parseCsv } from '$lib/csv';
 import { IMPORT_COURSES_MAX, groupImported, readImport } from '$lib/import';
 import { requireUser } from '$lib/server/auth/next';
 import { reviewBase, saveReviewed, suggestions } from '$lib/server/import/review';
+import { notifySharedChanged } from '$lib/server/shared-notify';
 import { currentTimetable } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
 import { currentTerm } from '$lib/terms';
@@ -53,10 +54,11 @@ export const actions: Actions = {
 			cut: courses.length > IMPORT_COURSES_MAX
 		};
 	},
-	save: async ({ locals, url, request }) => {
+	save: async ({ locals, url, request, platform }) => {
 		const { me, timetable } = await context(locals, url);
 		const saved = await saveReviewed(locals.db, me.id, timetable, await request.formData());
 		if ('status' in saved) return saved;
+		notifySharedChanged(platform, locals.db, me.id, saved.changedShared);
 		redirect(303, saved.termId ? `/?term=${encodeURIComponent(saved.termId)}` : '/');
 	}
 };

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import WarningScreen from '$lib/components/WarningScreen.svelte';
@@ -17,8 +18,8 @@
 
 	let body = $state('');
 	let previewing = $state(false);
-	const confirmed = (message: string) => (input: { cancel: () => void }) => {
-		if (!confirm(message)) input.cancel();
+	const confirmed = (message: string, ok: string) => async (input: { cancel: () => void }) => {
+		if (!(await ask({ message, ok, danger: true }))) input.cancel();
 	};
 </script>
 
@@ -96,17 +97,17 @@
 					<button class="btn" type="submit">利用を再開する</button>
 				</form>
 			{:else}
-				<form method="POST" action="?/suspend" use:enhance={confirmed('この人の利用を止めます。すべての端末からログアウトされ、ログインできなくなります')}>
+				<form method="POST" action="?/suspend" use:enhance={confirmed('この人の利用を止めます。すべての端末からログアウトされ、ログインできなくなります', '止める')}>
 					<button class="btn" type="submit">利用を止める</button>
 				</form>
 			{/if}
-			<form method="POST" action="?/nickname" use:enhance={confirmed('ニックネームを消します。次に開いたとき、新しく決めてもらいます')}>
+			<form method="POST" action="?/nickname" use:enhance={confirmed('ニックネームを消します。次に開いたとき、新しく決めてもらいます', '消す')}>
 				<button class="btn" type="submit" disabled={!u.nickname}>ニックネームを戻す</button>
 			</form>
-			<form method="POST" action="?/photo" use:enhance={confirmed('写真を消します')}>
+			<form method="POST" action="?/photo" use:enhance={confirmed('写真を消します', '消す')}>
 				<button class="btn" type="submit" disabled={!u.hasPhoto}>写真を消す</button>
 			</form>
-			<form method="POST" action="?/remove" use:enhance={confirmed('この人を退会させます。時間割などのデータがすべて消え、元に戻せません')}>
+			<form method="POST" action="?/remove" use:enhance={confirmed('この人を退会させます。時間割などのデータがすべて消え、元に戻せません', '退会させる')}>
 				<button class="btn danger" type="submit">退会させる</button>
 			</form>
 		</div>

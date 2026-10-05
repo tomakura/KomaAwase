@@ -3,9 +3,10 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { tokyoTime } from '$lib/time';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const KINDS = { bug: '不具合', request: '要望', other: 'そのほか' } as const;
+	const STATUS = { open: '受付', doing: '対応中', closed: '対応済み', declined: '見送り' } as const;
 	const when = (d: Date) => {
 		const t = tokyoTime(d.getTime());
 		const m = Math.floor(t.minutes);
@@ -28,6 +29,7 @@
 			<div class="item">
 				<div class="meta">
 					<span class="tag">{KINDS[f.kind]}</span>
+					{#if f.status === 'doing'}<span class="tag">対応中</span>{/if}
 					<span class="date">{when(f.createdAt)}</span>
 				</div>
 				<p class="body">{f.body}</p>
@@ -44,11 +46,23 @@
 				{/if}
 				<div class="foot">
 					<span class="from">{f.sender ?? '（退会した人）'}{#if f.senderEmail}（{f.senderEmail}）{/if}から</span>
-					<form method="POST" action="?/closeFeedback" use:enhance>
-						<input type="hidden" name="id" value={f.id} />
-						<button class="small" type="submit">対応済み</button>
-					</form>
 				</div>
+				<form class="answer" method="POST" action="?/update" use:enhance={() => async ({ update }) => update({ reset: false })}>
+					<input type="hidden" name="id" value={f.id} />
+					<label class="field">
+						送った人に見える返事（任意）
+						<textarea name="reply" rows="2" maxlength="1000">{f.reply ?? ''}</textarea>
+					</label>
+					<div class="answer-row">
+						<select name="status" aria-label="状態">
+							{#each Object.entries(STATUS) as [value, label] (value)}
+								<option {value} selected={f.status === value}>{label}</option>
+							{/each}
+						</select>
+						<button class="small" type="submit">保存</button>
+					</div>
+					{#if form?.message && form.id === f.id}<p class="error" role="alert">{form.message}</p>{/if}
+				</form>
 			</div>
 		{:else}
 			<p class="ui-note">未対応の不具合・要望はありません。</p>
@@ -140,8 +154,47 @@
 		overflow-wrap: anywhere;
 	}
 
-	.foot form {
-		margin-left: auto;
+	.answer {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-top: 6px;
+		border-top: 1px solid var(--line);
+	}
+
+	.answer textarea {
+		box-sizing: border-box;
+		padding: 8px 10px;
+		border: 1px solid var(--line-strong);
+		border-radius: 10px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 14px;
+		resize: vertical;
+	}
+
+	.answer-row {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+	}
+
+	.answer select {
+		height: 34px;
+		padding: 0 8px;
+		border: 1px solid var(--line-bold);
+		border-radius: 9px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 12px;
+	}
+
+	.error {
+		margin: 0;
+		font-size: 12px;
+		color: var(--accent-text);
 	}
 
 	.small {

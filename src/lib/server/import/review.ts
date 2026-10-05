@@ -229,5 +229,6 @@ export async function saveReviewed(
 	}
 	const failed = await commitCourses(db, prepared, [...first, ...updates]);
 	if (failed) return fail(409, failed);
-	return { termId: termIds[0] ?? null };
+	// changedShared: the shared courses this save changed for everyone, to tell the others
+	return { termId: termIds[0] ?? null, changedShared: prepared.map((p) => p.changedShared) };
 }

@@ -35,7 +35,7 @@ describe('saveReviewed', () => {
 				{ title: '線形代数', teachers: ['山田'], slots: [{ weekday: 1, period: 2, span: 1, room: 'B202' }], credits: null, sharedId: null, updateId: 'c1' }
 			])
 		);
-		expect(result).toEqual({ termId: 'q1' });
+		expect(result).toEqual({ termId: 'q1', changedShared: [null] });
 		expect(t.rows(`SELECT title, credits FROM courses WHERE timetable_id = 't1' ORDER BY title`)).toEqual([
 			{ title: '線形代数', credits: null },
 			{ title: '英語', credits: 1 }

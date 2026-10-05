@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { slide } from 'svelte/transition';
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
@@ -37,8 +38,8 @@
 						<form
 							method="POST"
 							action="?/end"
-							use:enhance={({ cancel }) => {
-								if (!confirm(`「${s.name ?? '不明な端末'}」をログアウトさせますか？`)) cancel();
+							use:enhance={async ({ cancel }) => {
+								if (!(await ask({ message: `「${s.name ?? '不明な端末'}」をログアウトさせますか？`, ok: 'ログアウト' }))) return cancel();
 							}}
 						>
 							<input type="hidden" name="id" value={s.id} />
@@ -53,8 +54,8 @@
 			<form
 				method="POST"
 				action="?/endOthers"
-				use:enhance={({ cancel }) => {
-					if (!confirm('この端末のほかは、すべてログアウトします。よろしいですか？')) cancel();
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: 'この端末のほかは、すべてログアウトします。よろしいですか？', ok: 'ログアウト' }))) return cancel();
 				}}
 			>
 				<button class="btn" type="submit">ほかの端末をすべてログアウト</button>

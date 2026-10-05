@@ -7,6 +7,7 @@ import { reviewBase, saveReviewed, suggestions } from '$lib/server/import/review
 import { sharedAccess } from '$lib/server/verify';
 import { currentTerm } from '$lib/terms';
 import { tokyoTime } from '$lib/time';
+import { notifySharedChanged } from '$lib/server/shared-notify';
 import type { Actions, PageServerLoad } from './$types';
 
 async function ownJob(db: App.Locals['db'], userId: string, id: string) {
@@ -42,7 +43,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 };
 
 export const actions: Actions = {
-	save: async ({ locals, params, url, request }) => {
+	save: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const { job, timetable } = await ownJob(locals.db, me.id, params.id);
 		if (job.closedAt) redirect(303, '/');
@@ -65,6 +66,7 @@ export const actions: Actions = {
 			throw e;
 		}
 		if ('status' in saved) return saved;
+		notifySharedChanged(platform, locals.db, me.id, saved.changedShared);
 		redirect(303, saved.termId ? `/?term=${encodeURIComponent(saved.termId)}` : '/');
 	},
 	dismiss: async ({ locals, params, url }) => {

@@ -154,7 +154,7 @@ export function upcomingCancellations(db: Db, timetableId: string, today: string
 		);
 }
 
-// Both only touch notes of the given course, which the caller has checked is the user's.
+// Only touches notes of the given course, which the caller has checked is the user's.
 export async function setTaskDone(db: Db, courseId: string, noteId: string, done: boolean) {
 	await db
 		.update(courseNotes)

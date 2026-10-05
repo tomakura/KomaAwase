@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ask } from '$lib/confirm.svelte';
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
 	import ReportForm from '$lib/components/ReportForm.svelte';
@@ -67,8 +68,8 @@
 			<form
 				method="POST"
 				action="?/unfriend"
-				use:enhance={({ cancel }) => {
-					if (!confirm(`${name}さんと友だちをやめます。おたがいの時間割は見えなくなります`)) cancel();
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: `${name}さんと友だちをやめます。おたがいの時間割は見えなくなります`, ok: 'やめる', danger: true }))) return cancel();
 				}}
 			>
 				<button class="ui-row" type="submit"><span>友だちをやめる</span></button>
@@ -77,8 +78,8 @@
 		<form
 			method="POST"
 			action="?/block"
-			use:enhance={({ cancel }) => {
-				if (!confirm(`${name}さんをブロックします。友だちではなくなり、同じグループにいても時間割は見えなくなります`)) cancel();
+			use:enhance={async ({ cancel }) => {
+				if (!(await ask({ message: `${name}さんをブロックします。友だちではなくなり、同じグループにいても時間割は見えなくなります`, ok: 'ブロック', danger: true }))) return cancel();
 			}}
 		>
 			<button class="ui-row" type="submit"><span>ブロックする</span><Icon name="block" size={18} /></button>
