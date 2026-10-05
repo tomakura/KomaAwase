@@ -5,6 +5,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Segmented from '$lib/components/Segmented.svelte';
 	import Switch from '$lib/components/Switch.svelte';
+	import { tokyoTime } from '$lib/time';
 
 	let { data, form } = $props();
 
@@ -27,6 +28,8 @@
 			theme: document.documentElement.dataset.theme ?? ''
 		};
 	});
+	const STATUS = { open: '受付', doing: '対応中', closed: '対応済み', declined: '見送り' } as const;
+	const day = (d: Date) => tokyoTime(d.getTime()).date.replace(/-/g, '/');
 	const LABELS: Record<string, string> = {
 		version: 'アプリのバージョン',
 		userAgent: 'ブラウザ',
@@ -82,6 +85,27 @@
 			<button class="btn btn-primary" type="submit">送る</button>
 		</form>
 	{/if}
+
+	{#if data.sent.length}
+		<section class="body sent" id="sent">
+			<h2>送ったもの</h2>
+			{#each data.sent as f (f.id)}
+				<div class="item">
+					<div class="meta">
+						<span class="status" class:done={f.status === 'closed'} class:doing={f.status === 'doing'}>{STATUS[f.status]}</span>
+						<span class="date">{day(f.createdAt)}</span>
+					</div>
+					<p class="sent-body">{f.body}</p>
+					{#if f.reply}
+						<div class="reply">
+							<span class="reply-from">運営から{#if f.repliedAt}（{day(f.repliedAt)}）{/if}</span>
+							<p>{f.reply}</p>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</section>
+	{/if}
 </div>
 
 <style>
@@ -128,6 +152,78 @@
 		margin: 0;
 		font-size: 12px;
 		overflow-wrap: anywhere;
+	}
+
+	.sent {
+		padding-top: 28px;
+	}
+
+	.sent h2 {
+		margin: 0;
+		font-size: 12px;
+		font-weight: 400;
+		color: var(--ink-sub);
+	}
+
+	.item {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 12px 14px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+	}
+
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.status {
+		padding: 1px 8px;
+		border-radius: 5px;
+		background: var(--slot);
+		font-size: 11px;
+		font-weight: 700;
+	}
+
+	.status.doing {
+		background: var(--course-yellow);
+	}
+
+	.status.done {
+		background: var(--course-green);
+	}
+
+	.date {
+		margin-left: auto;
+		font-size: 12px;
+		color: var(--ink-sub);
+	}
+
+	.sent-body,
+	.reply p {
+		margin: 0;
+		font-size: 14px;
+		line-height: 1.7;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
+	.reply {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 10px;
+		border-radius: 10px;
+		background: var(--slot);
+	}
+
+	.reply-from {
+		font-size: 11px;
+		color: var(--ink-sub);
 	}
 
 	.thanks {
