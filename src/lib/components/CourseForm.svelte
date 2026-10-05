@@ -34,6 +34,8 @@
 	let {
 		heading,
 		backHref,
+		onsaved,
+		onback,
 		action,
 		sync,
 		initial,
@@ -45,6 +47,10 @@
 	}: {
 		heading: string;
 		backHref: string;
+		// Beside the timetable (the home page on a wide screen): what saving and going back do
+		// there instead of changing pages
+		onsaved?: () => unknown;
+		onback?: () => unknown;
 		action?: string;
 		sync: Sync;
 		initial: CourseValues;
@@ -203,7 +209,12 @@
 	use:enhance={() => {
 		saving = true;
 		leaving = true;
-		return async ({ update }) => {
+		return async ({ result, update }) => {
+			if (result.type === 'redirect' && onsaved) {
+				saving = false;
+				await onsaved();
+				return;
+			}
 			await update({ reset: false });
 			saving = false;
 			// Not saved (an error to fix): edits are guarded again
@@ -212,7 +223,15 @@
 	}}
 >
 	<header>
-		<a class="back" href={backHref}>
+		<a
+			class="back"
+			href={backHref}
+			onclick={(e) => {
+				if (!onback) return;
+				e.preventDefault();
+				onback();
+			}}
+		>
 			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
 			<span class="visually-hidden">もどる：</span>
 			<h1>{heading}</h1>

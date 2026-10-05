@@ -4,7 +4,10 @@
 	import CourseForm from '$lib/components/CourseForm.svelte';
 	import { actionHref, courseHref } from '$lib/courses';
 
-	let { data, form } = $props();
+	import type { ActionData, PageData } from './$types';
+
+	// onsaved and onback: shown beside the timetable on a wide screen (the home page)
+	let { data, form, onsaved, onback }: { data: PageData; form?: ActionData; onsaved?: () => unknown; onback?: () => unknown } = $props();
 </script>
 
 <svelte:head>
@@ -29,6 +32,8 @@
 	others={data.others}
 	universityId={data.timetable.universityId}
 	message={form?.message}
+	{onsaved}
+	{onback}
 />
 
 <form

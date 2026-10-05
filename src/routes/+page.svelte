@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { goto, preloadData, pushState, replaceState } from '$app/navigation';
+	import { goto, invalidateAll, preloadData, pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import CourseDetail from '$lib/components/CourseDetail.svelte';
+	import CourseEdit from './courses/[id]/edit/+page.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
@@ -45,17 +46,52 @@
 	// be done that way, such as a click with a modifier key or a course that can't be loaded,
 	// goes the usual way.
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
+	const EDIT = /^\/courses\/(?!new$|search$)[^/]+\/edit$/;
+
+	// On a wide screen (a computer) the course opens beside the timetable instead of over it,
+	// and is edited there too; the timetable stays usable next to it.
+	let wide = $state(false);
+	$effect(() => {
+		const query = matchMedia('(min-width: 1024px)');
+		const changed = () => (wide = query.matches);
+		changed();
+		query.addEventListener('change', changed);
+		return () => query.removeEventListener('change', changed);
+	});
+
+	// Back to the course from editing it, once the browser has gone back
+	function back() {
+		return new Promise<void>((resolve) => {
+			const done = () => {
+				removeEventListener('popstate', done);
+				clearTimeout(timer);
+				// After SvelteKit has read the state it went back to
+				setTimeout(resolve);
+			};
+			const timer = setTimeout(done, 1000);
+			addEventListener('popstate', done);
+			history.back();
+		});
+	}
+
 	async function openCourse(e: MouseEvent) {
 		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 		const link = (e.target as Element | null)?.closest?.('a');
 		if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
 		const url = new URL(link.href, location.href);
-		if (url.origin !== location.origin || !COURSE.test(url.pathname)) return;
+		if (url.origin !== location.origin) return;
+		const editing = wide && !!page.state.course && EDIT.test(url.pathname);
+		if (!COURSE.test(url.pathname) && !editing) return;
 		e.preventDefault();
 		const href = url.pathname + url.search;
 		try {
 			const result = await preloadData(href);
-			if (result.type === 'loaded' && result.status === 200) return pushState(href, { course: result.data as NonNullable<typeof page.state.course> });
+			if (result.type === 'loaded' && result.status === 200) {
+				if (editing) return pushState(href, { course: page.state.course, edit: result.data as NonNullable<typeof page.state.edit> });
+				const state = { course: result.data as NonNullable<typeof page.state.course> };
+				// Beside the timetable, another course takes the place of the one open
+				return wide && page.state.course && !page.state.edit ? replaceState(href, state) : pushState(href, state);
+			}
 		} catch {
 			// Fall through to the page itself
 		}
@@ -88,7 +124,7 @@
 	<title>時間割 · コマあわせ</title>
 </svelte:head>
 
-<div class="screen">
+<div class="screen" class:with-side={wide && !!page.state.course}>
 	<header>
 		<div class="brand">
 			<svg width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
@@ -177,8 +213,20 @@
 </div>
 
 {#if page.state.course}
-	<div class="course-over" data-swipe-scroll in:fade={motion(200)} out:fade={motion(240)}>
-		<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} />
+	<div class="course-over" class:side={wide} data-swipe-scroll in:fade={motion(200)} out:fade={motion(240)}>
+		{#if wide && page.state.edit}
+			<CourseEdit
+				data={page.state.edit}
+				form={page.form}
+				onback={() => history.back()}
+				onsaved={async () => {
+					await back();
+					await invalidateAll();
+				}}
+			/>
+		{:else}
+			<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} />
+		{/if}
 	</div>
 {/if}
 
@@ -211,6 +259,31 @@
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		background: color-mix(in srgb, var(--scrim), transparent 30%);
+	}
+
+	/* Beside the timetable: the two side by side in the middle of the screen */
+	@media (min-width: 1024px) {
+		.screen.with-side {
+			margin-left: calc(50% - 468px);
+		}
+
+		.course-over.side {
+			left: calc(50% + 28px);
+			right: auto;
+			width: 440px;
+			background: var(--bg);
+			border-left: 1px solid var(--line);
+			border-right: 1px solid var(--line);
+		}
+
+		.course-over.side :global(.scrim) {
+			display: none;
+		}
+
+		.course-over.side :global(.course-sheet) {
+			max-width: none;
+			border-radius: 0;
+		}
 	}
 
 	.start {

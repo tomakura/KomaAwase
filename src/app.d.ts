@@ -34,6 +34,8 @@ declare global {
 		// A course opened over the timetable without leaving it (shallow routing, see the home page)
 		interface PageState {
 			course?: import('./routes/courses/[id]/$types').PageData;
+			// Editing it beside the timetable, on a wide screen (the home page)
+			edit?: import('./routes/courses/[id]/edit/$types').PageData;
 		}
 
 		// interface Error {}
