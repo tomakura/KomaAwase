@@ -100,6 +100,19 @@ describe('restoreBackup', () => {
 		expect(t.rows(`SELECT count(*) AS n FROM courses WHERE timetable_id = 't1'`)[0].n).toBe(2);
 	});
 
+	it('keeps two courses with the same name', async () => {
+		const t = world();
+		t.run(`INSERT INTO courses (id, timetable_id, title, color) VALUES ('c3', 't1', '英語', 'green')`);
+		t.run(`INSERT INTO course_terms (course_id, term_id) VALUES ('c3', 'q1')`);
+		const backup = await saved(t);
+		const { courseIds } = await restoreBackup(t.db, { id: 'u2', universityId: null }, backup, ['add'], false);
+		expect(courseIds[0].every(Boolean)).toBe(true);
+		expect(t.rows(`SELECT c.title, c.color FROM courses c JOIN timetables tt ON tt.id = c.timetable_id WHERE tt.user_id = 'u2' AND c.title = '英語' ORDER BY c.color`)).toEqual([
+			{ title: '英語', color: 'green' },
+			{ title: '英語', color: 'red' }
+		]);
+	});
+
 	it('merges: only courses the timetable lacks', async () => {
 		const t = world();
 		const backup = await saved(t);

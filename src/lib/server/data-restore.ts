@@ -377,10 +377,9 @@ export async function restoreBackup(
 				ids.push(null);
 				continue;
 			}
-			skipTitles.add(key);
 			const id = crypto.randomUUID();
 			ids.push(id);
-			restoredTitles.set(key, id);
+			if (!restoredTitles.has(key)) restoredTitles.set(key, id);
 			const linked = c.sharedCourseId && linkable.has(c.sharedCourseId) ? c.sharedCourseId : null;
 			rows.courses.push({
 				id,
