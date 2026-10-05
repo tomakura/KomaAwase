@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
-	import Switch from '$lib/components/Switch.svelte';
+	import Segmented from '$lib/components/Segmented.svelte';
+	import { INVITE_CLOSED, SHARE_CHOICES, SHARE_NOTES, type ShareChoice } from '$lib/sharing';
 
 	let { data, form } = $props();
-	let share = $state(true);
+	let share = $state<ShareChoice>('all');
 </script>
 
 <svelte:head>
@@ -23,6 +24,11 @@
 			<p class="notice" role="status">この招待からは参加できません。招待した人にご確認ください。</p>
 			<a class="btn" href="/">もどる</a>
 		</div>
+	{:else if data.closed && !data.requested}
+		<div class="actions">
+			<p class="notice" role="status">{INVITE_CLOSED[data.closed]}</p>
+			<a class="btn" href="/">もどる</a>
+		</div>
 	{:else if (data.requested || form?.requested) && !form?.cancelled}
 		<form class="actions" method="POST" action="?/cancel" use:enhance>
 			<p class="notice" role="status">申請しました。グループの管理者が承認すると参加できます。</p>
@@ -33,14 +39,10 @@
 		<form class="actions" method="POST" action="?/join" use:enhance>
 			<!-- The choice people make on joining, where they can't miss it -->
 			<div class="choice">
-				<div class="row">
-					<span id="share-label">このグループに時間割を見せる</span>
-					<Switch bind:checked={share} labelledby="share-label" name="share" />
-				</div>
+				<span class="row">このグループへの時間割の見せ方</span>
+				<Segmented options={SHARE_CHOICES} bind:value={share} label="このグループへの時間割の見せ方" name="share" />
 				<p>
-					{share
-						? 'メンバーはあなたの時間割を見たり、重ねたりできます。メモ・資料・課題は見えません。'
-						: 'メンバーにはあなたの時間割が見えません。'}
+					{SHARE_NOTES[share]}
 					参加したあとも変えられます。
 				</p>
 			</div>

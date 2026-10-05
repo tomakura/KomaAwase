@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { universities } from '$lib/server/db/schema';
-import { peopleTaking, visibleUserIds } from '$lib/server/friends';
+import { peopleTaking, showingClasses, visibleLevels } from '$lib/server/friends';
 import { searchSharedCourses } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
@@ -13,13 +13,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
 	const timetable = await currentTimetable(locals.db, locals.user, locals.timetable);
 	const universityId = timetable.universityId;
-	// Friends (and group members who show their timetable) already taking each course
+	// Friends (and group members who show their classes) already taking each course
 	const [shape, university, visible, access] = await Promise.all([
 		loadShape(locals.db, timetable.id),
 		universityId
 			? locals.db.select({ name: universities.name }).from(universities).where(eq(universities.id, universityId)).get()
 			: null,
-		visibleUserIds(locals.db, locals.user.id),
+		visibleLevels(locals.db, locals.user.id).then(showingClasses),
 		sharedAccess(locals.db, locals.user.id, universityId)
 	]);
 

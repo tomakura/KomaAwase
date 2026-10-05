@@ -2,7 +2,8 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { requireUser } from '$lib/server/auth/next';
 import { timetables } from '$lib/server/db/schema';
-import { block, friendshipBetween, loadPeople, removeFriendship, visibleUserIds } from '$lib/server/friends';
+import { busyOnly } from '$lib/busy';
+import { block, friendshipBetween, loadPeople, removeFriendship, visibleLevels } from '$lib/server/friends';
 import { REPORT_REASONS, saveReport } from '$lib/server/reports';
 import { thisYear } from '$lib/server/setup';
 import { verifiedIds } from '$lib/server/verify';
@@ -18,7 +19,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const year = thisYear();
 	const [[person], visible, timetable, friendship, verified] = await Promise.all([
 		loadPeople(locals.db, [params.id]),
-		visibleUserIds(locals.db, me.id),
+		visibleLevels(locals.db, me.id),
 		locals.db
 			.select({ id: timetables.id })
 			.from(timetables)
@@ -27,9 +28,12 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		friendshipBetween(locals.db, me.id, params.id),
 		verifiedIds(locals.db, [params.id])
 	]);
-	if (!person || !visible.has(person.id)) error(404, '時間割が見つかりません');
+	const level = person && visible.get(person.id);
+	if (!person || !level) error(404, '時間割が見つかりません');
 	const loaded = timetable ? await loadTimetable(locals.db, timetable.id, tokyoTime(now).date) : null;
 	const { daysShown, universityId: _, ...profile } = person;
+	// Memos, files, tasks, cancellations and moved classes stay with their owner.
+	const courses = (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, moves: ___, ...c }) => c);
 	return {
 		now,
 		year,
@@ -38,8 +42,9 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		days: daysShown,
 		terms: loaded?.terms ?? [],
 		periods: loaded?.periods ?? [],
-		// Memos, files, tasks, cancellations and moved classes stay with their owner.
-		courses: (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, moves: ___, ...c }) => c),
+		// Only when they are busy, if that is all they show
+		busyOnly: level === 'free',
+		courses: level === 'free' ? busyOnly(courses) : courses,
 		reportReasons: REPORT_REASONS.user
 	};
 };

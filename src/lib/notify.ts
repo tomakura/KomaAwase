@@ -7,7 +7,7 @@ export const NOTIFY_KINDS = [
 	{ id: 'friendAccepted', label: '友だち申請が承認されたとき' },
 	{ id: 'importDone', label: 'スクショの読み取りが終わったとき' },
 	{ id: 'groupJoin', label: 'グループに新しい人が参加したとき' },
-	{ id: 'groupRequest', label: '作ったグループに参加の申請が届いたとき' },
+	{ id: 'groupRequest', label: '管理しているグループに参加の申請が届いたとき' },
 	{ id: 'groupApproved', label: 'グループへの参加が承認されたとき' },
 	{ id: 'planEve', label: '前の日の20時に、明日の課題と予定を知らせる' },
 	{ id: 'taskMorning', label: '締め切りの日の朝8時に、今日の課題を知らせる', off: true },

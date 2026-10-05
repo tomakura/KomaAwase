@@ -125,7 +125,10 @@
 			</section>
 		{/if}
 
-		<a class="blocked" href="/friends/blocked">ブロックしている人</a>
+		<div class="links">
+			<a href="/friends/sharing">時間割の見せ方</a>
+			<a href="/friends/blocked">ブロックしている人</a>
+		</div>
 	</main>
 
 	<BottomNav current="friends" />
@@ -297,9 +300,14 @@
 		text-decoration: none;
 	}
 
-	.blocked {
+	.links {
 		align-self: center;
+		display: flex;
+		gap: 8px;
 		margin-top: 22px;
+	}
+
+	.links a {
 		padding: 10px;
 		color: var(--ink-sub);
 		font-size: 13px;

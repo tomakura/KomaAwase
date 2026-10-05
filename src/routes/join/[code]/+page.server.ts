@@ -4,15 +4,20 @@ import { readCode } from '$lib/server/friends';
 import {
 	cancelRequest,
 	findGroupByInvite,
+	inviteClosed,
 	isBanned,
 	joinGroup,
 	loadGroup,
+	managerIds,
 	membership,
 	memberCount,
 	otherMembers,
 	requestOf,
-	requestToJoin
+	requestToJoin,
+	returnInvite,
+	useInvite
 } from '$lib/server/groups';
+import { INVITE_CLOSED, readShareChoice } from '$lib/sharing';
 import { notifyLater } from '$lib/server/notify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -38,7 +43,7 @@ export const load: PageServerLoad = async ({ locals, params, url, cookies }) => 
 		isBanned(locals.db, group.id, me.id),
 		requestOf(locals.db, group.id, me.id)
 	]);
-	return { name: group.name, members, approval: group.approval, banned, requested: !!request };
+	return { name: group.name, members, approval: group.approval, banned, requested: !!request, closed: inviteClosed(group) };
 };
 
 export const actions: Actions = {
@@ -46,12 +51,16 @@ export const actions: Actions = {
 		const me = requireUser(locals, url);
 		const group = await invited(locals.db, params.code);
 		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'この招待からは参加できません。招待した人にご確認ください。' });
-		const share = (await request.formData()).get('share') === 'on';
+		const share = readShareChoice((await request.formData()).get('share')) ?? 'all';
+		// Asking again, or joining from a request made before, doesn't take another use of the invite
+		const asked = !!(await requestOf(locals.db, group.id, me.id));
+		if (!asked && !(await useInvite(locals.db, group.id, group.inviteCode))) {
+			return fail(400, { message: INVITE_CLOSED[inviteClosed(group) ?? 'used'] });
+		}
 		if (group.approval) {
-			const asked = !!(await requestOf(locals.db, group.id, me.id));
 			await requestToJoin(locals.db, group.id, me.id, share);
-			if (!asked && group.ownerId) {
-				notifyLater(platform, locals.db, [group.ownerId], 'groupRequest', {
+			if (!asked) {
+				notifyLater(platform, locals.db, await managerIds(locals.db, group.id), 'groupRequest', {
 					title: `${me.nickname ?? 'だれか'}さんが「${group.name}」に参加を申請しました`,
 					url: `/groups/${group.id}`,
 					tag: `group-request-${group.id}`
@@ -60,6 +69,7 @@ export const actions: Actions = {
 			return { requested: true };
 		}
 		const joined = await joinGroup(locals.db, group.id, me.id, share);
+		if (joined !== 'joined' && !asked) await returnInvite(locals.db, group.id, group.inviteCode);
 		if (joined === 'full') return fail(400, { message: 'このグループは人数がいっぱいです' });
 		// A request left from when the group needed approval
 		await cancelRequest(locals.db, group.id, me.id);
