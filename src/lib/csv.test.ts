@@ -31,3 +31,11 @@ describe('coursesOfCsv', () => {
 		expect(coursesOfCsv(parseCsv('統計,Thu,4')).courses[0]).toMatchObject({ title: '統計', weekday: 4, period: 4 });
 	});
 });
+
+describe('a CSV with two courses at one time', () => {
+	it('keeps both, but one row given twice once', () => {
+		const { courses } = coursesOfCsv(parseCsv('授業名,曜日,時限\nA,月,1\nB,月,1\nA,月,1'));
+		expect(readImport({ courses }, { sameSlot: true })?.map((c) => c.title)).toEqual(['A', 'B']);
+		expect(readImport({ courses })?.map((c) => c.title)).toEqual(['A']);
+	});
+});

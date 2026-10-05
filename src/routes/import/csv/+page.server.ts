@@ -42,7 +42,7 @@ export const actions: Actions = {
 		if (!text.trim()) return fail(400, { message: 'ファイルが空です' });
 		if (text.length > CSV_MAX) return fail(400, { message: 'ファイルが大きすぎます。授業の一覧だけにしてください' });
 		const { courses, skipped } = coursesOfCsv(parseCsv(text));
-		const read = readImport({ courses }) ?? [];
+		const read = readImport({ courses }, { sameSlot: true }) ?? [];
 		if (!read.length) return fail(400, { message: '授業を読み取れませんでした。見出しと列をひな形に合わせてください', skipped });
 		const groups = groupImported(read);
 		const access = await sharedAccess(locals.db, me.id, timetable.universityId);

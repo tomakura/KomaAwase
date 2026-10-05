@@ -66,8 +66,8 @@
 		const best = fitting(suggestions, chosen)[0];
 		return best?.score === 3 ? best.id : null;
 	};
-	const compare = (g: { title: string; slots: Slot[]; teachers: string }, chosen: string[]) =>
-		compareCourse({ title: g.title, slots: g.slots, teachers: splitTeachers(g.teachers) }, chosen, existing);
+	const compare = (g: { title: string; slots: Slot[]; teachers: string; sharedId: string | null }, chosen: string[]) =>
+		compareCourse({ title: g.title, slots: g.slots, teachers: splitTeachers(g.teachers), sharedId: g.sharedId }, chosen, existing);
 	// Added unless it is already there (the same, or with differences: left as it is unless chosen)
 	const kept = (kind: string) => kind === 'new' || kind === 'clash';
 
@@ -99,12 +99,12 @@
 	// Choosing other terms: what is already there, and which shared courses fit, are those of the new terms
 	function termsChanged() {
 		rows.forEach((row) => {
+			if (!row.sharedSet) row.sharedId = autoShared(row.suggestions, termIds);
+			else if (row.sharedId && !fitting(row.suggestions, termIds).some((s) => s.id === row.sharedId)) row.sharedId = null;
 			if (!row.includeSet) {
 				row.include = kept(compare(row, termIds).kind);
 				row.update = false;
 			}
-			if (!row.sharedSet) row.sharedId = autoShared(row.suggestions, termIds);
-			else if (row.sharedId && !fitting(row.suggestions, termIds).some((s) => s.id === row.sharedId)) row.sharedId = null;
 		});
 	}
 	let sync = $state(true);

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { compareCourse, titleDoubt, type Existing } from './import-review';
 
 describe('titleDoubt', () => {
-	it('marks unread letters and very short names', () => {
+	it('marks unread letters and one-letter names', () => {
 		expect(titleDoubt('線形代?')).toBe(true);
 		expect(titleDoubt('英□')).toBe(true);
-		expect(titleDoubt('体育')).toBe(true);
+		expect(titleDoubt('英')).toBe(true);
+		expect(titleDoubt('体育')).toBe(false);
 		expect(titleDoubt('線形代数学')).toBe(false);
 	});
 });
@@ -14,6 +15,7 @@ const course = (over: Partial<Existing>): Existing => ({
 	id: 'c1',
 	title: '線形代数',
 	synced: false,
+	sharedCourseId: null,
 	slots: [{ weekday: 1, period: 2, span: 1, room: 'A101' }],
 	teachers: ['山田'],
 	termIds: ['q1'],
@@ -39,6 +41,11 @@ describe('compareCourse', () => {
 			kind: 'changed',
 			diffs: ['教室']
 		});
+	});
+
+	it('takes a row matched to the shared course a synced one reads as the same', () => {
+		const synced = course({ synced: true, sharedCourseId: 's1', teachers: ['山田'] });
+		expect(compareCourse({ ...read({ teachers: ['別の人'] }), sharedId: 's1' }, ['q1'], [synced]).kind).toBe('same');
 	});
 
 	it('only looks in the chosen terms', () => {

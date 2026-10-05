@@ -8,12 +8,12 @@ type Slot = { weekday: number; period: number; span: number; room: string | null
 const UNREADABLE = /[?？□■◇◆〓�]/;
 
 /**
- * Whether a title is worth checking: it has a mark that stands for something unread, or is one
- * or two letters long. Decided here, not by the AI: models say they are sure when they aren't.
+ * Whether a title is worth checking: it has a mark that stands for something unread, or is a
+ * single letter (two is common: 英語, 体育). Decided here, not by the AI: models say they are sure when they aren't.
  */
 export function titleDoubt(title: string) {
 	const t = title.trim();
-	return UNREADABLE.test(t) || [...t].length <= 2;
+	return UNREADABLE.test(t) || [...t].length <= 1;
 }
 
 export type Existing = {
@@ -21,6 +21,7 @@ export type Existing = {
 	title: string;
 	// Reads the shared course's values: changed from its own page, never from an import
 	synced: boolean;
+	sharedCourseId: string | null;
 	slots: Slot[];
 	teachers: string[];
 	termIds: string[];
@@ -43,7 +44,7 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
  * A room or teacher left blank in what was read is not counted as a difference.
  */
 export function compareCourse(
-	row: { title: string; slots: Slot[]; teachers: string[] },
+	row: { title: string; slots: Slot[]; teachers: string[]; sharedId?: string | null },
 	terms: string[],
 	existing: Existing[]
 ): Comparison {
@@ -51,6 +52,8 @@ export function compareCourse(
 	const title = normalizeTitle(row.title);
 	const course = here.find((c) => normalizeTitle(c.title) === title);
 	if (course) {
+		// Matched to the shared course this one already reads
+		if (row.sharedId && course.synced && course.sharedCourseId === row.sharedId) return { kind: 'same', course };
 		const diffs: string[] = [];
 		if (!sameSet(row.slots.map(slotKey), course.slots.map(slotKey))) diffs.push('曜日・時限');
 		const at = (s: Slot) => course.slots.find((c) => c.weekday === s.weekday && c.period === s.period);

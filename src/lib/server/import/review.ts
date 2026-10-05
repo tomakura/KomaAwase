@@ -11,7 +11,7 @@ import { normalizeTitle } from '$lib/overlay';
 import type { Db } from '../db';
 import { commitCourses, nextColor, parseCourseForm, prepareCourse, shapeOf } from '../courses';
 import { courseSlots, courseTeachers, courses, sharedCourseSlots, sharedCourses } from '../db/schema';
-import { loadSharedCourses } from '../shared-courses';
+import { loadSharedCourses, syncedValues } from '../shared-courses';
 import { loadShape, loadTimetable } from '../timetable';
 import { sharedAccess } from '../verify';
 
@@ -62,10 +62,12 @@ export async function suggestions(db: Db, timetable: Timetable, groups: ReturnTy
 /** The timetable's terms and periods, and its courses as they show, to compare what was read with */
 export async function reviewBase(db: Db, timetable: Timetable, today: string) {
 	const loaded = await loadTimetable(db, timetable.id, today);
-	const ids = loaded.courses.map((c) => c.id);
-	const [modes, teachers] = ids.length
+	const [modes, teachers] = loaded.courses.length
 		? await db.batch([
-				db.select({ id: courses.id, syncMode: courses.syncMode }).from(courses).where(eq(courses.timetableId, timetable.id)),
+				db
+					.select({ id: courses.id, syncMode: courses.syncMode, sharedCourseId: courses.sharedCourseId })
+					.from(courses)
+					.where(eq(courses.timetableId, timetable.id)),
 				db
 					.select({ courseId: courseTeachers.courseId, name: courseTeachers.name })
 					.from(courseTeachers)
@@ -74,15 +76,18 @@ export async function reviewBase(db: Db, timetable: Timetable, today: string) {
 					.orderBy(courseTeachers.sortOrder)
 			])
 		: [[], []];
+	// A synced course's teachers are the shared course's
+	const shared = await syncedValues(db, modes);
 	const existing: Existing[] = loaded.courses.map((c) => {
-		const synced = modes.find((m) => m.id === c.id)?.syncMode === 'synced';
+		const mode = modes.find((m) => m.id === c.id);
+		const synced = mode?.syncMode === 'synced' && mode.sharedCourseId ? shared.get(mode.sharedCourseId) : undefined;
 		return {
 			id: c.id,
 			title: c.title,
-			synced,
+			synced: !!synced,
+			sharedCourseId: synced ? synced.id : null,
 			slots: c.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, room: s.room })),
-			// A synced course's teachers are the shared course's; they are never changed from here
-			teachers: synced ? [] : teachers.filter((t) => t.courseId === c.id).map((t) => t.name),
+			teachers: synced ? synced.values.teachers : teachers.filter((t) => t.courseId === c.id).map((t) => t.name),
 			termIds: c.termIds
 		};
 	});

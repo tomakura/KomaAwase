@@ -242,6 +242,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+		padding: 10px 0;
 	}
 
 	.sub {
