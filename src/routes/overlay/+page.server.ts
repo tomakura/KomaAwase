@@ -4,7 +4,8 @@ import { OVERLAY_COOKIE } from '$lib/overlay';
 import { compareJa } from '$lib/sort';
 import { requireUser } from '$lib/server/auth/next';
 import { friendships, timetables } from '$lib/server/db/schema';
-import { loadPeople, visibleUserIds } from '$lib/server/friends';
+import { busyOnly } from '$lib/busy';
+import { loadPeople, visibleLevels } from '$lib/server/friends';
 import { groupsWithSharers } from '$lib/server/groups';
 import { thisYear } from '$lib/server/setup';
 import { currentTimetable, loadTimetables } from '$lib/server/timetable';
@@ -16,9 +17,9 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	const me = requireUser(locals, url);
 	if (!me.setupAt) redirect(303, '/');
 	const year = thisYear();
-	const [mine, visible, groups, friendRows] = await Promise.all([
+	const [mine, levels, groups, friendRows] = await Promise.all([
 		currentTimetable(locals.db, me, locals.timetable),
-		visibleUserIds(locals.db, me.id),
+		visibleLevels(locals.db, me.id),
 		groupsWithSharers(locals.db, me.id),
 		locals.db
 			.select({ requesterId: friendships.requesterId, addresseeId: friendships.addresseeId })
@@ -30,6 +31,7 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 				)
 			)
 	]);
+	const visible = new Set(levels.keys());
 	const friendIds = new Set(friendRows.map((r) => (r.requesterId === me.id ? r.addresseeId : r.requesterId)));
 
 	// Who to lay over, from ?with= or the last choice (the page keeps it in a cookie)
@@ -63,6 +65,12 @@ export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 		groups: groups.map((g) => ({ ...g, memberIds: g.memberIds.filter((id) => visible.has(id)) })),
 		selected,
 		// null: no timetable for this year yet
-		timetables: Object.fromEntries(selected.map((id) => [id, loaded.get(byUser.get(id) ?? '') ?? null]))
+		timetables: Object.fromEntries(
+			selected.map((id) => {
+				const t = loaded.get(byUser.get(id) ?? '');
+				// Someone who shows only when they are busy: no classes leave the server
+				return [id, t && levels.get(id) === 'free' ? { ...t, courses: busyOnly(t.courses) } : (t ?? null)];
+			})
+		)
 	};
 };

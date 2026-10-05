@@ -52,6 +52,7 @@
 		<div class="actions">
 			<a class="btn" href="/overlay?with={data.person.id}"><Icon name="overlap" size={18} />自分の時間割と重ねる</a>
 		</div>
+		{#if data.busyOnly}<p class="ui-note busy">{name}さんは、空き時間だけを見せています。</p>{/if}
 		<TermBar year={data.year} terms={data.terms} bind:termId />
 		<TimetableGrid periods={data.periods} {days} courses={termCourses} clock={time.clock} termIsOn={termIsOn(term, time.clock.date)} termStart={term?.startDate} />
 		<UnscheduledCards courses={termCourses.filter((c) => c.slots.length === 0)} />
@@ -142,6 +143,10 @@
 
 	.actions {
 		padding: 0 16px 10px;
+	}
+
+	.busy {
+		padding: 0 20px 6px;
 	}
 
 	.actions .btn {
