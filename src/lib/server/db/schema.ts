@@ -15,7 +15,7 @@ const createdAt = () =>
 
 // Which notifications to send; a missing key means on
 export type NotifySettings = Partial<
-	Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'groupRequest' | 'groupApproved' | 'planEve', boolean>
+	Record<'friendRequest' | 'friendAccepted' | 'importDone' | 'groupJoin' | 'groupRequest' | 'groupApproved' | 'planEve' | 'sharedChange' | 'feedbackReply', boolean>
 >;
 
 // `photo` is when the user's photo (user_photos) was last set, which also busts caches
@@ -88,6 +88,10 @@ export const pushSubscriptions = sqliteTable(
 		// The session that turned it on, so logging that device out stops its notifications.
 		// Not a foreign key; null for ones made before this was kept.
 		sessionId: text('session_id'),
+		// The last time a notification reached the push service for it, and the last time one
+		// didn't, for the checks in 通知 → 届かないときは
+		lastOkAt: integer('last_ok_at', { mode: 'timestamp_ms' }),
+		lastFailedAt: integer('last_failed_at', { mode: 'timestamp_ms' }),
 		createdAt: createdAt()
 	},
 	(t) => [index('push_subscriptions_user_idx').on(t.userId)]
@@ -265,6 +269,9 @@ export const courses = sqliteTable(
 		credits: real('credits'),
 		// How many absences the class allows, for the warning; personal
 		absenceLimit: integer('absence_limit'),
+		// When this person last saw the shared course's changes (synced only); edits by others
+		// after it are shown as changed. Null: since syncing began
+		sharedSeenAt: integer('shared_seen_at', { mode: 'timestamp_ms' }),
 		createdAt: createdAt()
 	},
 	(t) => [
@@ -692,9 +699,13 @@ export const feedback = sqliteTable(
 		body: text('body').notNull(),
 		// Browser, screen and page, attached only if the sender agreed after seeing them
 		env: text('env', { mode: 'json' }).$type<Record<string, string>>(),
-		status: text('status', { enum: ['open', 'closed'] })
+		// 受付 / 対応中 / 対応済み / 見送り, which the sender sees in 送ったもの
+		status: text('status', { enum: ['open', 'doing', 'closed', 'declined'] })
 			.notNull()
 			.default('open'),
+		// A word from the operator, shown to the sender
+		reply: text('reply'),
+		repliedAt: integer('replied_at', { mode: 'timestamp_ms' }),
 		createdAt: createdAt()
 	},
 	(t) => [
@@ -748,4 +759,42 @@ export const verifyTokens = sqliteTable(
 		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
 	},
 	(t) => [index('verify_tokens_user_idx').on(t.userId)]
+);
+
+// What was just deleted (a memo, a task, an event), kept a few minutes so 元に戻す can put it
+// back as it was. `row` is the whole row; old ones go in the daily sweep.
+export const undoItems = sqliteTable(
+	'undo_items',
+	{
+		id: id(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		kind: text('kind', { enum: ['note', 'event'] }).notNull(),
+		row: text('row', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(t) => [index('undo_items_user_idx').on(t.userId)]
+);
+
+// Notices from the operator on /status (trouble, maintenance); shown until resolved
+export const statusNotes = sqliteTable('status_notes', {
+	id: id(),
+	level: text('level', { enum: ['info', 'trouble'] }).notNull(),
+	body: text('body').notNull(),
+	createdAt: createdAt(),
+	resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' })
+});
+
+// Counts per hour (UTC, YYYY-MM-DDTHH) for how well the service is doing: failures and how
+// long things take. Nothing about who: no user, address or URL. Kept 30 days.
+export const metrics = sqliteTable(
+	'metrics',
+	{
+		hour: text('hour').notNull(),
+		name: text('name').notNull(),
+		n: integer('n').notNull().default(0),
+		totalMs: integer('total_ms').notNull().default(0)
+	},
+	(t) => [primaryKey({ columns: [t.hour, t.name] })]
 );
