@@ -180,7 +180,9 @@
 		{/key}
 		{#if live}<span class="left">あと{live.left}分</span>{/if}
 		{#if off}<span class="cancel">休み {monthDay(off)}</span>{:else if away}<span class="cancel">振替 {monthDay(away)}</span>{:else if moved}<span class="cancel moved">振替 {monthDay(moved)}</span>{:else if cancel}<span class="cancel">休講 {monthDay(cancel)}</span>{:else if maybe}<span class="cancel maybe" title="{monthDay(maybe)}に休講と入れている人がいます">休講かも</span>{/if}
-		{#if slot.room && week}
+		{#if off || away || moved || cancel || maybe}
+			<!-- The room gives way to the label, so the name still fits -->
+		{:else if slot.room && week}
 			<span class="room"><b class="week" aria-label="{week}数週">{week}</b>{slot.room}</span>
 		{:else if slot.room || week}
 			<span class="room">{slot.room ?? `${week}数週`}</span>
@@ -429,8 +431,9 @@
 		flex-shrink: 0;
 		margin-top: auto;
 		align-self: center;
-		padding: 1px 5px;
+		padding: 1px 4px;
 		border-radius: 5px;
+		letter-spacing: -0.02em;
 		background: var(--ink);
 		color: var(--surface);
 		font-size: 10px;

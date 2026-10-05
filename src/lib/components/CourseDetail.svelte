@@ -128,6 +128,9 @@
 	);
 	// Homework whose steps are open, and the weekly one being deleted (asking which copies)
 	let opened = $state<string[]>([]);
+	// Up to five homework at first; weekly ones can make a long list
+	const TASKS_SHOWN = 5;
+	let allTasks = $state(false);
 	let removing = $state<string | null>(null);
 
 	// The note being changed (its form is where the note was)
@@ -490,7 +493,7 @@
 			{#if tasks.length}
 				<section>
 					<h2>課題</h2>
-					{#each tasks as task (task.id)}
+					{#each allTasks ? tasks : tasks.slice(0, TASKS_SHOWN) as task (task.id)}
 						{#if editing === task.id}
 							{@render editForm(task)}
 						{:else}
@@ -586,6 +589,9 @@
 						{/if}
 						{/if}
 					{/each}
+					{#if !allTasks && tasks.length > TASKS_SHOWN}
+						<button class="more-tasks" type="button" onclick={() => (allTasks = true)}>さらに表示（あと{tasks.length - TASKS_SHOWN}件）</button>
+					{/if}
 				</section>
 			{/if}
 
@@ -1105,6 +1111,17 @@
 		background: var(--shu);
 		color: #fff;
 		font-size: 11px;
+	}
+
+	.more-tasks {
+		height: 40px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 13px;
+		cursor: pointer;
 	}
 
 	.hint {
