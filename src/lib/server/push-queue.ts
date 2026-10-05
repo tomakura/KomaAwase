@@ -5,6 +5,7 @@
 // failed, and nothing is sent once it is out of date (each phone's `expires`). Sending a part twice only
 // shows the notification again in its place, since notifications of one thing share a tag.
 // Relative imports only, because the Worker's entry file (worker/entry.js) reaches it directly.
+import { METRICS, count } from './metrics';
 import { PUSH_SUBJECT, sendPush } from './push';
 
 /** The part of a D1 database this needs, so a test can stand in for it */
@@ -35,12 +36,14 @@ async function sendNow(env: PushEnv, items: PushItem[], send: typeof sendPush) {
 	const keys = { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY };
 	const gone: string[] = [];
 	const failed: PushItem[] = [];
+	const ok: string[] = [];
 	await Promise.all(
 		items.map(async (item) => {
 			try {
 				const result = await send(item, item.message, keys, PUSH_SUBJECT);
 				if (result === 'gone') gone.push(item.deviceId);
 				else if (result === 'failed') failed.push(item);
+				else ok.push(item.deviceId);
 			} catch (e) {
 				console.error('push failed', e);
 				failed.push(item);
@@ -56,6 +59,23 @@ async function sendNow(env: PushEnv, items: PushItem[], send: typeof sendPush) {
 			console.error('push: removing dropped phones failed', e);
 		}
 	}
+	// For 通知 → 届かないときは: when each phone was last reached, or last not
+	const now = Date.now();
+	for (const [column, ids] of [
+		['last_ok_at', ok],
+		['last_failed_at', failed.map((f) => f.deviceId)]
+	] as const) {
+		if (!ids.length) continue;
+		try {
+			await env.DB.prepare(`UPDATE push_subscriptions SET ${column} = ? WHERE id IN (${ids.map(() => '?').join(', ')})`)
+				.bind(now, ...ids)
+				.run();
+		} catch (e) {
+			console.error('push: recording the result failed', e);
+		}
+	}
+	await count(env.DB, METRICS.pushOk, ok.length, 0, now);
+	await count(env.DB, METRICS.pushFailed, failed.length, 0, now);
 	return failed;
 }
 

@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import PushCheck from '$lib/components/PushCheck.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import type { PushState } from '$lib/notify-prompt';
 	import { enablePush, pushState, subscription } from '$lib/push-client';
@@ -99,6 +100,8 @@
 				{#if message || form?.message}<p class="error" role="alert">{message ?? form?.message}</p>{/if}
 				{#if data.devices}<p class="ui-note">通知を受け取っている端末：{data.devices}台</p>{/if}
 			</section>
+
+			<PushCheck />
 
 			<section>
 				<h2>知らせること</h2>
