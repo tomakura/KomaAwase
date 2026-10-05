@@ -11,6 +11,7 @@
 	import Sheet from '$lib/components/Sheet.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import { motion } from '$lib/motion';
+	import { spanLabel } from '$lib/calendar';
 	import { SECTIONS, dueLabel, groupPlans, whenLabel, type Plan } from '$lib/plans';
 	import { tokyoTime } from '$lib/time';
 
@@ -20,6 +21,19 @@
 	const groups = $derived(groupPlans(data.plans, today));
 	const shown = $derived(SECTIONS.filter((s) => s.id !== 'past' && groups[s.id].length));
 	const empty = $derived(shown.length === 0 && groups.past.length === 0);
+
+	// 試験: the exams from today on, nearest first
+	const views = [
+		{ id: 'all', label: 'すべて' },
+		{ id: 'exam', label: '試験' }
+	] as const;
+	let view = $state<'all' | 'exam'>('all');
+	const exams = $derived(
+		data.plans
+			.filter((p) => p.exam && p.date && p.date >= today)
+			.toSorted((a, b) => (a.date ?? '').localeCompare(b.date ?? '') || (a.start ?? '99').localeCompare(b.start ?? '99'))
+	);
+	let exam = $state(false);
 
 	// The sheet for adding, or for changing an event (`editing`)
 	let open = $state(false);
@@ -34,18 +48,28 @@
 	function add() {
 		editing = null;
 		allDay = false;
-		kind = data.courses.length ? 'task' : 'event';
+		exam = view === 'exam';
+		kind = data.courses.length && view !== 'exam' ? 'task' : 'event';
 		open = true;
 	}
 
 	function edit(p: Plan) {
 		editing = p;
 		allDay = !p.start;
+		exam = p.exam;
 		kind = 'event';
 		open = true;
 	}
 
-	const subLine = (p: Plan) => [p.kind === 'event' ? whenLabel(p) : '', p.place, p.course].filter(Boolean).join(' · ');
+	const subLine = (p: Plan) =>
+		[
+			p.kind === 'event' ? whenLabel(p) : p.start ? `${p.start.replace(/^0/, '')}まで` : '',
+			p.place,
+			p.course,
+			p.steps ? `チェック ${p.steps}` : ''
+		]
+			.filter(Boolean)
+			.join(' · ');
 </script>
 
 <svelte:head>
@@ -76,9 +100,9 @@
 				<span class="due" class:late={due.late}>{due.text}</span>
 			{/if}
 		{:else}
-			<span class="dot" aria-hidden="true"></span>
+			<span class="dot" class:exam={p.exam} aria-hidden="true"></span>
 			<button class="text" type="button" onclick={() => edit(p)}>
-				<span class="title">{p.title}</span>
+				<span class="title">{#if p.exam}<b class="exam-tag">試験</b>{/if}{p.title}</span>
 				<span class="sub">{subLine(p)}</span>
 			</button>
 		{/if}
@@ -91,7 +115,30 @@
 		<button class="add" type="button" onclick={add}><Icon name="plus" size={18} />追加</button>
 	</header>
 
+	<div class="views"><Segmented options={views} bind:value={view} label="表示" /></div>
+
 	<main>
+		{#if view === 'exam'}
+			{#each data.examPeriods as e (e.id)}
+				<p class="period-note"><b>{e.label}</b> {spanLabel(e)}</p>
+			{/each}
+			{#each exams as p (p.id)}
+				{@const left = dueLabel(p.date ?? today, today)}
+				<button class="exam-card" type="button" onclick={() => edit(p)}>
+					<span class="exam-head">
+						<span class="title">{p.title}</span>
+						<span class="due">{left.text === '今日まで' ? '今日' : left.text}</span>
+					</span>
+					<span class="sub">{[whenLabel(p), p.place, p.course].filter(Boolean).join(' · ')}</span>
+					{#if p.scope}<span class="detail"><b>範囲</b>{p.scope}</span>{/if}
+					{#if p.bring}<span class="detail"><b>持ち物</b>{p.bring}</span>{/if}
+				</button>
+			{:else}
+				<div class="empty">
+					<p>これからの試験はありません。「追加」でイベントを入れるときに「試験」を選ぶと、ここに出ます。</p>
+				</div>
+			{/each}
+		{:else}
 		{#each shown as s (s.id)}
 			<section class="ui-section">
 				<h2 class="ui-section-title" class:late={s.id === 'late'}>{s.label}</h2>
@@ -119,6 +166,7 @@
 					{/each}
 				</div>
 			</details>
+		{/if}
 		{/if}
 	</main>
 
@@ -152,7 +200,14 @@
 					</select>
 				</label>
 				<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
-				<label class="field">締め切り（日付）<input type="date" name="due" /></label>
+				<div class="times">
+					<label class="field">締め切り（日付）<input type="date" name="due" /></label>
+					<label class="field">時刻（任意）<input type="time" name="dueTime" /></label>
+				</div>
+				<label class="field">
+					提出先（任意）
+					<input name="submitTo" maxlength="200" autocomplete="off" placeholder="URL や「レポートボックス」など" />
+				</label>
 			{:else}
 				<label class="field">名前<input name="title" maxlength="100" required autocomplete="off" value={editing?.title ?? ''} /></label>
 				<label class="field">日付<input type="date" name="date" required value={editing?.date ?? today} /></label>
@@ -174,6 +229,14 @@
 						{#each data.courses as c (c.id)}<option value={c.id} selected={editing?.courseId === c.id}>{c.title}</option>{/each}
 					</select>
 				</label>
+				<div class="all-day">
+					<span id="exam-label">試験</span>
+					<Switch bind:checked={exam} name="exam" labelledby="exam-label" />
+				</div>
+				{#if exam}
+					<label class="field">範囲（任意）<textarea name="scope" rows="2" maxlength="500">{editing?.scope ?? ''}</textarea></label>
+					<label class="field">持ち物（任意）<textarea name="bring" rows="2" maxlength="500">{editing?.bring ?? ''}</textarea></label>
+				{/if}
 				<label class="field">メモ<textarea name="memo" rows="3" maxlength="500">{editing?.memo ?? ''}</textarea></label>
 			{/if}
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
@@ -271,6 +334,86 @@
 		margin: 0 6px;
 		border-radius: 50%;
 		background: var(--ink-sub);
+	}
+
+	.dot.exam {
+		background: var(--shu);
+	}
+
+	.exam-tag {
+		margin-right: 6px;
+		padding: 1px 6px;
+		border-radius: 6px;
+		background: var(--shu);
+		color: #fff;
+		font-size: 11px;
+	}
+
+	.views {
+		padding: 12px 16px 0;
+	}
+
+	.period-note {
+		margin: 12px 16px 0;
+		font-size: 13px;
+		color: var(--ink-sub);
+	}
+
+	.period-note b {
+		color: var(--ink);
+	}
+
+	.exam-card {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		width: calc(100% - 32px);
+		margin: 12px 16px 0;
+		padding: 12px 14px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--surface);
+		color: var(--ink);
+		font-family: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.exam-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 10px;
+	}
+
+	.exam-card .title {
+		font-size: 15px;
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.exam-card .due {
+		flex-shrink: 0;
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--shu);
+	}
+
+	.exam-card .sub {
+		font-size: 12px;
+		color: var(--ink-sub);
+	}
+
+	.exam-card .detail {
+		font-size: 13px;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
+	.exam-card .detail b {
+		margin-right: 8px;
+		font-size: 12px;
+		color: var(--ink-sub);
 	}
 
 	.text {

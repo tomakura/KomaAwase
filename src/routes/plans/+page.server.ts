@@ -2,6 +2,7 @@ import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { findOwnedCourse } from '$lib/server/courses';
 import { addNote, parseNote, setTaskDone } from '$lib/server/notes';
 import { deleteEventKept, deleteNoteKept } from '$lib/server/undo';
+import { upcomingExamPeriods } from '$lib/server/calendar';
 import { addEvent, listCourseChoices, loadPlans, parseEvent, updateEvent } from '$lib/server/plans';
 import { tokyoTime } from '$lib/time';
 import type { Actions, PageServerLoad } from './$types';
@@ -12,11 +13,12 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	// Passed down so the first render in the browser matches the server's
 	const now = Date.now();
 	const today = tokyoTime(now).date;
-	const [plans, courses] = await Promise.all([
+	const [plans, courses, examPeriods] = await Promise.all([
 		loadPlans(locals.db, locals.user.id, today),
-		listCourseChoices(locals.db, locals.user.id, today)
+		listCourseChoices(locals.db, locals.user.id, today),
+		upcomingExamPeriods(locals.db, locals.user.id, today)
 	]);
-	return { now, plans, courses };
+	return { now, plans, courses, examPeriods };
 };
 
 async function ownCourse({ locals }: RequestEvent, form: FormData) {

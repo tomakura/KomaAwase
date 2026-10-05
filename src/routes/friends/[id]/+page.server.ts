@@ -32,8 +32,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!person || !level) error(404, '時間割が見つかりません');
 	const loaded = timetable ? await loadTimetable(locals.db, timetable.id, tokyoTime(now).date) : null;
 	const { daysShown, universityId: _, ...profile } = person;
-	// Memos, files, tasks and cancellations stay with their owner.
-	const courses = (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, ...c }) => c);
+	// Memos, files, tasks, cancellations and moved classes stay with their owner.
+	const courses = (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, moves: ___, ...c }) => c);
 	return {
 		now,
 		year,

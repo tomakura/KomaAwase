@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -59,6 +60,19 @@
 	// svelte-ignore state_referenced_locally
 	let picked = $state<number[]>(data.reminders);
 	let remindersForm = $state<HTMLFormElement>();
+
+	// svelte-ignore state_referenced_locally
+	let quietOn = $state(!!data.quiet);
+	// svelte-ignore state_referenced_locally
+	let quietFrom = $state(data.quiet?.from ?? data.quietDefault.from);
+	// svelte-ignore state_referenced_locally
+	let quietTo = $state(data.quiet?.to ?? data.quietDefault.to);
+	let quietForm = $state<HTMLFormElement>();
+	// After the time fields are in the form (turning it on adds them)
+	async function saveQuiet() {
+		await tick();
+		quietForm?.requestSubmit();
+	}
 </script>
 
 <svelte:head>
@@ -124,7 +138,7 @@
 						</div>
 					{/each}
 				</form>
-				<p class="ui-note">設定はすべての端末で共通です。</p>
+				<p class="ui-note">締め切りの3時間前・1時間前は、締め切りの時刻を入れた課題だけです。設定はすべての端末で共通です。</p>
 			</section>
 
 			<section>
@@ -150,6 +164,30 @@
 				{#if device !== 'on' && device !== 'checking'}
 					<p class="ui-note">通知をオンにした端末に届きます。</p>
 				{/if}
+			</section>
+
+			<section>
+				<h2>通知を送らない時間</h2>
+				<form
+					class="ui-list"
+					method="POST"
+					action="?/quiet"
+					bind:this={quietForm}
+					use:enhance={() => async ({ update }) => update({ reset: false })}
+				>
+					<div class="ui-row">
+						<span id="quiet-label">送らない時間を決める</span>
+						<Switch bind:checked={quietOn} name="on" labelledby="quiet-label" onchange={saveQuiet} />
+					</div>
+					{#if quietOn}
+						<div class="ui-row times">
+							<label>から<input type="time" name="from" bind:value={quietFrom} onchange={saveQuiet} required /></label>
+							<label>まで<input type="time" name="to" bind:value={quietTo} onchange={saveQuiet} required /></label>
+						</div>
+					{/if}
+				</form>
+				{#if form?.quietMessage}<p class="error" role="alert">{form.quietMessage}</p>{/if}
+				<p class="ui-note">この時間に来るはずの通知は送りません。後からまとめて送ることもしません。</p>
 			</section>
 		{/if}
 	</div>
@@ -194,6 +232,31 @@
 
 	.row form .btn {
 		width: 100%;
+	}
+
+	.times {
+		justify-content: flex-start;
+		gap: 16px;
+		padding: 8px 14px;
+	}
+
+	.times label {
+		display: flex;
+		flex-direction: row-reverse;
+		align-items: center;
+		gap: 6px;
+		font-size: 14px;
+	}
+
+	.times input {
+		height: 40px;
+		padding: 0 8px;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 16px;
 	}
 
 	.chips {

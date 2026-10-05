@@ -4,9 +4,10 @@ import { courseAbsences, courseNotes } from '$lib/server/db/schema';
 import { findOwnedCourse, keepBeforeChanges, loadCourse, markSharedSeen } from '$lib/server/courses';
 import { USER_QUOTA_BYTES, deleteFile, filesEnabled, listFiles, usedBytes } from '$lib/server/files';
 import { reportCancellation, reportedDates, sharedCancellations } from '$lib/server/cancellations';
+import { addMove, deleteMove, parseMove } from '$lib/server/calendar';
 import { addEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
 import { deleteEventKept, deleteNoteKept } from '$lib/server/undo';
-import { addNote, orderMemoIds, parseNote, setTaskDone, updateNote } from '$lib/server/notes';
+import { addNote, addWeeklyTask, deleteNote, orderMemoIds, parseNote, parseRepeat, setStepDone, setTaskDone, updateNote } from '$lib/server/notes';
 import { isDate, tokyoTime } from '$lib/time';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
@@ -58,9 +59,13 @@ async function ownCourse({ locals, params }: RequestEvent<{ id: string }>) {
 export const actions: Actions = {
 	note: async (event) => {
 		const courseId = await ownCourse(event);
-		const parsed = parseNote(await event.request.formData());
+		const form = await event.request.formData();
+		const parsed = parseNote(form);
 		if ('message' in parsed) return fail(400, { message: parsed.message });
-		await addNote(event.locals.db, courseId, parsed.note);
+		const repeat = parseRepeat(form, parsed.note);
+		if ('message' in repeat) return fail(400, { message: repeat.message });
+		if (repeat.until && parsed.note.kind === 'task') await addWeeklyTask(event.locals.db, courseId, parsed.note, repeat.until);
+		else await addNote(event.locals.db, courseId, parsed.note);
 		return { added: true };
 	},
 	// Marks the day as cancelled here too, as others syncing the class have
@@ -92,6 +97,20 @@ export const actions: Actions = {
 		if ('message' in parsed) return fail(400, { message: parsed.message });
 		await addEvent(event.locals.db, event.locals.user!.id, parsed.event);
 		return { added: true };
+	},
+	// The class held once on another day or in another period
+	move: async (event) => {
+		const courseId = await ownCourse(event);
+		const loaded = await loadCourse(event.locals.db, event.locals.user!.id, courseId);
+		if (!loaded) error(404, '授業が見つかりません');
+		const parsed = parseMove(await event.request.formData(), loaded.periods.map((p) => p.number));
+		if ('message' in parsed) return fail(400, { message: parsed.message });
+		if (!(await addMove(event.locals.db, courseId, parsed.move))) return fail(400, { message: '振替が多すぎます。済んだものを消してください' });
+		return { added: true };
+	},
+	removeMove: async (event) => {
+		const courseId = await ownCourse(event);
+		await deleteMove(event.locals.db, courseId, String((await event.request.formData()).get('id') ?? ''));
 	},
 	removeEvent: async (event) => {
 		await ownCourse(event);
@@ -132,9 +151,19 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		await setTaskDone(event.locals.db, courseId, String(form.get('id')), form.get('done') === 'on');
 	},
+	step: async (event) => {
+		const courseId = await ownCourse(event);
+		const form = await event.request.formData();
+		await setStepDone(event.locals.db, courseId, String(form.get('id')), Number(form.get('index')), form.get('done') === 'on');
+	},
 	remove: async (event) => {
 		const courseId = await ownCourse(event);
 		const form = await event.request.formData();
+		// A weekly homework's copies from this one on go together, without 元に戻す
+		if (form.get('later') === 'on') {
+			await deleteNote(event.locals.db, courseId, String(form.get('id')), true);
+			return;
+		}
 		return { undo: await deleteNoteKept(event.locals.db, event.locals.user!.id, courseId, String(form.get('id'))) };
 	},
 	// 確認した on the shared course's changes

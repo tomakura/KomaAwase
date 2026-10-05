@@ -6,6 +6,7 @@
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import CourseDetail from '$lib/components/CourseDetail.svelte';
 	import CourseEdit from './courses/[id]/edit/+page.svelte';
+	import DayClasses from '$lib/components/DayClasses.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
@@ -150,6 +151,17 @@
 				<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 			</a>
 		{/if}
+		{#if data.courses.length}
+			<DayClasses
+				today={clock.date}
+				terms={data.terms}
+				periods={data.periods}
+				courses={data.courses}
+				calendar={data.calendar}
+				href={(id) => courseHref(id, termId ?? null)}
+				calendarHref="/calendar"
+			/>
+		{/if}
 		<TermBar year={data.year} terms={data.terms} bind:termId onchange={selectTerm} />
 
 		<!-- A new timetable: the ways to fill it, up front. Searching and importing need an
@@ -183,6 +195,10 @@
 						<span><b>自分で入力する</b></span>
 					</a>
 				{/if}
+				<a class="way" href="/import/csv{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
+					<Icon name="download" size={22} />
+					<span><b>CSV から入力</b>表計算ソフトの一覧からまとめて登録</span>
+				</a>
 				<p class="ui-note">下の時間割の空いているコマを押しても追加できます。</p>
 			</section>
 		{/if}
@@ -198,6 +214,8 @@
 					{clock}
 					termIsOn={on}
 					termStart={term?.startDate}
+					calendar={data.calendar}
+					dayHref={() => '/calendar'}
 					slotHref={(day, period) => `/courses/search?term=${termId}&day=${day}&period=${period}`}
 					courseHref={(id) => courseHref(id, termId ?? null)}
 				/>

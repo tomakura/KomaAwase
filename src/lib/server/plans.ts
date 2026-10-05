@@ -1,5 +1,6 @@
 import { and, asc, eq, gte, or, sql } from 'drizzle-orm';
 import type { Plan } from '$lib/plans';
+import { stepsDone } from '$lib/tasks';
 import { addDays, academicYear, isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseNotes, courses, events, timetables } from './db/schema';
@@ -8,6 +9,7 @@ import { shownTitle } from './shared-courses';
 const TITLE_MAX = 100;
 const PLACE_MAX = 50;
 const MEMO_MAX = 500;
+const EXAM_TEXT_MAX = 500;
 // How far back finished things are still listed
 const KEEP_DAYS = 60;
 
@@ -22,6 +24,9 @@ export type EventInput = {
 	place: string | null;
 	memo: string | null;
 	courseId: string | null;
+	exam: boolean;
+	scope: string | null;
+	bring: string | null;
 };
 
 export function parseEvent(form: FormData): { event: EventInput } | { message: string } {
@@ -34,6 +39,9 @@ export function parseEvent(form: FormData): { event: EventInput } | { message: s
 	const place = String(form.get('place') ?? '').trim() || null;
 	const memo = String(form.get('memo') ?? '').trim() || null;
 	const courseId = String(form.get('courseId') ?? '') || null;
+	const exam = form.get('exam') === 'on';
+	const scope = (exam && String(form.get('scope') ?? '').trim()) || null;
+	const bring = (exam && String(form.get('bring') ?? '').trim()) || null;
 	if (!title || length(title) > TITLE_MAX) return { message: `名前は1〜${TITLE_MAX}文字で入れてください` };
 	if (!isDate(date)) return { message: '日付を確かめてください' };
 	if ((startTime && !isTime(startTime)) || (endTime && !isTime(endTime))) return { message: '時刻を確かめてください' };
@@ -41,7 +49,9 @@ export function parseEvent(form: FormData): { event: EventInput } | { message: s
 	if (startTime && endTime && endTime < startTime) return { message: '終わりの時刻は、はじまりより後にしてください' };
 	if (place && length(place) > PLACE_MAX) return { message: `場所は${PLACE_MAX}文字までです` };
 	if (memo && length(memo) > MEMO_MAX) return { message: `メモは${MEMO_MAX}文字までです` };
-	return { event: { title, date, startTime, endTime, place, memo, courseId } };
+	if (scope && length(scope) > EXAM_TEXT_MAX) return { message: `範囲は${EXAM_TEXT_MAX}文字までです` };
+	if (bring && length(bring) > EXAM_TEXT_MAX) return { message: `持ち物は${EXAM_TEXT_MAX}文字までです` };
+	return { event: { title, date, startTime, endTime, place, memo, courseId, exam, scope, bring } };
 }
 
 // The classes of this year's timetable, for choosing which one a homework or event belongs to
@@ -63,6 +73,8 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 				id: courseNotes.id,
 				title: courseNotes.body,
 				date: courseNotes.due,
+				start: courseNotes.dueTime,
+				steps: courseNotes.steps,
 				done: courseNotes.done,
 				courseId: courses.id,
 				course: shownTitle
@@ -92,6 +104,9 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 				end: events.endTime,
 				place: events.place,
 				memo: events.memo,
+				exam: events.exam,
+				scope: events.scope,
+				bring: events.bring,
 				courseId: events.courseId,
 				course: sql<string | null>`${shownTitle}`
 			})
@@ -104,8 +119,20 @@ export async function loadPlans(db: Db, userId: string, today: string): Promise<
 			.all()
 	]);
 	return [
-		...tasks.map((t): Plan => ({ kind: 'task', ...t, start: null, end: null, place: null, memo: null })),
-		...eventRows.map((e): Plan => ({ kind: 'event', ...e, done: false }))
+		...tasks.map(
+			({ steps, ...t }): Plan => ({
+				kind: 'task',
+				...t,
+				end: null,
+				place: null,
+				memo: null,
+				steps: stepsDone(steps),
+				exam: false,
+				scope: null,
+				bring: null
+			})
+		),
+		...eventRows.map((e): Plan => ({ kind: 'event', ...e, steps: null, done: false }))
 	];
 }
 
@@ -119,7 +146,10 @@ export function listCourseEvents(db: Db, courseId: string) {
 			start: events.startTime,
 			end: events.endTime,
 			place: events.place,
-			memo: events.memo
+			memo: events.memo,
+			exam: events.exam,
+			scope: events.scope,
+			bring: events.bring
 		})
 		.from(events)
 		.where(eq(events.courseId, courseId))

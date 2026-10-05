@@ -7,6 +7,7 @@ import type { Db } from './db';
 import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, sharedCourseEdits, timetables } from './db/schema';
 import { sharedChanges, sharedSource, type SharedChange } from '$lib/shared-changes';
 import { deleteCourseFiles } from './files';
+import { courseMovesQuery } from './calendar';
 import { loadNotes } from './notes';
 import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, syncedValues, writeShared, type SharedCourse, type SharedValues } from './shared-courses';
 import { loadShape, shapeQueries } from './timetable';
@@ -354,7 +355,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 	// in a batch, drizzle mixes up columns of the same name from a join.)
 	const ofCourse = (column: typeof courses.timetableId | typeof courses.sharedCourseId) =>
 		db.select({ id: column }).from(courses).where(eq(courses.id, courseId));
-	const [[course], [timetable], termRows, periodRows, sharedRows, sharedSlots, sharedTeachers, notes, termLinks, slotRows, teacherRows, absences] =
+	const [[course], [timetable], termRows, periodRows, sharedRows, sharedSlots, sharedTeachers, notes, termLinks, slotRows, teacherRows, absences, moves] =
 		await db.batch([
 			db.select().from(courses).where(eq(courses.id, courseId)),
 			db
@@ -385,7 +386,8 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 				.select({ id: courseAbsences.id, date: courseAbsences.date })
 				.from(courseAbsences)
 				.where(eq(courseAbsences.courseId, courseId))
-				.orderBy(desc(courseAbsences.date))
+				.orderBy(desc(courseAbsences.date)),
+			courseMovesQuery(db, courseId)
 		]);
 	if (!course || !timetable) return null;
 	const shape = { terms: termRows, periods: periodRows };
@@ -413,6 +415,7 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 			syncMode: course.syncMode
 		},
 		absences,
+		moves,
 		shared: shared && {
 			id: shared.id,
 			source: shared.source,

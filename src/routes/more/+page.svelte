@@ -87,6 +87,7 @@
 				</form>
 				{@render link('/more/periods', '時限と時刻', data.periodsLabel)}
 				{@render link('/more/terms', '学期の区切り', data.termsLabel)}
+				{@render link('/calendar?back=/more', '日程（休み・試験期間）')}
 			</div>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		</section>
@@ -141,12 +142,12 @@
 						<Icon name="chevron" size={16} />
 					</span>
 				</a>
-				<a class="ui-row" href="/more/data" download data-sveltekit-reload>
+				<a class="ui-row" href="/more/backup">
 					<span class="share-text">
-						自分のデータを保存（JSON）
-						<span class="share-sub">時間割・メモ・予定などをJSONで保存します。資料のファイル本体は含まれません。</span>
+						データの保存と復元
+						<span class="share-sub">時間割・メモ・予定などを保存したり、保存したファイルから戻したりできます。</span>
 					</span>
-					<span class="ui-row-value"><Icon name="download" size={16} /></span>
+					<span class="ui-row-value"><Icon name="chevron" size={16} /></span>
 				</a>
 			</div>
 		</section>

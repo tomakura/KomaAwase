@@ -150,6 +150,14 @@
 				<span>自分で入力する</span>
 				<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 			</a>
+			<a class="option" href="/import/csv">
+				<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+					<rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+					<path d="M3.5 10h17M3.5 15h17M10 4.5v15" />
+				</svg>
+				<span>CSV からまとめて入力する</span>
+				<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+			</a>
 			{#if data.access === 'ok'}
 				<a class="option" href="/import?back={encodeURIComponent(page.url.pathname + page.url.search)}">
 					<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">

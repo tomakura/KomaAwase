@@ -8,6 +8,7 @@ import type { KnownTimetable } from './auth/session';
 import type { Db } from './db';
 import { courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
 import { sharedCancellations } from './cancellations';
+import { calendarQuery, upcomingMoves } from './calendar';
 import { upcomingCancellations } from './notes';
 import { sharedCourseQueries, sharedCoursesFrom } from './shared-courses';
 import { getUniversity } from './universities';
@@ -249,7 +250,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 		.select({ id: courses.sharedCourseId })
 		.from(courses)
 		.where(and(eq(courses.timetableId, timetableId), eq(courses.syncMode, 'synced')));
-	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows, sharedRows, sharedSlots, sharedTeachers] = await db.batch([
+	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows, calendarRows, moveRows, sharedRows, sharedSlots, sharedTeachers] = await db.batch([
 		termsQuery(db, timetableId),
 		periodsQuery(db, timetableId),
 		db
@@ -287,6 +288,8 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 			.innerJoin(courses, eq(courseSlots.courseId, courses.id))
 			.where(eq(courses.timetableId, timetableId)),
 		upcomingCancellations(db, timetableId, today),
+		calendarQuery(db, timetableId, today),
+		upcomingMoves(db, timetableId, today),
 		...sharedCourseQueries(db, syncedIds)
 	]);
 	const shared = sharedCoursesFrom(sharedRows, sharedSlots, sharedTeachers);
@@ -302,6 +305,8 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 	return {
 		terms: termRows,
 		periods: periodRows,
+		// Days off and exam periods from today on
+		calendar: calendarRows,
 		courses: courseRows.map(({ syncMode, sharedCourseId, ...c }) => {
 			const synced = syncMode === 'synced' && sharedCourseId ? shared.get(sharedCourseId) : undefined;
 			const values = synced
@@ -319,6 +324,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
 				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : [])),
 				sharedChanged: !!synced && !!c.changed,
+				moves: moveRows.filter((m) => m.courseId === c.id).map(({ courseId: _, ...m }) => m),
 				// Not the ones this person already marked themselves
 				maybeCancels: votes
 					.filter((v) => syncMode === 'synced' && v.sharedCourseId === sharedCourseId && v.n >= MAYBE_MIN)

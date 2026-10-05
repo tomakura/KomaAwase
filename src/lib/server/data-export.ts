@@ -2,7 +2,9 @@ import { and, asc, eq, type Column } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db';
 import {
+	calendarEntries,
 	courseAbsences,
+	courseMoves,
 	courseFiles,
 	courseNotes,
 	courseSlots,
@@ -27,7 +29,7 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 export async function exportData(db: Db, user: { id: string }) {
 	const me = user.id;
 	const own = (table: { timetableId: Column }) => eq(table.timetableId, timetables.id);
-	const [account, tables, termRows, periodRows, courseRows, termLinks, slots, teachers, notes, files, absences, eventRows, { friends }, groupRows] =
+	const [account, tables, termRows, periodRows, courseRows, termLinks, slots, teachers, notes, files, absences, eventRows, { friends }, groupRows, calendarRows, moveRows] =
 		await Promise.all([
 			db
 				.select({
@@ -84,7 +86,7 @@ export async function exportData(db: Db, user: { id: string }) {
 				.where(eq(timetables.userId, me))
 				.orderBy(asc(courseNotes.createdAt)),
 			db
-				.select({ courseId: courseFiles.courseId, name: courseFiles.name, mime: courseFiles.mime, size: courseFiles.size })
+				.select({ id: courseFiles.id, courseId: courseFiles.courseId, name: courseFiles.name, mime: courseFiles.mime, size: courseFiles.size })
 				.from(courseFiles)
 				.innerJoin(courses, eq(courses.id, courseFiles.courseId))
 				.innerJoin(timetables, own(courses))
@@ -107,7 +109,20 @@ export async function exportData(db: Db, user: { id: string }) {
 					.innerJoin(groupMembers, eq(groupMembers.groupId, groups.id))
 					.innerJoin(users, eq(users.id, groupMembers.userId))
 					.orderBy(asc(groups.name));
-			})()
+			})(),
+			db
+				.select({ timetableId: calendarEntries.timetableId, kind: calendarEntries.kind, label: calendarEntries.label, start: calendarEntries.start, end: calendarEntries.end })
+				.from(calendarEntries)
+				.innerJoin(timetables, own(calendarEntries))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(calendarEntries.start)),
+			db
+				.select({ move: courseMoves })
+				.from(courseMoves)
+				.innerJoin(courses, eq(courses.id, courseMoves.courseId))
+				.innerJoin(timetables, own(courses))
+				.where(eq(timetables.userId, me))
+				.orderBy(asc(courseMoves.fromDate))
 		]);
 
 	// A synced course is written as the timetable shows it: with the shared course's values
@@ -136,6 +151,7 @@ export async function exportData(db: Db, user: { id: string }) {
 			archived: t.archived,
 			terms: termRows.filter((x) => x.timetableId === t.id).map(({ name, group, start, end }) => ({ name, group, start, end })),
 			periods: periodRows.filter((x) => x.timetableId === t.id).map(({ number, start, end }) => ({ number, start, end })),
+			calendar: calendarRows.filter((x) => x.timetableId === t.id).map(({ kind, label, start, end }) => ({ kind, label, start, end })),
 			courses: courseRows
 				.filter((r) => r.course.timetableId === t.id)
 				.map(({ course: c }) => {
@@ -168,8 +184,21 @@ export async function exportData(db: Db, user: { id: string }) {
 						teachers: v.teachers,
 						notes: notes
 							.filter((n) => n.note.courseId === c.id)
-							.map(({ note: n }) => ({ kind: n.kind, date: n.date, body: n.body, due: n.due, done: n.done })),
-						files: by(files, c.id).map(({ name, mime, size }) => ({ name, mime, size }))
+							.map(({ note: n }) => ({
+								kind: n.kind,
+								date: n.date,
+								body: n.body,
+								due: n.due,
+								dueTime: n.dueTime,
+								submitTo: n.submitTo,
+								steps: n.steps,
+								done: n.done
+							})),
+						moves: moveRows
+							.filter((m) => m.move.courseId === c.id)
+							.map(({ move: m }) => ({ from: m.fromDate, to: m.toDate, period: m.period, span: m.span, room: m.room })),
+						// Where the file itself is read from, for a backup that includes the files (backup.ts)
+						files: by(files, c.id).map(({ id, name, mime, size }) => ({ name, mime, size, url: `/courses/${c.id}/files/${id}` }))
 					};
 				})
 		})),
@@ -180,6 +209,9 @@ export async function exportData(db: Db, user: { id: string }) {
 			end: e.endTime,
 			place: e.place,
 			memo: e.memo,
+			exam: e.exam,
+			scope: e.scope,
+			bring: e.bring,
 			course: e.courseId ? (courseTitle.get(e.courseId) ?? null) : null
 		})),
 		// Only the nicknames
