@@ -77,7 +77,10 @@ export async function addWeeklyTask(db: Db, courseId: string, note: Extract<Note
 	const steps = note.steps?.map((s) => ({ ...s, done: false })) ?? null;
 	const rows = weeklyDates(note.due ?? until, until).map((due) => ({ courseId, ...note, due, steps, seriesId }));
 	// D1 takes at most 100 bound values per query
-	for (let i = 0; i < rows.length; i += 5) await db.insert(courseNotes).values(rows.slice(i, i + 5));
+	const inserts: BatchItem<'sqlite'>[] = [];
+	for (let i = 0; i < rows.length; i += 5) inserts.push(db.insert(courseNotes).values(rows.slice(i, i + 5)));
+	// One batch, so a series is added whole or not at all
+	if (inserts.length) await db.batch(inserts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }
 
 export async function addNote(db: Db, courseId: string, note: NoteInput) {
@@ -156,16 +159,22 @@ export async function setTaskDone(db: Db, courseId: string, noteId: string, done
 		.where(and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId), eq(courseNotes.kind, 'task')));
 }
 
-// Checks off (or not) one step of a homework, by its place in the list
+// Checks off (or not) one step of a homework, by its place in the list. Only that step is
+// written, so two quick checks don't undo each other.
 export async function setStepDone(db: Db, courseId: string, noteId: string, index: number, done: boolean) {
-	const where = and(eq(courseNotes.id, noteId), eq(courseNotes.courseId, courseId), eq(courseNotes.kind, 'task'));
-	const row = await db.select({ steps: courseNotes.steps }).from(courseNotes).where(where).get();
-	const steps = row?.steps;
-	if (!steps || !Number.isInteger(index) || !steps[index]) return;
+	if (!Number.isInteger(index) || index < 0 || index >= STEPS_MAX) return;
+	const path = `$[${index}].done`;
 	await db
 		.update(courseNotes)
-		.set({ steps: steps.map((s, i) => (i === index ? { ...s, done } : s)) })
-		.where(where);
+		.set({ steps: sql`json_set(${courseNotes.steps}, ${path}, json(${done ? 'true' : 'false'}))` })
+		.where(
+			and(
+				eq(courseNotes.id, noteId),
+				eq(courseNotes.courseId, courseId),
+				eq(courseNotes.kind, 'task'),
+				sql`${index} < json_array_length(${courseNotes.steps})`
+			)
+		);
 }
 
 // `later`: a weekly homework's copies from this one on go too

@@ -17,7 +17,7 @@ export function pushEnabled(env: Env | undefined) {
  * the Worker can send go through the push queue (push-queue.ts). Subscriptions the browser
  * has let go (404/410) are removed. Failures are logged, never thrown.
  */
-export async function notify(env: Env, db: Db, userIds: string[], kind: NotifyKind | null, message: PushMessage) {
+export async function notify(env: Env, db: Db, userIds: string[], kind: NotifyKind | null, message: PushMessage, options: { ignoreQuiet?: boolean } = {}) {
 	if (!pushEnabled(env) || !userIds.length) return;
 	try {
 		// D1 takes at most 100 bound values per query
@@ -38,12 +38,12 @@ export async function notify(env: Env, db: Db, userIds: string[], kind: NotifyKi
 					.where(inArray(pushSubscriptions.userId, ids.slice(i, i + 90))))
 			);
 		}
-		// kind null: a test from the settings page, which always goes. In the quiet hours a
-		// person chose nothing goes.
+		// kind null: not one a person can turn off (a test, a message to the admins). In the quiet
+		// hours a person chose nothing goes, except the test from the settings page.
 		const expires = Date.now() + 24 * 60 * 60 * 1000;
 		const minutes = tokyoTime(Date.now()).minutes;
 		const items = rows
-			.filter((r) => !kind || (wants(r.settings, kind) && !isQuiet(r.settings?.quiet, minutes)))
+			.filter((r) => (!kind || wants(r.settings, kind)) && (options.ignoreQuiet || !isQuiet(r.settings?.quiet, minutes)))
 			.map((r) => ({ deviceId: r.id, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, message, expires }));
 		await deliver(env, items);
 	} catch (e) {

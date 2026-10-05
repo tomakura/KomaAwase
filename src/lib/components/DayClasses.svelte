@@ -50,7 +50,7 @@
 
 	{#if day.items.length}
 		<div class="list">
-			{#each day.items as c (`${c.courseId}-${c.period}-${c.status}`)}
+			{#each day.items as c, i (`${c.courseId}-${c.period}-${c.status}-${c.move?.id ?? i}`)}
 				<a class="row" class:gone={c.status === 'cancel' || c.status === 'away'} href={href(c.courseId)} style:--c={courseColor(c.color)}>
 					<span class="when"><b>{periodLabel(c.period, c.span, periodNumbers)}</b>{time(c.start)}</span>
 					<span class="text">

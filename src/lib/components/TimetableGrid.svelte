@@ -96,6 +96,7 @@
 		off?: string | null;
 		away?: string | null;
 		moved?: string | null;
+		moveId?: string;
 	};
 
 	const cells = $derived(
@@ -137,7 +138,7 @@
 			const span = Math.min(m.span, lastRow - row + 1);
 			const slot = { weekday, period: m.period, span: m.span, room: m.room };
 			const live = m.toDate === clock.date ? session(weekday, row, span) : null;
-			return [{ course, slot, row, col, span, live, cancel: null, maybe: null, meets: true, moved: m.toDate }];
+			return [{ course, slot, row, col, span, live, cancel: null, maybe: null, meets: true, moved: m.toDate, moveId: m.id }];
 		});
 	}
 
@@ -238,7 +239,7 @@
 			</div>
 		{:else}
 			<div class="place stacked" style:grid-row="{stack.row} / span {stack.span}" style:grid-column={stack.col} style:--n={stack.row + stack.col - 4}>
-				{#each stack.cells as cell (`${cell.course.id}-${cell.slot.period}`)}
+				{#each stack.cells as cell, i (`${cell.course.id}-${cell.slot.period}-${cell.moveId ?? i}`)}
 					{@render course(cell)}
 				{/each}
 			</div>

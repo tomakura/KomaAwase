@@ -69,7 +69,7 @@ export const actions: Actions = {
 			body: 'このように届きます',
 			url: '/more/notifications',
 			tag: 'test'
-		});
+		}, { ignoreQuiet: true });
 		return { tested: true };
 	}
 };
