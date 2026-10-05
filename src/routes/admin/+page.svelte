@@ -36,7 +36,7 @@
 		<div class="ui-list">
 			{@render link('/admin/users', '利用者（警告・利用停止）')}
 			{@render link('/admin/courses', '授業（直す・まとめる）')}
-			{@render link('/admin/universities', '利用者が作った大学')}
+			{@render link('/admin/universities', '利用者が作った大学（直す・消す）')}
 		</div>
 	</section>
 
