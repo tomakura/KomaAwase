@@ -11,7 +11,8 @@ export type Ask = {
 type Open = Ask & { answer: (yes: boolean) => void };
 
 class Confirmation {
-	current = $state<Open | null>(null);
+	// Raw, so the one answering can be told apart from a newer one by identity
+	current = $state.raw<Open | null>(null);
 
 	ask(options: Ask): Promise<boolean> {
 		// A second one replaces the first, which counts as cancelled

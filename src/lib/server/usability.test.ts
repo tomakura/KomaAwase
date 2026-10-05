@@ -97,8 +97,8 @@ describe('changes to a synced course', () => {
 
 	it('says where the values come from', () => {
 		const day = Date.UTC(2026, 9, 1, 3);
-		expect(sharedSource({ source: 'syllabus', version: 1, createdAt: day, updatedAt: day })).toBe('シラバスから（2026年10月1日 確認）');
-		expect(sharedSource({ source: 'user', version: 3, createdAt: day, updatedAt: day })).toBe('利用者が入力（2026年10月1日 更新）');
+		expect(sharedSource({ source: 'syllabus', version: 1, createdAt: day, updatedAt: day })).toBe('シラバスから（10月1日 確認）');
+		expect(sharedSource({ source: 'user', version: 3, createdAt: day, updatedAt: day })).toBe('利用者が入力（10月1日 更新）');
 	});
 });
 

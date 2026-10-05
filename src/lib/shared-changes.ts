@@ -35,14 +35,14 @@ export function sharedChanges(before: SharedValuesLike, after: SharedValuesLike)
 const monthDay = (ms: number) => {
 	// Japan time
 	const d = new Date(ms + 9 * 60 * 60 * 1000);
-	return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
+	return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
 };
 
 /** Where a shared course's values come from, and when they were last looked at or changed */
 export function sharedSource(c: { source: 'syllabus' | 'user'; version: number; createdAt: number; updatedAt: number }) {
 	if (c.source === 'syllabus') {
 		const base = `シラバスから（${monthDay(c.createdAt)} 確認）`;
-		return c.version > 1 ? `${base}、利用者が直した（${monthDay(c.updatedAt)}）` : base;
+		return c.version > 1 ? `${base}・${monthDay(c.updatedAt)} 利用者が修正` : base;
 	}
 	return `利用者が入力（${monthDay(c.updatedAt)} 更新）`;
 }

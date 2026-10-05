@@ -5,7 +5,7 @@ const SHOWN_MS = 6000;
 export type ToastAction = { label: string; run: () => unknown };
 
 class Toasts {
-	current = $state<{ key: number; text: string; action?: ToastAction } | null>(null);
+	current = $state.raw<{ key: number; text: string; action?: ToastAction } | null>(null);
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#key = 0;
 

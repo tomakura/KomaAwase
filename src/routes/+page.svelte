@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, invalidateAll, preloadData, pushState, replaceState } from '$app/navigation';
+	import { goto, preloadData, pushState, refreshAll, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
@@ -221,7 +221,8 @@
 				onback={() => history.back()}
 				onsaved={async () => {
 					await back();
-					await invalidateAll();
+					// Not invalidateAll, which would close the course too
+					await refreshAll();
 				}}
 			/>
 		{:else}
@@ -276,7 +277,8 @@
 			border-right: 1px solid var(--line);
 		}
 
-		.course-over.side :global(.scrim) {
+		.course-over.side :global(.scrim),
+		.course-over.side :global(.grabber) {
 			display: none;
 		}
 

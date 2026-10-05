@@ -28,13 +28,23 @@
 
 {#if note && page.url.pathname !== '/status'}
 	<a class="strip" class:trouble={note.level === 'trouble'} href="/status">
-		<b>{NOTE_LABELS[note.level]}</b>
-		<span>{note.body}</span>
+		<span class="inner">
+			<b>{NOTE_LABELS[note.level]}</b>
+			<span class="body">{note.body}</span>
+		</span>
 	</a>
 {/if}
 
 <style>
 	.strip {
+		display: block;
+		background: var(--course-yellow);
+		color: var(--ink);
+		font-size: 12px;
+		text-decoration: none;
+	}
+
+	.inner {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -42,10 +52,6 @@
 		margin: 0 auto;
 		box-sizing: border-box;
 		padding: 8px 16px;
-		background: var(--course-yellow);
-		color: var(--ink);
-		font-size: 12px;
-		text-decoration: none;
 	}
 
 	.strip.trouble {
@@ -53,7 +59,12 @@
 		color: var(--surface);
 	}
 
-	span {
+	b {
+		flex: none;
+		white-space: nowrap;
+	}
+
+	.body {
 		min-width: 0;
 		overflow: hidden;
 		white-space: nowrap;
