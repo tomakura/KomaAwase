@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const timetable = await currentTimetable(locals.db, me, locals.timetable);
 	const loaded = share === 'none' ? null : await loadTimetable(locals.db, timetable.id, tokyoTime(now).date);
 	// The same as others get from /friends/[id]
-	const courses = (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, ...c }) => c);
+	const courses = (loaded?.courses ?? []).map(({ cancels: _, maybeCancels: __, moves: ___, ...c }) => c);
 	return {
 		now,
 		year: timetable.year,

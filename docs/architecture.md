@@ -207,10 +207,10 @@ AI の読み取りは間違えることがある。画面と規約の両方で�
 
 ## 授業の前の通知
 
-1分ごとの Cron（`wrangler.jsonc` の `* 0-13,21-23 * * *`、日本時間の 6:00〜22:59）が `CLASS_REMINDERS` を読み、「今からその分数あとに始まる授業」がある人の端末へ送る。
+1分ごとの Cron（`wrangler.jsonc` の `* * * * *`）が `CLASS_REMINDERS` を読み、「今からその分数あとに始まる授業」がある人の端末へ送る。同じ Cron で、前の日20時の通知（`plan-eve.ts`）と、課題の締め切りの日の通知（`task-reminders.ts`：朝8時、締め切りの3時間前・1時間前。どれも最初はオフ）も送る。課題の締め切りは夜中もあるので、Cron は一日中動かす。人が決めた「通知を送らない時間」（`users.notify.quiet`）には、どの通知も送らず、後からまとめて送ることもしない
 
 - 無料プランの CPU は1回10ms までなので、SvelteKit を起動しない。`worker/entry.js` の `scheduled` が Cron の文字列を見て、日次のほうは今まで通り `/internal/daily`、1分ごとのほうは `src/lib/server/reminders.ts` を直接呼ぶ。動くのは1本のクエリで、何もなければそこで終わる
-- クエリ：今年度の時間割（`archived = 0`）→ その曜日の授業のコマ → 時限の開始時刻 − 選んだ分数 = いまの分、で絞り、その日の休講（`course_notes.kind = 'cancel'`）を除く。学期の期間（`termIsOn`）と隔週（`meetsInWeek`）はあとで JS で見る。時限の開始は `8:40` でも `08:40` でも読める
+- クエリ：今年度の時間割（`archived = 0`）→ その曜日の授業のコマ → 時限の開始時刻 − 選んだ分数 = いまの分、で絞り、その日の休講（`course_notes.kind = 'cancel'`）、休みの日（`calendar_entries.kind = 'off'`）、振替でほかの日に移した授業（`course_moves.from_date`）を除く。振替でその日に移ってきた授業は、別のクエリを `UNION ALL` でつないで拾う。学期の期間（`termIsOn`）と隔週（`meetsInWeek`）はあとで JS で見る。時限の開始は `8:40` でも `08:40` でも読める
 - 相対 import だけにしてある（`entry.js` から直接読むため）。`src/lib/server/reminders.test.ts` は本物のマイグレーションを `node:sqlite` に流して、このクエリごと確かめる
 - 1分に送るのは40件まで（無料プランの外へのリクエストは50回まで）。始業の時刻に集中して超えるほど人が増えたら、キューに分けて送る形に変える。送った数は Worker のログに出る（`class reminders: sent …`）
 - 通知の `tag` は `class-<コマ>-<日付>-<分数>`。同じ通知が二重に届いても、端末では1つに置き換わる

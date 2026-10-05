@@ -4,6 +4,7 @@
 // are spread over the ten minutes from 20:00, each in the same one every day (eveSlot), and
 // what one minute can't send goes through the push queue (push-queue.ts).
 // Relative imports only, because the Worker's entry file (worker/entry.js) reaches it directly.
+import { isQuiet, wants } from '../notify';
 import { EVE_MINUTES, eveMessage, eveSlot, type EveItem } from '../plan-eve';
 import { addDays, tokyoTime } from '../time';
 import { sendPush } from './push';
@@ -45,7 +46,8 @@ export async function sendPlanEve(env: PushEnv, scheduledTime: number, send: typ
 	const byUser = new Map<string, EveItem[]>();
 	for (const r of results) {
 		if (eveSlot(r.userId) !== slot) continue;
-		if (r.notify && JSON.parse(r.notify).planEve === false) continue;
+		const settings = r.notify ? JSON.parse(r.notify) : null;
+		if (!wants(settings, 'planEve') || isQuiet(settings?.quiet, now.minutes)) continue;
 		byUser.set(r.userId, [...(byUser.get(r.userId) ?? []), r]);
 	}
 	if (!byUser.size) return 0;
