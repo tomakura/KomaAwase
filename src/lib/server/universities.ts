@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from './db';
+import { cleanText } from '$lib/text';
 import { courses, reports, sharedCourses, timetables, universities, univVerifications, users, verifyTokens } from './db/schema';
 
 export const UNIVERSITY_NAME_MAX = 40;
@@ -8,9 +9,7 @@ export const UNIVERSITY_NAME_MAX = 40;
 export const SUGGEST_MIN_USERS = 3;
 
 // Full-width letters and odd spaces are folded so 「東京　大学」 and 「東京大学」 are one university.
-export function normalizeUniversityName(input: string) {
-	return input.normalize('NFKC').replace(/\s+/g, ' ').trim();
-}
+export const normalizeUniversityName = cleanText;
 
 // Names for the suggestions in はじめの設定 and 大学: the preset universities, and those
 // that SUGGEST_MIN_USERS people or more use; presets first.

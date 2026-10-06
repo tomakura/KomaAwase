@@ -15,6 +15,7 @@ import {
 	removeShared,
 	restoreShared,
 	sharedCreator,
+	sharesTerm,
 	syncedCount,
 	usageCounts,
 	writeShared
@@ -60,14 +61,17 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 	const mergeQuery = isAdmin ? url.searchParams.get('merge') : null;
 	const intoId = isAdmin ? url.searchParams.get('into') : null;
 	const into = intoId && intoId !== course.id ? await loadSharedCourse(locals.db, intoId) : null;
-	const target = into && into.universityId === course.universityId && into.year === course.year ? into : null;
+	const target =
+		into && into.universityId === course.universityId && into.year === course.year && sharesTerm(into, course) ? into : null;
 	const [candidates, preview] = await Promise.all([
 		mergeQuery !== null
 			? adminSearchShared(locals.db, {
 					universityId: course.universityId,
 					year: course.year,
 					q: mergeQuery.trim().slice(0, 50),
-					excludeId: course.id
+					excludeId: course.id,
+					// Only courses of a quarter it shares: two of different quarters are different classes
+					sharesTerm: course.terms
 				})
 			: [],
 		target ? mergePreview(locals.db, course.id, target.id) : null
@@ -83,8 +87,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		merge: isAdmin
 			? {
 					query: mergeQuery,
-					candidates: candidates.map((c) => ({ id: c.id, version: c.version, users: c.users, using: c.using, source: c.source, values: c.values })),
-					target: target && preview ? { id: target.id, version: target.version, values: target.values, ...preview } : null
+					candidates: candidates.map((c) => ({ id: c.id, version: c.version, users: c.users, using: c.using, source: c.source, terms: c.terms, values: c.values })),
+					target: target && preview ? { id: target.id, version: target.version, terms: target.terms, values: target.values, ...preview } : null
 				}
 			: null,
 		back: safeNext(url.searchParams.get('back')) ?? '/',
@@ -181,6 +185,7 @@ export const actions: Actions = {
 		if (!into || into.id === course.id || into.universityId !== course.universityId || into.year !== course.year) {
 			return fail(400, { message: '同期させる授業が見つかりません。選び直してください', merge: true });
 		}
+		if (!sharesTerm(into, course)) return fail(400, { message: '学期が違う授業とは、まとめられません', merge: true });
 		// The versions the confirmation showed: if either changed since, nothing is merged
 		if (Number(form.get('version')) !== course.version || Number(form.get('into_version')) !== into.version) {
 			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', merge: true });

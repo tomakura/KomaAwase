@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { slotGroups } from './slot-groups';
+import { slotGroups, termSections } from './slot-groups';
 
 const course = (title: string, slots: [number, number, number?][]) => ({
 	title,
@@ -24,5 +24,19 @@ describe('slotGroups', () => {
 		// A two-period class starting at 2 is found at 3, under its start
 		const long = course('L', [[5, 2, 2]]);
 		expect(slotGroups([long], { period: 3 }).map((g) => g.label)).toEqual(['金曜 2限']);
+	});
+});
+
+describe('termSections', () => {
+	it('splits by term first, a course with two terms under each and none last', () => {
+		const a = { ...course('A', [[1, 1]]), courseTerms: ['Q1'] };
+		const b = { ...course('B', [[2, 1]]), courseTerms: ['Q1', 'Q2'] };
+		const c = { ...course('C', [[3, 1]]), courseTerms: [] };
+		const sections = termSections([a, b, c], ['Q1', 'Q2', 'Q3']);
+		expect(sections.map((s) => [s.label, s.groups.flatMap((g) => g.items.map((i) => i.title))])).toEqual([
+			['Q1', ['A', 'B']],
+			['Q2', ['B']],
+			['学期なし', ['C']]
+		]);
 	});
 });

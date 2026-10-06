@@ -125,9 +125,9 @@
 						<p>「{data.course.values.title}」を「{target.values.title}」にまとめます。</p>
 						<dl>
 							<dt>まとめる授業</dt>
-							<dd>{sharedFields(data.course.values)['授業名']} · {sharedFields(data.course.values)['先生']} · {sharedFields(data.course.values)['曜日・時限']}</dd>
+							<dd>{sharedFields(data.course.values)['授業名']} · {data.course.terms.join('・') || '学期なし'} · {sharedFields(data.course.values)['先生']} · {sharedFields(data.course.values)['曜日・時限']}</dd>
 							<dt>まとめ先</dt>
-							<dd>{sharedFields(target.values)['授業名']} · {sharedFields(target.values)['先生']} · {sharedFields(target.values)['曜日・時限']}</dd>
+							<dd>{sharedFields(target.values)['授業名']} · {target.terms.join('・') || '学期なし'} · {sharedFields(target.values)['先生']} · {sharedFields(target.values)['曜日・時限']}</dd>
 						</dl>
 						<ul>
 							<li>この授業を使っている{data.merge.target.people}人が、まとめ先と同期します。授業名・先生・教室・コマも、まとめ先の内容になります</li>
@@ -145,7 +145,7 @@
 						</form>
 					</div>
 				{:else if data.merge.query === null}
-					<p class="ui-note">名前が少し違うだけで別の授業になっているときに、同じ大学・年度の授業にまとめられます。</p>
+					<p class="ui-note">名前が少し違うだけで別の授業になっているときに、同じ大学・年度・学期の授業にまとめられます。</p>
 					<a class="btn" href={mergeHref('')}>まとめ先をさがす</a>
 				{:else}
 					<form method="GET" role="search" class="merge-search">
@@ -158,7 +158,7 @@
 							{@const v = sharedFields(c.values)}
 							<a class="candidate" href={mergeHref(data.merge.query, c.id)}>
 								<b>{v['授業名']}</b>
-								<span>{v['先生']} · {v['曜日・時限']} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人</span>
+								<span>{c.terms.join('・') || '学期なし'} · {v['先生']} · {v['曜日・時限']} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人</span>
 							</a>
 						{:else}
 							<p class="ui-note">見つかりませんでした。</p>

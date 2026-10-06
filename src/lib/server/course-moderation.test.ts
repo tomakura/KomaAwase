@@ -10,6 +10,7 @@ import {
 	removeShared,
 	sharedCoursesBy,
 	sharedCreator,
+	sharesTerm,
 	writeShared
 } from './shared-courses';
 import { findOrCreateUniversity, getUserUniversity } from './universities';
@@ -131,6 +132,26 @@ describe('adminSearchShared', () => {
 		expect(await titles({ period: 3 })).toEqual(['長い授業']);
 		expect(await titles({ weekday: 1, period: 1 })).toEqual(['ひどい授業2']);
 		expect(await titles({ weekday: 2 })).toEqual([]);
+	});
+});
+
+describe('quarters', () => {
+	it('keeps courses of another quarter out of merge candidates, and finds those with no term', async () => {
+		const { t } = await world();
+		const add = async (title: string, terms: string[]) => {
+			const w = writeShared(t.db, { userId: 'u2', universityId: 'uni', year: 2026, termNames: terms, existing: null, values: values(title) });
+			await t.db.batch(w.statements as [never]);
+		};
+		await add('英語 Q1', ['Q1']);
+		await add('英語 Q3', ['Q3']);
+		await add('英語 Q1Q2', ['Q1', 'Q2']);
+		const titles = async (o: { sharesTerm?: string[]; term?: string }) =>
+			(await adminSearchShared(t.db, { universityId: 'uni', year: 2026, q: '', ...o })).map((c) => c.values.title).sort();
+		expect(await titles({ sharesTerm: ['Q1'] })).toEqual(['ひどい授業2', '英語 Q1', '英語 Q1Q2']);
+		expect(await titles({ term: 'none' })).toEqual(['ひどい授業2']);
+		expect(sharesTerm({ terms: ['Q1'] }, { terms: ['Q3'] })).toBe(false);
+		expect(sharesTerm({ terms: ['Q1', 'Q2'] }, { terms: ['Q2'] })).toBe(true);
+		expect(sharesTerm({ terms: [] }, { terms: ['Q3'] })).toBe(true);
 	});
 });
 
