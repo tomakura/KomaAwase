@@ -1,11 +1,12 @@
-import { count, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { requireAdmin } from '$lib/server/auth/reauth';
-import { sharedCourses, universities } from '$lib/server/db/schema';
+import { sharedCourseSlots, sharedCourses, universities } from '$lib/server/db/schema';
 import { adminSearchShared, sharedTermNames } from '$lib/server/shared-courses';
 import type { PageServerLoad } from './$types';
 
-// The shared courses for whoever runs the app: find one by name, teacher or code to fix it
-// or fold it into another (/shared/[id]).
+// The shared courses for whoever runs the app: find one by name, teacher, code, weekday or
+// period to fix it, fold it into another or delete it (/shared/[id]). Shown by weekday and period.
+const LIMIT = 200;
 export const load: PageServerLoad = async ({ locals, url }) => {
 	await requireAdmin(locals, url);
 	const [list, years] = await Promise.all([
@@ -31,11 +32,41 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const askedTerm = url.searchParams.get('t') ?? '';
 	const term = terms.includes(askedTerm) ? askedTerm : '';
 	const unused = url.searchParams.get('z') === '1';
+	// The periods the university's courses of the year meet in, for the period picker
+	const periods =
+		university && year !== null
+			? (
+					await locals.db
+						.selectDistinct({ n: sharedCourseSlots.periodNumber })
+						.from(sharedCourseSlots)
+						.innerJoin(sharedCourses, eq(sharedCourses.id, sharedCourseSlots.sharedCourseId))
+						.where(and(eq(sharedCourses.universityId, university.id), eq(sharedCourses.year, year)))
+						.orderBy(asc(sharedCourseSlots.periodNumber))
+				).map((r) => r.n)
+			: [];
+	const askedDay = Number(url.searchParams.get('d'));
+	const weekday = Number.isInteger(askedDay) && askedDay >= 1 && askedDay <= 7 ? askedDay : 0;
+	const askedPeriod = Number(url.searchParams.get('p'));
+	const period = periods.includes(askedPeriod) ? askedPeriod : 0;
 	const results =
 		university && year !== null
-			? await adminSearchShared(locals.db, { universityId: university.id, year, q, term: term || undefined, unused })
+			? await adminSearchShared(locals.db, {
+					universityId: university.id,
+					year,
+					q,
+					term: term || undefined,
+					unused,
+					weekday: weekday || undefined,
+					period: period || undefined,
+					limit: LIMIT
+				})
 			: [];
 	return {
+		periods,
+		weekday,
+		period,
+		limit: LIMIT,
+		removed: url.searchParams.get('removed') === '1',
 		terms,
 		term,
 		unused,
