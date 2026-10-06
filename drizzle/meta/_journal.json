@@ -204,6 +204,13 @@
       "when": 1791327416773,
       "tag": "0028_clean_course_text",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1791328578386,
+      "tag": "0029_room_slash",
+      "breakpoints": true
     }
   ]
 }

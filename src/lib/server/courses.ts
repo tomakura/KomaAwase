@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, gt, isNull, ne, or, sql } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch';
 import { ABSENCE_LIMIT_MAX, COURSE_COLORS, CREDITS_MAX, isCourseColor, readNumber, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { isDate } from '$lib/time';
-import { cleanText } from '$lib/text';
+import { cleanRoom, cleanText } from '$lib/text';
 import type { Db } from './db';
 import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, sharedCourseEdits, timetables } from './db/schema';
 import { sharedChanges, sharedSource, type SharedChange } from '$lib/shared-changes';
@@ -115,7 +115,7 @@ function parseSlots(values: FormDataEntryValue[], periods: number[]): SlotInput[
 		if (typeof span !== 'number' || !Number.isInteger(span) || span < 1) return invalid;
 		const start = periods.indexOf(period as number);
 		if (start < 0 || start + span > periods.length) return invalid;
-		const room = typeof raw.room === 'string' ? cleanText(raw.room) : '';
+		const room = typeof raw.room === 'string' ? cleanRoom(raw.room) : '';
 		if (length(room) > ROOM_MAX) return `教室は${ROOM_MAX}文字までです`;
 		// Slots sent without it (older pages, imports) meet every week.
 		const week = raw.week === undefined ? 'every' : raw.week;

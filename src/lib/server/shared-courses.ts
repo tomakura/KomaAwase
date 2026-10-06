@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, ne, or, sql, type SQLWrapper } from
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Delivery, WeekPattern } from '$lib/courses';
 import { compareJa } from '$lib/sort';
-import { cleanText } from '$lib/text';
+import { cleanRoom, cleanText } from '$lib/text';
 import type { Db } from './db';
 import {
 	courses,
@@ -49,7 +49,7 @@ function cleanValues(v: SharedValues): SharedValues {
 		...v,
 		title: cleanText(v.title),
 		teachers: [...new Set(v.teachers.map(cleanText))].filter(Boolean),
-		slots: v.slots.map((s) => ({ ...s, room: s.room === null ? null : cleanText(s.room) || null }))
+		slots: v.slots.map((s) => ({ ...s, room: s.room === null ? null : cleanRoom(s.room) || null }))
 	};
 }
 
