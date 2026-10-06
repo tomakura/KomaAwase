@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, ne, sql, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne, or, sql, type SQLWrapper } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Delivery, WeekPattern } from '$lib/courses';
 import { compareJa } from '$lib/sort';
@@ -12,7 +12,8 @@ import {
 	sharedCourses,
 	timetables,
 	univVerifications,
-	users
+	users,
+	warnings
 } from './db/schema';
 
 type Slot = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
@@ -268,6 +269,43 @@ export function writeShared(
 	};
 }
 
+// The edit that added a course to the shared data (it has nothing before it)
+const firstEdit = sql`json_extract(${sharedCourseEdits.diff}, '$.before') is null`;
+
+/** Who added the course to the shared data, for the admin; null for syllabus courses and deleted accounts */
+export async function sharedCreator(db: Db, sharedCourseId: string) {
+	const row = await db
+		.select({ id: users.id, nickname: users.nickname })
+		.from(sharedCourseEdits)
+		.innerJoin(users, eq(users.id, sharedCourseEdits.userId))
+		.where(and(eq(sharedCourseEdits.sharedCourseId, sharedCourseId), firstEdit))
+		.orderBy(asc(sharedCourseEdits.createdAt))
+		.get();
+	return row ?? null;
+}
+
+/**
+ * For the admin's page about a person: the shared courses they added and those they changed,
+ * newest first (50 at most), so what someone suspended left behind can be found and deleted.
+ */
+export async function sharedCoursesBy(db: Db, userId: string) {
+	return db
+		.select({
+			id: sharedCourses.id,
+			title: sharedCourses.title,
+			year: sharedCourses.year,
+			university: sql<string>`(select u.name from universities u where u.id = "shared_courses"."university_id")`,
+			created: sql<number>`max(case when json_extract("shared_course_edits"."diff", '$.before') is null then 1 else 0 end)`,
+			edits: count()
+		})
+		.from(sharedCourseEdits)
+		.innerJoin(sharedCourses, eq(sharedCourses.id, sharedCourseEdits.sharedCourseId))
+		.where(eq(sharedCourseEdits.userId, userId))
+		.groupBy(sharedCourses.id)
+		.orderBy(desc(sql`max("shared_course_edits"."created_at")`))
+		.limit(50);
+}
+
 const likePattern = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 // A search by title, teacher or course code
@@ -353,14 +391,24 @@ export async function searchSharedCourses(
 
 export const EDITS_PAGE = 50;
 
-/** One page of the course's changes, newest first, and whether older ones follow. Who made them is never shown. */
+/**
+ * One page of the course's changes, newest first, and whether older ones follow. Who made each
+ * one is only for the admin: the page leaves it out for everyone else.
+ */
 export async function loadEdits(db: Db, sharedCourseId: string, page = 1) {
 	const rows = await db
-		.select({ id: sharedCourseEdits.id, diff: sharedCourseEdits.diff, createdAt: sharedCourseEdits.createdAt })
+		.select({
+			id: sharedCourseEdits.id,
+			diff: sharedCourseEdits.diff,
+			createdAt: sharedCourseEdits.createdAt,
+			userId: sharedCourseEdits.userId,
+			nickname: users.nickname
+		})
 		.from(sharedCourseEdits)
+		.leftJoin(users, eq(users.id, sharedCourseEdits.userId))
 		.where(eq(sharedCourseEdits.sharedCourseId, sharedCourseId))
 		// Times are to the second; rowid keeps edits within one second in the order they were saved.
-		.orderBy(desc(sharedCourseEdits.createdAt), desc(sql`rowid`))
+		.orderBy(desc(sharedCourseEdits.createdAt), desc(sql`"shared_course_edits"."rowid"`))
 		.limit(EDITS_PAGE + 1)
 		.offset((page - 1) * EDITS_PAGE);
 	return { edits: rows.slice(0, EDITS_PAGE), more: rows.length > EDITS_PAGE };
@@ -419,13 +467,23 @@ export async function sharedTermNames(db: Db, universityId: string, year: number
 
 /**
  * For the admin: a university's shared courses of a year, by title, teacher or course code
- * (the first 50 by title when there is no search), with how many people sync each and how
+ * (the first `limit` by title when there is no search), with how many people sync each and how
  * many have it at all. `term` keeps those tagged with that term name; `unused` those no
- * timetable has.
+ * timetable has; `weekday` and `period` those meeting then (a period inside a longer class counts).
  */
 export async function adminSearchShared(
 	db: Db,
-	opts: { universityId: string; year: number; q: string; excludeId?: string; term?: string; unused?: boolean }
+	opts: {
+		universityId: string;
+		year: number;
+		q: string;
+		excludeId?: string;
+		term?: string;
+		unused?: boolean;
+		weekday?: number;
+		period?: number;
+		limit?: number;
+	}
 ) {
 	const rows = await db
 		.select({ id: sharedCourses.id })
@@ -441,12 +499,17 @@ export async function adminSearchShared(
 					: undefined,
 				opts.unused
 					? sql`not exists (select 1 from ${courses} where ${courses.sharedCourseId} = ${sharedCourses.id})`
+					: undefined,
+				opts.weekday || opts.period
+					? sql`exists (select 1 from ${sharedCourseSlots} s where s.shared_course_id = ${sharedCourses.id}
+						${opts.weekday ? sql`and s.weekday = ${opts.weekday}` : sql``}
+						${opts.period ? sql`and s.period_number <= ${opts.period} and s.period_number + s.span > ${opts.period}` : sql``})`
 					: undefined
 			)
 		)
 		.orderBy(asc(sharedCourses.title))
-		// The ids go into IN (...) lists below (D1: at most 100 bound values).
-		.limit(50);
+		// The ids are read 90 at a time below (D1: at most 100 bound values).
+		.limit(opts.limit ?? 50);
 	const ids = rows.map((r) => r.id);
 	if (!ids.length) return [];
 	const [details, usage] = await Promise.all([loadSharedCourses(db, ids), usageCounts(db, ids)]);
@@ -459,41 +522,26 @@ export async function adminSearchShared(
 /**
  * For the admin: how many timetables sync each course (`synced`) and how many have it at all
  * (`linked`), which includes those that stopped syncing and kept their own copy (自分だけで使う,
- * still linked so overlays group them). Up to 90 ids at a time.
+ * still linked so overlays group them).
  */
 export async function usageCounts(db: Db, ids: string[]) {
-	const rows = ids.length
-		? await db
+	const chunks = [];
+	for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+	const parts = await Promise.all(
+		chunks.map((part) =>
+			db
 				.select({
 					id: courses.sharedCourseId,
 					linked: count(),
 					synced: sql<number>`sum(case when ${courses.syncMode} = 'synced' then 1 else 0 end)`
 				})
 				.from(courses)
-				.where(inArray(courses.sharedCourseId, ids.slice(0, CHUNK)))
+				.where(inArray(courses.sharedCourseId, part))
 				.groupBy(courses.sharedCourseId)
-		: [];
+		)
+	);
+	const rows = parts.flat();
 	return new Map(rows.map((r) => [r.id ?? '', { linked: r.linked, synced: Number(r.synced) }]));
-}
-
-/**
- * Statements that delete a shared course nobody has in a timetable, with its history and the
- * reports about it. The delete only happens while no course links to it: if someone added it
- * since the page was read, the guard stops the batch and D1 rolls it back.
- */
-export function deleteShared(db: Db, id: string): BatchItem<'sqlite'>[] {
-	return [
-		db
-			.delete(sharedCourses)
-			.where(
-				and(
-					eq(sharedCourses.id, id),
-					sql`not exists (select 1 from ${courses} where ${courses.sharedCourseId} = ${sharedCourses.id})`
-				)
-			),
-		db.run(sql`select json(case when changes() = 1 then 'true' else 'in use' end)`),
-		db.delete(reports).where(and(eq(reports.targetType, 'shared_course'), eq(reports.targetId, id)))
-	];
 }
 
 // Raw statements in a batch can't take bound values (drizzle's D1 batch fails on them), so the
@@ -572,5 +620,84 @@ export function mergeShared(db: Db, from: SharedCourse, into: SharedCourse): Bat
 			.set({ status: 'closed' })
 			.where(and(eq(reports.targetType, 'shared_course'), eq(reports.targetId, from.id))),
 		db.delete(sharedCourses).where(eq(sharedCourses.id, from.id))
+	];
+}
+
+/**
+ * For the admin's delete: how many people have the course, split into whoever added it and
+ * the rest. `creatorCourses` are the creator's copies, which the delete removes.
+ */
+export async function removePreview(db: Db, sharedCourseId: string, creatorId: string | null) {
+	const rows = await db
+		.select({ id: courses.id, userId: timetables.userId })
+		.from(courses)
+		.innerJoin(timetables, eq(timetables.id, courses.timetableId))
+		.where(eq(courses.sharedCourseId, sharedCourseId));
+	const creatorCourses = rows.filter((r) => creatorId && r.userId === creatorId).map((r) => r.id);
+	const others = new Set(rows.filter((r) => r.userId !== creatorId).map((r) => r.userId)).size;
+	return { creatorCourses, others };
+}
+
+/**
+ * Statements that delete a shared course whoever has it (an admin taking down something
+ * improper). The creator's own copies go (their files must already be gone: see
+ * deleteCourseFiles); everyone else keeps theirs as 自分だけで使う with the values they were
+ * seeing, so their notes and tasks stay. Reports about it are closed, not deleted, and a
+ * warning goes to the creator when one is given. The course must still be at the version that
+ * was read, else the batch stops at the guard and rolls back.
+ */
+export function removeShared(
+	db: Db,
+	course: SharedCourse,
+	{ creatorId, warning, adminId }: { creatorId: string | null; warning: string | null; adminId: string }
+): BatchItem<'sqlite'>[] {
+	const id = literal(course.id);
+	const synced = `select a.id from courses a where a.shared_course_id = ${id} and a.sync_mode = 'synced'`;
+	const v = course.values;
+	return [
+		db
+			.update(sharedCourses)
+			.set({ updatedAt: new Date() })
+			.where(and(eq(sharedCourses.id, course.id), eq(sharedCourses.version, course.version))),
+		db.run(sql`select json(case when changes() = 1 then 'true' else 'version conflict' end)`),
+		...(creatorId
+			? [
+					db.run(
+						sql.raw(`delete from courses where shared_course_id = ${id}
+						and timetable_id in (select t.id from timetables t where t.user_id = ${literal(creatorId)})`)
+					)
+				]
+			: []),
+		db.run(sql.raw(`delete from course_slots where course_id in (${synced})`)),
+		db.run(sql.raw(`delete from course_teachers where course_id in (${synced})`)),
+		db.run(
+			sql.raw(`insert into course_slots (id, course_id, weekday, period_number, span, week_pattern, room)
+			select lower(hex(randomblob(16))), a.id, s.weekday, s.period_number, s.span, s.week_pattern, s.room
+			from courses a join shared_course_slots s on s.shared_course_id = a.shared_course_id
+			where a.id in (${synced})`)
+		),
+		db.run(
+			sql.raw(`insert into course_teachers (id, course_id, name, sort_order)
+			select lower(hex(randomblob(16))), a.id, t.name, t.sort_order
+			from courses a join shared_course_teachers t on t.shared_course_id = a.shared_course_id
+			where a.id in (${synced})`)
+		),
+		db.run(
+			sql.raw(`update courses set title = ${literal(v.title)}, delivery = ${literal(v.delivery)},
+			intensive_from = ${literal(v.intensiveFrom)}, intensive_to = ${literal(v.intensiveTo)}, credits = ${literal(v.credits)},
+			sync_mode = 'personal' where id in (${synced})`)
+		),
+		db.update(courses).set({ sharedCourseId: null }).where(eq(courses.sharedCourseId, course.id)),
+		db
+			.update(reports)
+			.set({ status: 'closed' })
+			.where(
+				or(
+					and(eq(reports.targetType, 'shared_course'), eq(reports.targetId, course.id)),
+					and(eq(reports.targetType, 'shared_cancel'), sql`${reports.targetId} like ${`${course.id}|%`}`)
+				)
+			),
+		...(creatorId && warning ? [db.insert(warnings).values({ userId: creatorId, body: warning, sentBy: adminId })] : []),
+		db.delete(sharedCourses).where(eq(sharedCourses.id, course.id))
 	];
 }

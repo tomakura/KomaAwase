@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { universities } from '$lib/server/db/schema';
+import { REPORT_REASONS } from '$lib/server/reports';
 import { peopleTaking, showingClasses, visibleLevels } from '$lib/server/friends';
 import { searchSharedCourses } from '$lib/server/shared-courses';
 import { currentTimetable, loadShape } from '$lib/server/timetable';
@@ -57,6 +58,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		year: timetable.year,
 		universityName: university?.name ?? null,
 		periods: shape.periods,
+		reportReasons: REPORT_REASONS.shared_course,
 		results: results.map((r) => ({
 			id: r.id,
 			title: r.values.title,

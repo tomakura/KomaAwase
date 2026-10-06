@@ -5,13 +5,15 @@ import { deleteAccount } from '$lib/server/account';
 import { users } from '$lib/server/db/schema';
 import { readWarning } from '$lib/moderation';
 import { deletePhoto, loadUser, resetNickname, resumeUser, sendWarning, suspendUser } from '$lib/server/moderation';
+import { sharedCoursesBy } from '$lib/server/shared-courses';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	await requireAdmin(locals, url);
 	const user = await loadUser(locals.db, params.id);
 	if (!user) error(404, '利用者が見つかりません');
-	return { user };
+	// The shared courses they added or changed, to take down what a troublemaker left
+	return { user, sharedCourses: await sharedCoursesBy(locals.db, params.id) };
 };
 
 /** The person to act on: an admin's own account is never touched from here */

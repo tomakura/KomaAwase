@@ -2,7 +2,10 @@
 	import { onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import Icon from '$lib/components/Icon.svelte';
+	import ReportForm from '$lib/components/ReportForm.svelte';
 	import SharedLock from '$lib/components/SharedLock.svelte';
+	import Sheet from '$lib/components/Sheet.svelte';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { DAY_NAMES, periodLabel, timetableHref, weekLabel } from '$lib/courses';
 
@@ -48,6 +51,10 @@
 		timer = setTimeout(() => goto(url, { keepFocus: true, replaceState: true, noScroll: true }), delay);
 	}
 	onDestroy(() => clearTimeout(timer));
+
+	// A course picked to report, from its row's flag
+	let reporting = $state<{ id: string; title: string } | null>(null);
+	let reportOpen = $state(false);
 </script>
 
 <svelte:head>
@@ -107,30 +114,43 @@
 				<div class="list">
 					{#each data.results as r (r.id)}
 						{@const info = details(r)}
-						<a href={newCourseHref(r.id)}>
-							<span class="name">
-								<span class="title">{r.title}</span>
-								{#if r.source === 'syllabus'}
-									<span class="tag syllabus">シラバス</span>
-								{:else}
-									<span class="tag">みんなの登録 {r.users}人</span>
-								{/if}
-							</span>
-							{#if info}<span class="details">{info}</span>{/if}
-							{#if r.friends.length}
-								<span class="friends">
-									{#each r.friends.slice(0, 5) as f (f.id)}<UserIcon user={f} size={20} short />{/each}
-									<span class="friends-text">
-										{r.friends.length > 2
-											? `${r.friends[0].nickname}さんたち${r.friends.length}人`
-											: `${r.friends.map((f) => f.nickname).join('さん・')}さん`}も取っています
-									</span>
+						<div class="row">
+							<a href={newCourseHref(r.id)}>
+								<span class="name">
+									<span class="title">{r.title}</span>
+									{#if r.source === 'syllabus'}
+										<span class="tag syllabus">シラバス</span>
+									{:else}
+										<span class="tag">みんなの登録 {r.users}人</span>
+									{/if}
 								</span>
-							{/if}
-						</a>
+								{#if info}<span class="details">{info}</span>{/if}
+								{#if r.friends.length}
+									<span class="friends">
+										{#each r.friends.slice(0, 5) as f (f.id)}<UserIcon user={f} size={20} short />{/each}
+										<span class="friends-text">
+											{r.friends.length > 2
+												? `${r.friends[0].nickname}さんたち${r.friends.length}人`
+												: `${r.friends.map((f) => f.nickname).join('さん・')}さん`}も取っています
+										</span>
+									</span>
+								{/if}
+							</a>
+							<button
+								class="report"
+								type="button"
+								aria-label="「{r.title}」を報告する"
+								onclick={() => {
+									reporting = { id: r.id, title: r.title };
+									reportOpen = true;
+								}}
+							>
+								<Icon name="flag" size={18} />
+							</button>
+						</div>
 					{/each}
 				</div>
-				<p class="note">「シラバス」は大学の公開シラバス、「みんなの登録」は同じ大学の人が入れた授業です。</p>
+				<p class="note">「シラバス」は大学の公開シラバス、「みんなの登録」は同じ大学の人が入れた授業です。まちがいや不適切な授業は、旗のボタンから報告できます。</p>
 			{:else}
 				<p class="empty">
 					{data.q
@@ -172,6 +192,15 @@
 		</section>
 	</div>
 </div>
+
+<Sheet bind:open={reportOpen} title="授業を報告">
+	{#if reporting}
+		{#key reporting.id}
+			<p class="report-title">{reporting.title}</p>
+			<ReportForm reasons={data.reportReasons} action="/shared/{reporting.id}?/report" done={() => (reportOpen = false)} />
+		{/key}
+	{/if}
+</Sheet>
 
 <style>
 	.page {
@@ -298,7 +327,18 @@
 		background: var(--surface);
 	}
 
+	.row {
+		display: flex;
+		align-items: stretch;
+	}
+
+	.row + .row {
+		border-top: 1px solid var(--slot);
+	}
+
 	.list a {
+		flex: 1 1 0;
+		min-width: 0;
 		min-height: 64px;
 		box-sizing: border-box;
 		display: flex;
@@ -310,8 +350,22 @@
 		text-decoration: none;
 	}
 
-	.list a + a {
-		border-top: 1px solid var(--slot);
+	.report {
+		flex-shrink: 0;
+		width: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: var(--ink-sub);
+		cursor: pointer;
+	}
+
+	.report-title {
+		margin: 0 0 12px;
+		font-weight: 700;
 	}
 
 	.name {
