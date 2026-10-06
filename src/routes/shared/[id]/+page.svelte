@@ -7,6 +7,7 @@
 	import ReportForm from '$lib/components/ReportForm.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { sharedChanges, sharedFields, sharedSource, slotText, type SharedValuesLike } from '$lib/shared-changes';
+	import { WARNING_MAX } from '$lib/moderation';
 	import { tokyoTime } from '$lib/time';
 
 	let { data, form } = $props();
@@ -42,6 +43,9 @@
 		return url.pathname + url.search;
 	}
 	let reporting = $state(false);
+	// The delete's warning to the creator, on unless the admin unticks it
+	let warn = $state(true);
+	const warningDraft = $derived(`授業「${data.course.values.title}」を、不適切な内容であると判断して削除しました。くり返すと利用を止めることがあります。`);
 </script>
 
 <svelte:head>
@@ -71,6 +75,11 @@
 			<p class="meta">
 				{data.course.university} · {data.course.source === 'syllabus' ? 'シラバスから' : 'みんなの登録'} · {data.users}人が同期中{data.isAdmin ? `・使用中 ${data.using}人` : ''}
 			</p>
+			{#if data.isAdmin && data.course.source === 'user'}
+				<p class="meta">
+					作成者：{#if data.creator}<a href="/admin/users/{data.creator.id}">{data.creator.nickname ?? '（名前なし）'}</a>{:else}（退会した人）{/if}
+				</p>
+			{/if}
 		</div>
 		<p class="ui-note">
 			この授業を同期していて在籍確認済みの人と運営が直せます。直した内容は同期しているみんなに反映され、履歴から元に戻せます。{data.canEdit
@@ -161,21 +170,38 @@
 
 		<section class="ui-section">
 			<h2 class="ui-section-title">削除</h2>
-			{#if data.using === 0}
-				<p class="ui-note">この授業を時間割に入れている人はいません。削除すると、変更の履歴と、この授業への報告も消えます。元に戻せません。</p>
-				<form
-					method="POST"
-					action="?/remove"
-					use:enhance={async ({ cancel }) => {
-						if (!(await ask({ message: `「${data.course.values.title}」を削除します。変更の履歴と報告も消えて、元に戻せません`, ok: '削除する', danger: true }))) return cancel();
-					}}
-				>
-					{#if form?.message && form.remove}<p class="error" role="alert">{form.message}</p>{/if}
-					<button class="btn danger" type="submit">この授業を削除する</button>
-				</form>
-			{:else}
-				<p class="ui-note">時間割に入れている人が{data.using}人いるので、削除できません。同期を切って残している人も数えています。</p>
+			{#if data.removal}
+				<ul class="ui-note reach">
+					{#if data.removal.creatorHas}<li>作成者の時間割からは消えます</li>{/if}
+					{#if data.removal.others}<li>ほかに入れている{data.removal.others}人は、今の内容のまま「自分だけで使う」に変わります。メモや課題は残ります</li>{/if}
+					<li>変更の履歴も消えて、元に戻せません。この授業への報告は対応済みになります</li>
+				</ul>
 			{/if}
+			<form
+				class="remove"
+				method="POST"
+				action="?/remove"
+				use:enhance={async ({ cancel }) => {
+					if (!(await ask({ message: `「${data.course.values.title}」を削除します。元に戻せません`, ok: '削除する', danger: true }))) return cancel();
+					return async ({ update }) => update({ reset: false });
+				}}
+			>
+				<input type="hidden" name="version" value={data.course.version} />
+				{#if data.creator}
+					<label class="check">
+						<input type="checkbox" name="warn" bind:checked={warn} />
+						作成者に警告を送る
+					</label>
+					{#if warn}
+						<label class="field">
+							警告の文
+							<textarea name="warning" rows="3" maxlength={WARNING_MAX}>{warningDraft}</textarea>
+						</label>
+					{/if}
+				{/if}
+				{#if form?.message && form.remove}<p class="error" role="alert">{form.message}</p>{/if}
+				<button class="btn danger" type="submit">この授業を削除する</button>
+			</form>
 		</section>
 	{/if}
 
@@ -189,6 +215,11 @@
 					<div class="edit-head">
 						<span class="date">{when(edit.createdAt)}</span>
 						{#if data.page === 1 && i === 0}<span class="now">いまの内容</span>{/if}
+						{#if edit.by}
+							<span class="by">
+								{#if edit.by.id}<a href="/admin/users/{edit.by.id}">{edit.by.nickname ?? '（名前なし）'}</a>{:else}（退会した人）{/if}
+							</span>
+						{/if}
 					</div>
 					{#each changes(edit.diff) as change (change.label)}
 						<p class="change"><b>{change.label}</b>{change.text}</p>
@@ -215,7 +246,7 @@
 				{#if data.more}<a class="older" href={historyPage(data.page + 1)}>もっと前の変更</a>{/if}
 			</nav>
 		{/if}
-		<p class="ui-note">だれが直したかは表示しません。</p>
+		<p class="ui-note">{data.isAdmin ? 'だれが直したかは、運営にだけ表示しています。' : 'だれが直したかは表示しません。'}</p>
 	</section>
 </div>
 
@@ -448,5 +479,41 @@
 		margin: 0;
 		font-size: 13px;
 		color: var(--ink-soft);
+	}
+
+	.by {
+		margin-left: auto;
+		font-size: 12px;
+	}
+
+	.by a,
+	.meta a {
+		color: var(--accent-text);
+	}
+
+	.reach {
+		margin: 0;
+		padding-left: 18px;
+	}
+
+	.remove {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.check {
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-size: 14px;
+	}
+
+	.check input {
+		width: 20px;
+		height: 20px;
+		margin: 0;
+		accent-color: var(--ink);
 	}
 </style>

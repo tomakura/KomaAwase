@@ -7,16 +7,20 @@ import { REPORT_REASONS, saveReport } from '$lib/server/reports';
 import {
 	adminSearchShared,
 	canEditShared,
-	deleteShared,
 	loadEdits,
 	loadSharedCourse,
 	mergePreview,
 	mergeShared,
+	removePreview,
+	removeShared,
 	restoreShared,
+	sharedCreator,
 	syncedCount,
 	usageCounts,
 	writeShared
 } from '$lib/server/shared-courses';
+import { deleteCourseFiles } from '$lib/server/files';
+import { readWarning } from '$lib/moderation';
 import { sharedAccess } from '$lib/server/verify';
 import { notifySharedChanged } from '$lib/server/shared-notify';
 import type { Actions, PageServerLoad } from './$types';
@@ -69,8 +73,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		target ? mergePreview(locals.db, course.id, target.id) : null
 	]);
 	const using = isAdmin ? ((await usageCounts(locals.db, [course.id])).get(course.id)?.linked ?? 0) : 0;
+	// For the admin: who added it, and who a delete reaches
+	const creator = isAdmin ? await sharedCreator(locals.db, course.id) : null;
+	const reach = isAdmin ? await removePreview(locals.db, course.id, creator?.id ?? null) : null;
 	return {
 		using,
+		creator,
+		removal: reach && { creatorHas: reach.creatorCourses.length > 0, others: reach.others },
 		merge: isAdmin
 			? {
 					query: mergeQuery,
@@ -93,7 +102,13 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		users,
 		canEdit,
 		isAdmin,
-		edits: history.edits.map((e) => ({ id: e.id, createdAt: e.createdAt, diff: e.diff })),
+		// Who made each change is shown to the admin only
+		edits: history.edits.map((e) => ({
+			id: e.id,
+			createdAt: e.createdAt,
+			diff: e.diff,
+			by: isAdmin ? { id: e.userId, nickname: e.nickname } : null
+		})),
 		page,
 		more: history.more,
 		reportReasons: REPORT_REASONS.shared_course
@@ -179,21 +194,38 @@ export const actions: Actions = {
 		}
 		redirect(303, `/shared/${into.id}?back=${encodeURIComponent(safeNext(String(form.get('back') ?? '')) ?? '/')}&merged=1`);
 	},
-	// Delete a course nobody has in a timetable
-	remove: async ({ locals, params, url }) => {
+	// Take the course down whoever has it: the creator's copies go, everyone else keeps theirs as
+	// 自分だけで使う. A warning can go to the creator at the same time.
+	remove: async ({ locals, params, url, request, platform }) => {
 		const me = await requireAdmin(locals, url);
+		if (!platform) error(500);
 		const course = await usable(locals.db, me, params.id);
-		if (((await usageCounts(locals.db, [course.id])).get(course.id)?.linked ?? 0) > 0) {
-			return fail(409, { message: '使っている人がいるので、削除できません', remove: true });
+		const form = await request.formData();
+		if (Number(form.get('version')) !== course.version) {
+			return fail(409, { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください', remove: true });
+		}
+		const creator = await sharedCreator(locals.db, course.id);
+		let warning: string | null = null;
+		if (creator && form.get('warn') === 'on') {
+			const read = readWarning(form.get('warning'));
+			if ('message' in read) return fail(400, { message: read.message, remove: true });
+			warning = read.body;
+		}
+		// The creator's copies are deleted, so their files go first
+		const { creatorCourses } = await removePreview(locals.db, course.id, creator?.id ?? null);
+		for (const id of creatorCourses) {
+			if ((await deleteCourseFiles(platform.env, locals.db, id)) > 0) {
+				return fail(409, { message: '資料が多いので、一部だけ消しました。もう一度「この授業を削除する」を押してください', remove: true });
+			}
 		}
 		try {
-			const statements = deleteShared(locals.db, course.id);
+			const statements = removeShared(locals.db, course, { creatorId: creator?.id ?? null, warning, adminId: me.id });
 			await locals.db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
 		} catch (e) {
 			console.error('shared course delete failed', e);
-			return fail(409, { message: '削除できませんでした。だれかが追加した可能性があります。読み込み直してください', remove: true });
+			return fail(409, { message: '削除できませんでした。読み込み直してから、もう一度やり直してください', remove: true });
 		}
-		redirect(303, '/admin/courses');
+		redirect(303, '/admin/courses?removed=1');
 	},
 	report: async ({ locals, params, url, request }) => {
 		const me = requireUser(locals, url);

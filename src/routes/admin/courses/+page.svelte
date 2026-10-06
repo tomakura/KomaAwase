@@ -2,12 +2,14 @@
 	import { page } from '$app/state';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { DAY_NAMES } from '$lib/courses';
+	import { slotGroups } from '$lib/slot-groups';
 
 	let { data } = $props();
 
 	const slotText = (s: { weekday: number; period: number; span: number }) =>
 		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}`;
 	const back = $derived(encodeURIComponent(page.url.pathname + page.url.search));
+	const groups = $derived(slotGroups(data.results, { weekday: data.weekday, period: data.period }));
 </script>
 
 <svelte:head>
@@ -50,24 +52,46 @@
 					</label>
 				</div>
 				<div class="pick">
+					<label>
+						曜日
+						<select name="d" value={data.weekday}>
+							<option value={0}>すべて</option>
+							{#each [1, 2, 3, 4, 5, 6, 7] as d (d)}<option value={d}>{DAY_NAMES[d]}曜</option>{/each}
+						</select>
+					</label>
+					<label>
+						時限
+						<select name="p" value={data.period}>
+							<option value={0}>すべて</option>
+							{#each data.periods as p (p)}<option value={p}>{p}限</option>{/each}
+						</select>
+					</label>
+				</div>
+				<div class="pick">
 					<input type="search" name="q" value={data.q} placeholder="授業名・先生・授業コード" maxlength="50" aria-label="授業をさがす" />
 					<button class="btn btn-primary" type="submit">さがす</button>
 				</div>
 			</form>
 
-			<div class="ui-list">
-				{#each data.results as c (c.id)}
-					<a class="course" class:unused={c.using === 0} href="/shared/{c.id}?back={back}">
-						<b>{c.title}{#if c.using === 0}<em>使用中 0人</em>{/if}</b>
-						<span>
-							{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人
-						</span>
-					</a>
-				{:else}
-					<p class="ui-note">見つかりませんでした。</p>
-				{/each}
-			</div>
-			{#if data.results.length >= 50}<p class="ui-note">先頭の50件です。絞りこんでください。</p>{/if}
+			{#if data.removed}<p class="done" role="status">授業を削除しました。</p>{/if}
+			{#each groups as g (g.key)}
+				<section class="group">
+					<h2>{g.label}<span>{g.items.length}件</span></h2>
+					<div class="ui-list">
+						{#each g.items as c (c.id)}
+							<a class="course" class:unused={c.using === 0} href="/shared/{c.id}?back={back}">
+								<b>{c.title}{#if c.using === 0}<em>使用中 0人</em>{/if}</b>
+								<span>
+									{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人
+								</span>
+							</a>
+						{/each}
+					</div>
+				</section>
+			{:else}
+				<p class="ui-note">見つかりませんでした。</p>
+			{/each}
+			{#if data.results.length >= data.limit}<p class="ui-note">先頭の{data.limit}件です。絞りこんでください。</p>{/if}
 		{/if}
 	</div>
 </div>
@@ -140,7 +164,34 @@
 		font-size: 15px;
 	}
 
-	/* Nobody has it in a timetable: it can be deleted */
+	.group {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.group h2 {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin: 6px 2px 0;
+		font-size: 14px;
+		font-weight: 700;
+	}
+
+	.group h2 span {
+		font-size: 12px;
+		font-weight: 400;
+		color: var(--ink-sub);
+	}
+
+	.done {
+		margin: 0;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+
+	/* Nobody has it in a timetable */
 	.course.unused {
 		border-left: 4px solid var(--accent-text);
 		background: color-mix(in srgb, var(--accent-text) 10%, var(--surface));

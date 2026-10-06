@@ -27,6 +27,9 @@
 			<button class="btn btn-primary" type="submit">保存する</button>
 		</form>
 		<p class="ui-note">使っている{u.users}人の表示も変わります。</p>
+		<p class="ui-note">
+			入力した人：{#if u.createdBy}<a href="/admin/users/{u.createdBy}">{u.creator ?? '（名前なし）'}</a>{:else}不明{/if}
+		</p>
 	</section>
 
 	<section class="ui-section">

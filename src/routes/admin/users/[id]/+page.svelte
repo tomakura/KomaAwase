@@ -89,6 +89,23 @@
 		</section>
 	{/if}
 
+	{#if data.sharedCourses.length}
+		<section class="ui-section">
+			<h2 class="ui-section-title">作った・直したみんなの授業（{data.sharedCourses.length}）</h2>
+			<div class="ui-list">
+				{#each data.sharedCourses as c (c.id)}
+					<a class="ui-row" href="/shared/{c.id}?back={encodeURIComponent(`/admin/users/${u.id}`)}">
+						<span class="course">
+							<b>{c.title}</b>
+							<span class="dates">{c.university} · {c.year}年度</span>
+						</span>
+						<span class="ui-row-value"><span class="dates">{c.created ? '作成' : `直した ${c.edits}回`}</span></span>
+					</a>
+				{/each}
+			</div>
+		</section>
+	{/if}
+
 	<section class="ui-section">
 		<h2 class="ui-section-title">対応</h2>
 		<div class="tools">
@@ -115,6 +132,15 @@
 </div>
 
 <style>
+	.course {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 0;
+		overflow-wrap: anywhere;
+	}
+
 	.warn {
 		display: flex;
 		flex-direction: column;

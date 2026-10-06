@@ -1,6 +1,8 @@
+import { fail } from '@sveltejs/kit';
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { requireAdmin } from '$lib/server/auth/reauth';
-import { hideCancellation, parseCancelTarget } from '$lib/server/cancellations';
+import { cancelMarkers, hideCancellation, parseCancelTarget } from '$lib/server/cancellations';
+import { GROUP_NAME_MAX, deleteGroup, readGroupName, renameGroup } from '$lib/server/groups';
 import { monthDay } from '$lib/time';
 import { groups, reports, sharedCourses, users } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
@@ -46,7 +48,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			? locals.db.select({ id: users.id, name: users.nickname }).from(users).where(inArray(users.id, ids('user')))
 			: [],
 		ids('group').length
-			? locals.db.select({ id: groups.id, name: groups.name }).from(groups).where(inArray(groups.id, ids('group')))
+			? locals.db
+					.select({ id: groups.id, name: groups.name, ownerId: groups.ownerId, owner: users.nickname })
+					.from(groups)
+					.leftJoin(users, eq(users.id, groups.ownerId))
+					.where(inArray(groups.id, ids('group')))
 			: [],
 		ids('shared_course').length
 			? locals.db
@@ -62,6 +68,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			: []
 	]);
 	const names = new Map([...people, ...groupRows, ...courseRows].map((r) => [r.id, r.name]));
+	const owners = new Map(groupRows.map((g) => [g.id, g.ownerId ? { id: g.ownerId, nickname: g.owner } : null]));
+	// Who marked each reported day as cancelled, for warning someone who did it as a prank
+	const markers = new Map(
+		await Promise.all(
+			[...new Set(reportRows.filter((r) => r.targetType === 'shared_cancel').map((r) => r.targetId))].map(
+				async (targetId) => [targetId, await cancelMarkers(locals.db, targetId)] as const
+			)
+		)
+	);
 	const cancelName = (targetId: string) => {
 		const t = parseCancelTarget(targetId);
 		const course = cancelCourses.find((c) => c.id === t?.sharedCourseId);
@@ -71,8 +86,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {
 		reports: reportRows.map((r) => ({
 			...r,
-			target: (r.targetType === 'shared_cancel' ? cancelName(r.targetId) : names.get(r.targetId)) ?? '（消えています）'
+			target: (r.targetType === 'shared_cancel' ? cancelName(r.targetId) : names.get(r.targetId)) ?? null,
+			owner: r.targetType === 'group' ? (owners.get(r.targetId) ?? null) : null,
+			markers: r.targetType === 'shared_cancel' ? (markers.get(r.targetId) ?? []) : []
 		})),
+		groupNameMax: GROUP_NAME_MAX,
 		pageSize: PAGE,
 		page,
 		total: total?.n ?? 0
@@ -89,5 +107,30 @@ export const actions: Actions = {
 	hideCancel: async ({ locals, request, url }) => {
 		await requireAdmin(locals, url);
 		await hideCancellation(locals.db, String((await request.formData()).get('targetId') ?? ''));
+	},
+	// A reported group's name, changed by the admin; the reports about it are closed
+	renameGroup: async ({ locals, request, url }) => {
+		await requireAdmin(locals, url);
+		const form = await request.formData();
+		const id = String(form.get('id') ?? '');
+		const name = readGroupName(form.get('name'));
+		if (!name) return fail(400, { message: `名前は1〜${GROUP_NAME_MAX}文字で入れてください`, id });
+		await renameGroup(locals.db, id, name);
+		await closeReportsAbout(locals.db, 'group', id);
+		return { renamed: id };
+	},
+	// The group goes for everyone in it, and the reports about it are closed
+	deleteGroup: async ({ locals, request, url }) => {
+		await requireAdmin(locals, url);
+		const id = String((await request.formData()).get('id') ?? '');
+		await deleteGroup(locals.db, id);
+		await closeReportsAbout(locals.db, 'group', id);
 	}
 };
+
+function closeReportsAbout(db: App.Locals['db'], targetType: 'group', targetId: string) {
+	return db
+		.update(reports)
+		.set({ status: 'closed' })
+		.where(and(eq(reports.targetType, targetType), eq(reports.targetId, targetId), eq(reports.status, 'open')));
+}

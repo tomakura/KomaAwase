@@ -90,6 +90,26 @@ export async function reportCancellation(db: Db, reporterId: string, sharedCours
 	await db.insert(reports).values({ reporterId, targetType: 'shared_cancel', targetId, reason: CANCEL_REPORT_REASON });
 }
 
+/** For the admin: who marked this shared course's day as cancelled (10 at most) */
+export async function cancelMarkers(db: Db, targetId: string) {
+	const t = parseCancelTarget(targetId);
+	if (!t) return [];
+	return db
+		.selectDistinct({ id: users.id, nickname: users.nickname })
+		.from(courseNotes)
+		.innerJoin(courses, eq(courseNotes.courseId, courses.id))
+		.innerJoin(timetables, eq(courses.timetableId, timetables.id))
+		.innerJoin(users, eq(timetables.userId, users.id))
+		.where(
+			and(
+				eq(courseNotes.kind, 'cancel'),
+				eq(courseNotes.date, t.date),
+				eq(courses.sharedCourseId, t.sharedCourseId)
+			)
+		)
+		.limit(10);
+}
+
 /** Takes the day down for everyone and closes the reports about it */
 export async function hideCancellation(db: Db, targetId: string) {
 	const t = parseCancelTarget(targetId);
