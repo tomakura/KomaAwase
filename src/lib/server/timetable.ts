@@ -264,8 +264,9 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 				credits: courses.credits,
 				syncMode: courses.syncMode,
 				sharedCourseId: courses.sharedCourseId,
-				// Someone else changed the shared course since its owner last looked (only for them)
-				changed: viewerId ? sharedChangedSql(viewerId) : sql<number>`0`
+				// Someone else changed the shared course since its owner last looked (only for them).
+				// Named: in a batch, D1's rows are read in key order, and a column named "0" would come first.
+				changed: (viewerId ? sharedChangedSql(viewerId) : sql<number>`0`).as('shared_changed')
 			})
 			.from(courses)
 			.where(eq(courses.timetableId, timetableId))
