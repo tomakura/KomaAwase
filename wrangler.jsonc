@@ -15,9 +15,12 @@
 	// Sign-in mail goes through relay/send.php on シンレンタルサーバー (Workers can't reach its SMTP).
 	// Course files are kept there too, through relay/files.php.
 	// The HMAC keys are secrets: `npx wrangler secret put RELAY_SECRET` and `FILES_SECRET`.
+	// The status page (UptimeFlare at status.tomakura.com) is built from STATUS_REPO; the notices
+	// from 運営 are written into it with the STATUS_GITHUB_TOKEN secret (src/lib/server/status-page.ts).
 	"vars": {
 		"RELAY_URL": "https://tomakura.com/koma-relay/send.php",
-		"FILES_URL": "https://tomakura.com/koma-files/files.php"
+		"FILES_URL": "https://tomakura.com/koma-files/files.php",
+		"STATUS_REPO": "tomakura/KomaAwase-Status"
 	},
 	// The app lives at koma.tomakura.com. Passkeys are bound to this hostname.
 	"routes": [{ "pattern": "koma.tomakura.com", "custom_domain": true }],

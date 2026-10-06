@@ -5,6 +5,10 @@ export type StatusNote = { id: string; level: 'info' | 'trouble'; body: string; 
 export type StatusSignal = { id: string; label: string; level: StatusLevel; text: string };
 export type StatusAnswer = { notes: StatusNote[]; signals: StatusSignal[]; at: number };
 
+// The status page (UptimeFlare, from the KomaAwase-Status repository): checks each minute and
+// the notices from 運営 (src/lib/server/status-page.ts)
+export const STATUS_PAGE_URL = 'https://status.tomakura.com';
+
 export const LEVEL_LABELS: Record<StatusLevel, string> = { ok: 'ふつう', slow: '遅れ気味', down: '止まっている' };
 export const NOTE_LABELS: Record<StatusNote['level'], string> = { info: 'お知らせ', trouble: '障害' };
 

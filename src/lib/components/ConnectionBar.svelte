@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { fade, fly, slide } from 'svelte/transition';
 	import Icon from './Icon.svelte';
+	import { STATUS_PAGE_URL } from '$lib/status';
 	import { connection } from '$lib/connection.svelte';
 	import { motion } from '$lib/motion';
 	import { savedAtLabel } from '$lib/sync';
@@ -61,7 +62,7 @@
 				<div class="text">
 					<b>{title}</b>
 					{#if detail}<span>{detail}</span>{/if}
-					{#if link !== 'online'}<a class="status-link" href="/status">稼働状況を見る</a>{/if}
+					{#if link !== 'online'}<a class="status-link" href={STATUS_PAGE_URL} target="_blank" rel="noopener">稼働状況を見る</a>{/if}
 				</div>
 				{#if link !== 'online'}
 					<button class="refresh" type="button" onclick={() => connection.refresh()} disabled={busy} aria-label="最新の情報に更新">

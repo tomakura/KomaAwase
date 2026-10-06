@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { page } from '$app/state';
-	import { NOTE_LABELS, fetchStatus, type StatusNote } from '$lib/status';
+	import { NOTE_LABELS, STATUS_PAGE_URL, fetchStatus, type StatusNote } from '$lib/status';
 
-	// A thin strip at the top while the operator has a notice up (trouble, maintenance), to /status.
+	// A thin strip at the top while the operator has a notice up (trouble, maintenance), to the status page.
 	// Read when the app opens and again now and then while it is on screen.
 	const EVERY_MS = 10 * 60 * 1000;
 	let note = $state<StatusNote | null>(null);
@@ -26,8 +25,8 @@
 	});
 </script>
 
-{#if note && page.url.pathname !== '/status'}
-	<a class="strip" class:trouble={note.level === 'trouble'} href="/status">
+{#if note}
+	<a class="strip" class:trouble={note.level === 'trouble'} href={STATUS_PAGE_URL} target="_blank" rel="noopener">
 		<span class="inner">
 			<b>{NOTE_LABELS[note.level]}</b>
 			<span class="body">{note.body}</span>

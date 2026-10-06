@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { loadNotes, signals } from '$lib/server/status';
 import type { RequestHandler } from './$types';
 
-// What /status shows (and the strip at the top of the app while there is trouble). Open to
+// The notices for the strip at the top of the app, and the levels behind /api/status/[id]. Open to
 // anyone: notices from the operator and levels made from counts, nothing about anyone.
 export const GET: RequestHandler = async ({ locals }) => {
 	const [notes, levels] = await Promise.all([loadNotes(locals.db), signals(locals.db)]);
