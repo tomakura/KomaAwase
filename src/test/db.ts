@@ -7,6 +7,16 @@ import { getDb } from '$lib/server/db';
 // D1 takes booleans and undefined; SQLite here takes numbers and null
 const value = (v: unknown) => (typeof v === 'boolean' ? Number(v) : v === undefined ? null : v);
 
+// drizzle reads a batch's rows by key order, as D1 returns them: two columns with the same name,
+// or a name like "0" (which comes first), would put values in the wrong fields.
+function checkKeys(sql: string, columns: number | undefined, row: Record<string, unknown> | undefined) {
+	if (!row) return;
+	const keys = Object.keys(row);
+	if ((columns !== undefined && keys.length !== columns) || keys.some((k) => /^\d+$/.test(k))) {
+		throw new Error(`Columns of a batched read would be mixed up (${keys.join(', ')}): ${sql}`);
+	}
+}
+
 export function testDatabase() {
 	const sqlite = new DatabaseSync(':memory:');
 	const dir = new URL('../../drizzle/', import.meta.url);
@@ -42,7 +52,11 @@ export function testDatabase() {
 			// In a batch: rows for a statement that reads, the count of changes for one that writes
 			execute: () => {
 				const { s, values } = run();
-				if (/^\s*(select|with)\b/i.test(sql) || /\breturning\b/i.test(sql)) return { results: s.all(...values), success: true, meta: {} };
+				if (/^\s*(select|with)\b/i.test(sql) || /\breturning\b/i.test(sql)) {
+					const results = s.all(...values) as Record<string, unknown>[];
+					checkKeys(sql, s.columns?.().length, results[0]);
+					return { results, success: true, meta: {} };
+				}
 				const result = s.run(...values) as { changes: number | bigint };
 				return { results: [], success: true, meta: { changes: Number(result.changes) } };
 			}

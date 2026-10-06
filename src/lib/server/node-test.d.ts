@@ -10,6 +10,8 @@ declare module 'node:sqlite' {
 			get(...values: unknown[]): unknown;
 			run(...values: unknown[]): unknown;
 			setReturnArrays(on: boolean): void;
+			// Node 22.16 or later
+			columns?(): unknown[];
 		};
 	}
 }
