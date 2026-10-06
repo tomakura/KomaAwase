@@ -17,6 +17,17 @@ function checkKeys(sql: string, columns: number | undefined, row: Record<string,
 	}
 }
 
+// columns() is Node 22.16 or later; before that a read is run again as arrays to count them
+// (not a write with `returning`, which would write twice).
+function columnCount(s: ReturnType<DatabaseSync['prepare']>, values: unknown[], writes: boolean) {
+	if (s.columns) return s.columns().length;
+	if (writes) return undefined;
+	s.setReturnArrays(true);
+	const row = (s.all(...values) as unknown[][])[0];
+	s.setReturnArrays(false);
+	return row?.length;
+}
+
 export function testDatabase() {
 	const sqlite = new DatabaseSync(':memory:');
 	const dir = new URL('../../drizzle/', import.meta.url);
@@ -54,7 +65,7 @@ export function testDatabase() {
 				const { s, values } = run();
 				if (/^\s*(select|with)\b/i.test(sql) || /\breturning\b/i.test(sql)) {
 					const results = s.all(...values) as Record<string, unknown>[];
-					checkKeys(sql, s.columns?.().length, results[0]);
+					checkKeys(sql, columnCount(s, values, /\breturning\b/i.test(sql)), results[0]);
 					return { results, success: true, meta: {} };
 				}
 				const result = s.run(...values) as { changes: number | bigint };
