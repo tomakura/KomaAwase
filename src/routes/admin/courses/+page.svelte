@@ -6,8 +6,9 @@
 
 	let { data } = $props();
 
-	const slotText = (s: { weekday: number; period: number; span: number }) =>
-		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}`;
+	// 月1限（B-203）
+	const slotText = (s: { weekday: number; period: number; span: number; room: string | null }) =>
+		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}${s.room ? `（${s.room}）` : ''}`;
 	const back = $derived(encodeURIComponent(page.url.pathname + page.url.search));
 	// The picked term only, or every term in its own section
 	const sections = $derived(

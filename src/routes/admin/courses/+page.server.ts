@@ -85,7 +85,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			title: c.values.title,
 			courseTerms: c.terms,
 			teachers: c.values.teachers,
-			slots: c.values.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span }))
+			slots: c.values.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, room: s.room }))
 		}))
 	};
 };
