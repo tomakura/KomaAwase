@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, inArray, ne, or, sql, type SQLWrapper } from
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Delivery, WeekPattern } from '$lib/courses';
 import { compareJa } from '$lib/sort';
+import { cleanText } from '$lib/text';
 import type { Db } from './db';
 import {
 	courses,
@@ -39,6 +40,16 @@ function normalize(v: SharedValues): SharedValues {
 		intensiveFrom: v.intensiveFrom,
 		intensiveTo: v.intensiveTo,
 		credits: v.credits ?? null
+	};
+}
+
+// Names typed two ways (full-width spaces, Ａ・１) are saved one way
+function cleanValues(v: SharedValues): SharedValues {
+	return {
+		...v,
+		title: cleanText(v.title),
+		teachers: [...new Set(v.teachers.map(cleanText))].filter(Boolean),
+		slots: v.slots.map((s) => ({ ...s, room: s.room === null ? null : cleanText(s.room) || null }))
 	};
 }
 
@@ -222,7 +233,7 @@ export function writeShared(
 		values: SharedValues;
 	}
 ): { id: string; changed: boolean; statements: BatchItem<'sqlite'>[] } {
-	const after = normalize(values);
+	const after = cleanValues(normalize(values));
 	const fields = {
 		title: after.title,
 		delivery: after.delivery,
@@ -308,14 +319,14 @@ export async function sharedCoursesBy(db: Db, userId: string) {
 
 const likePattern = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
-// A search by title, teacher or course code
+// A search by title, teacher or course code. Spaces are ignored, so 山田太郎 finds 山田 太郎.
 const queryMatch = (q: string) => {
-	const pattern = likePattern(q);
-	return sql`(${sharedCourses.title} like ${pattern} escape '\\'
+	const pattern = likePattern(cleanText(q).replaceAll(' ', ''));
+	return sql`(replace(${sharedCourses.title}, ' ', '') like ${pattern} escape '\\'
 		or ${sharedCourses.code} like ${pattern} escape '\\'
 		or exists (select 1 from ${sharedCourseTeachers}
 			where ${sharedCourseTeachers.sharedCourseId} = ${sharedCourses.id}
-			and ${sharedCourseTeachers.name} like ${pattern} escape '\\'))`;
+			and replace(${sharedCourseTeachers.name}, ' ', '') like ${pattern} escape '\\'))`;
 };
 
 // Courses at a weekday and period (in the given term), or matching a search by title,
