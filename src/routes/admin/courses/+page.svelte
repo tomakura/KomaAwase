@@ -2,14 +2,28 @@
 	import { page } from '$app/state';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { DAY_NAMES } from '$lib/courses';
-	import { slotGroups } from '$lib/slot-groups';
+	import { termSections } from '$lib/slot-groups';
 
 	let { data } = $props();
 
 	const slotText = (s: { weekday: number; period: number; span: number }) =>
 		`${DAY_NAMES[s.weekday]}${s.period}限${s.span > 1 ? `〜${s.period + s.span - 1}限` : ''}`;
 	const back = $derived(encodeURIComponent(page.url.pathname + page.url.search));
-	const groups = $derived(slotGroups(data.results, { weekday: data.weekday, period: data.period }));
+	// The picked term only, or every term in its own section
+	const sections = $derived(
+		termSections(
+			data.results,
+			data.term === 'all' ? data.terms : data.term === data.noTerm ? [] : [data.term],
+			{ weekday: data.weekday, period: data.period }
+		)
+	);
+	// The same search in another term
+	function termHref(t: string) {
+		const url = new URL(page.url);
+		url.searchParams.set('t', t);
+		url.searchParams.delete('removed');
+		return url.pathname + url.search;
+	}
 </script>
 
 <svelte:head>
@@ -39,13 +53,7 @@
 					</label>
 				</div>
 				<div class="pick">
-					<label>
-						学期
-						<select name="t" value={data.term}>
-							<option value="">すべて</option>
-							{#each data.terms as t (t)}<option value={t}>{t}</option>{/each}
-						</select>
-					</label>
+					<input type="hidden" name="t" value={data.term} />
 					<label class="check">
 						<input type="checkbox" name="z" value="1" checked={data.unused} />
 						使用中0人だけ
@@ -74,20 +82,28 @@
 			</form>
 
 			{#if data.removed}<p class="done" role="status">授業を削除しました。</p>{/if}
-			{#each groups as g (g.key)}
-				<section class="group">
-					<h2>{g.label}<span>{g.items.length}件</span></h2>
-					<div class="ui-list">
-						{#each g.items as c (c.id)}
-							<a class="course" class:unused={c.using === 0} href="/shared/{c.id}?back={back}">
-								<b>{c.title}{#if c.using === 0}<em>使用中 0人</em>{/if}</b>
-								<span>
-									{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人
-								</span>
-							</a>
-						{/each}
-					</div>
-				</section>
+			<nav class="terms" aria-label="学期">
+				{#each [...data.terms, data.noTerm, 'all'] as t (t)}
+					<a href={termHref(t)} aria-current={data.term === t ? 'page' : undefined}>{t === data.noTerm ? '学期なし' : t === 'all' ? 'すべて' : t}</a>
+				{/each}
+			</nav>
+			{#each sections as section (section.key)}
+				{#if data.term === 'all'}<h2 class="term">{section.label}</h2>{/if}
+				{#each section.groups as g (g.key)}
+					<section class="group">
+						<h3>{g.label}<span>{g.items.length}件</span></h3>
+						<div class="ui-list">
+							{#each g.items as c (c.id)}
+								<a class="course" class:unused={c.using === 0} href="/shared/{c.id}?back={back}">
+									<b>{c.title}{#each c.courseTerms as t (t)}<i>{t}</i>{/each}{#if c.using === 0}<em>使用中 0人</em>{/if}</b>
+									<span>
+										{c.teachers.join('・') || '先生なし'} · {c.slots.map(slotText).join('、') || '曜日・時限なし'} · {c.source === 'syllabus' ? 'シラバス · ' : ''}同期中 {c.users}人・使用中 {c.using}人
+									</span>
+								</a>
+							{/each}
+						</div>
+					</section>
+				{/each}
 			{:else}
 				<p class="ui-note">見つかりませんでした。</p>
 			{/each}
@@ -170,7 +186,51 @@
 		gap: 6px;
 	}
 
-	.group h2 {
+	.terms {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.terms a {
+		min-height: 36px;
+		box-sizing: border-box;
+		display: flex;
+		align-items: center;
+		padding: 0 14px;
+		border: 1px solid var(--line-strong);
+		border-radius: 18px;
+		background: var(--surface);
+		color: var(--ink);
+		font-size: 14px;
+		text-decoration: none;
+	}
+
+	.terms a[aria-current='page'] {
+		border-color: var(--ink);
+		background: var(--ink);
+		color: var(--surface);
+		font-weight: 700;
+	}
+
+	.term {
+		margin: 10px 2px 0;
+		font-family: var(--font-display);
+		font-size: 18px;
+	}
+
+	.course i {
+		margin-left: 6px;
+		padding: 1px 6px;
+		border-radius: 5px;
+		background: var(--slot);
+		color: var(--ink-soft);
+		font-size: 11px;
+		font-style: normal;
+		font-weight: 700;
+	}
+
+	.group h3 {
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
@@ -179,7 +239,7 @@
 		font-weight: 700;
 	}
 
-	.group h2 span {
+	.group h3 span {
 		font-size: 12px;
 		font-weight: 400;
 		color: var(--ink-sub);

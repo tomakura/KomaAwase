@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { requireAdmin } from '$lib/server/auth/reauth';
 import { sharedCourseSlots, sharedCourses, universities } from '$lib/server/db/schema';
-import { adminSearchShared, sharedTermNames } from '$lib/server/shared-courses';
+import { NO_TERM, adminSearchShared, sharedTermNames } from '$lib/server/shared-courses';
 import type { PageServerLoad } from './$types';
 
 // The shared courses for whoever runs the app: find one by name, teacher, code, weekday or
@@ -29,8 +29,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const year = yearsOf.includes(askedYear) ? askedYear : (yearsOf[0] ?? null);
 	const q = (url.searchParams.get('q') ?? '').trim().slice(0, 50);
 	const terms = university && year !== null ? await sharedTermNames(locals.db, university.id, year) : [];
+	// One term at a time, the first unless another is picked; 'all' is every term, split by term
 	const askedTerm = url.searchParams.get('t') ?? '';
-	const term = terms.includes(askedTerm) ? askedTerm : '';
+	const term = terms.includes(askedTerm) || askedTerm === NO_TERM || askedTerm === 'all' ? askedTerm : (terms[0] ?? 'all');
 	const unused = url.searchParams.get('z') === '1';
 	// The periods the university's courses of the year meet in, for the period picker
 	const periods =
@@ -54,7 +55,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					universityId: university.id,
 					year,
 					q,
-					term: term || undefined,
+					term: term === 'all' ? undefined : term,
 					unused,
 					weekday: weekday || undefined,
 					period: period || undefined,
@@ -66,6 +67,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		weekday,
 		period,
 		limit: LIMIT,
+		noTerm: NO_TERM,
 		removed: url.searchParams.get('removed') === '1',
 		terms,
 		term,
@@ -81,6 +83,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			users: c.users,
 			using: c.using,
 			title: c.values.title,
+			courseTerms: c.terms,
 			teachers: c.values.teachers,
 			slots: c.values.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span }))
 		}))

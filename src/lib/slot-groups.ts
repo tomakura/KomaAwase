@@ -23,3 +23,20 @@ export function slotGroups<T extends Slotted>(items: T[], filter: { weekday?: nu
 	}
 	return [...groups.values()].sort((a, b) => a.weekday - b.weekday || a.period - b.period);
 }
+
+/**
+ * The same list split first by term (Q1, Q2…, in the order given), then by weekday and period.
+ * A course with several terms is under each; one with none is under 「学期なし」 at the end.
+ */
+export function termSections<T extends Slotted & { courseTerms: string[] }>(
+	items: T[],
+	terms: string[],
+	filter: { weekday?: number; period?: number } = {}
+) {
+	const sections = [...terms, ''].map((term) => ({
+		key: term || 'none',
+		label: term || '学期なし',
+		items: items.filter((i) => (term ? i.courseTerms.includes(term) : !i.courseTerms.length))
+	}));
+	return sections.filter((s) => s.items.length).map((s) => ({ key: s.key, label: s.label, groups: slotGroups(s.items, filter) }));
+}

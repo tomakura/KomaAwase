@@ -456,6 +456,13 @@ export async function syncedCount(db: Db, sharedCourseId: string) {
 	return row?.n ?? 0;
 }
 
+/** Whether two courses may be the same class: a term in common, or no term on either */
+export const sharesTerm = (a: { terms: string[] }, b: { terms: string[] }) =>
+	!a.terms.length || !b.terms.length || a.terms.some((t) => b.terms.includes(t));
+
+/** The admin's pick for courses with no term name */
+export const NO_TERM = 'none';
+
 /** The term names (Q1, 前期…) the university's shared courses of a year are tagged with */
 export async function sharedTermNames(db: Db, universityId: string, year: number) {
 	const rows = await db
@@ -470,6 +477,8 @@ export async function sharedTermNames(db: Db, universityId: string, year: number
  * (the first `limit` by title when there is no search), with how many people sync each and how
  * many have it at all. `term` keeps those tagged with that term name; `unused` those no
  * timetable has; `weekday` and `period` those meeting then (a period inside a longer class counts).
+ * `term` of NO_TERM keeps those with no term name. `sharesTerm` keeps those with a term in common
+ * with these (or with none), so a course isn't folded into one of another quarter.
  */
 export async function adminSearchShared(
 	db: Db,
@@ -479,6 +488,7 @@ export async function adminSearchShared(
 		q: string;
 		excludeId?: string;
 		term?: string;
+		sharesTerm?: string[];
 		unused?: boolean;
 		weekday?: number;
 		period?: number;
@@ -494,8 +504,17 @@ export async function adminSearchShared(
 				eq(sharedCourses.year, opts.year),
 				opts.q ? queryMatch(opts.q) : undefined,
 				opts.excludeId ? ne(sharedCourses.id, opts.excludeId) : undefined,
-				opts.term
-					? sql`exists (select 1 from json_each(${sharedCourses.terms}) where json_each.value = ${opts.term})`
+				opts.term === NO_TERM
+					? sql`json_array_length(${sharedCourses.terms}) = 0`
+					: opts.term
+						? sql`exists (select 1 from json_each(${sharedCourses.terms}) where json_each.value = ${opts.term})`
+						: undefined,
+				opts.sharesTerm?.length
+					? sql`(json_array_length(${sharedCourses.terms}) = 0 or exists (select 1 from json_each(${sharedCourses.terms})
+						where json_each.value in (${sql.join(
+							opts.sharesTerm.slice(0, 20).map((t) => sql`${t}`),
+							sql`, `
+						)})))`
 					: undefined,
 				opts.unused
 					? sql`not exists (select 1 from ${courses} where ${courses.sharedCourseId} = ${sharedCourses.id})`
