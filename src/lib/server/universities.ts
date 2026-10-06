@@ -51,10 +51,13 @@ export function getUniversity(db: Db, id: string) {
 }
 
 /** The university with this name, added as a user-made one (no presets) when it's new. */
-export async function findOrCreateUniversity(db: Db, input: string) {
+export async function findOrCreateUniversity(db: Db, input: string, userId: string) {
 	const name = normalizeUniversityName(input);
 	if (!name || [...name].length > UNIVERSITY_NAME_MAX) return null;
-	await db.insert(universities).values({ name, source: 'user' }).onConflictDoNothing({ target: universities.name });
+	await db
+		.insert(universities)
+		.values({ name, source: 'user', createdBy: userId })
+		.onConflictDoNothing({ target: universities.name });
 	return (await db.select().from(universities).where(eq(universities.name, name)).get()) ?? null;
 }
 
@@ -68,7 +71,13 @@ export function emailMatchesDomains(email: string, domains: string[]) {
 /** A university someone typed in, for the admin to rename or delete; presets are left alone */
 export function getUserUniversity(db: Db, id: string) {
 	return db
-		.select({ id: universities.id, name: universities.name, users: count(users.id) })
+		.select({
+			id: universities.id,
+			name: universities.name,
+			users: count(users.id),
+			createdBy: universities.createdBy,
+			creator: sql<string | null>`(select u.nickname from users u where u.id = "universities"."created_by")`
+		})
 		.from(universities)
 		.leftJoin(users, eq(users.universityId, universities.id))
 		.where(and(eq(universities.id, id), eq(universities.source, 'user')))

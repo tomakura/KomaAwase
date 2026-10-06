@@ -63,7 +63,7 @@ erDiagram
 
 | テーブル | 主な列 | メモ |
 |---|---|---|
-| `UNIVERSITIES` | name, email_domains, term_preset, period_preset, calendar_preset, source | `name` は一意。`source` は `preset`（ひな形あり）か `user`（だれかが入力した名前。ひな形なし）。入力候補に出るのは `preset` と、`users.university_id` で選んでいる人が3人以上（`SUGGEST_MIN_USERS`）の大学だけ。`user` の名前は、入力した本人はそのまま使えるが、3人に届くまでほかの人の候補には出ない（`/admin` の「利用者が作った大学」で人数を見られる）。`email_domains` は在籍確認に使い、完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する）。`calendar_preset` はある1年度の休み・試験期間（`{year, source, checkedAt, entries}`、`source` は出典の URL、`checkedAt` は確認した日）。学期のひな形と同じくマイグレーションで入れる |
+| `UNIVERSITIES` | name, email_domains, term_preset, period_preset, calendar_preset, source, created_by | `name` は一意。`source` は `preset`（ひな形あり）か `user`（だれかが入力した名前。ひな形なし）。`created_by` は `user` の大学を入力した人（運営の画面に出す。退会すると空になる。0027 より前の大学は空）。入力候補に出るのは `preset` と、`users.university_id` で選んでいる人が3人以上（`SUGGEST_MIN_USERS`）の大学だけ。`user` の名前は、入力した本人はそのまま使えるが、3人に届くまでほかの人の候補には出ない（`/admin` の「利用者が作った大学」で人数を見られる）。`email_domains` は在籍確認に使い、完全一致か `.` 区切りのサブドメインだけで判定する（単純な末尾一致は使わない）。学期の日付はある1年度のもので、その年度の時間割にだけコピーする（毎年マイグレーションで更新する）。`calendar_preset` はある1年度の休み・試験期間（`{year, source, checkedAt, entries}`、`source` は出典の URL、`checkedAt` は確認した日）。学期のひな形と同じくマイグレーションで入れる |
 | `SHARED_COURSES` | university_id, year, code, title, terms, delivery, intensive_from, intensive_to, credits, source, version | `credits` は単位数で、同期しているみんなで同じ値。`code` はシラバスの授業コード。`source` は `syllabus` か `user`。`terms` は開講する学期の名前（Q3 など）で、登録したときの値のまま変えない（Q3 だけ取る人の保存で「Q3・Q4 の授業」が書き換わらないように）。「授業をさがす」で学期をしぼるのに使う |
 | `SHARED_COURSE_SLOTS` | shared_course_id, weekday, period_number, span, week_pattern, room | シラバスに教室がない大学は、みんなの登録で埋める |
 | `SHARED_COURSE_TEACHERS` | shared_course_id, name, sort_order | |

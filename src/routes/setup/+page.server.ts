@@ -28,7 +28,7 @@ export const actions: Actions = {
 		if (!days) return fail(400, { message: '入力を読み取れませんでした。もう一度やり直してください' });
 
 		const name = String(form.get('university') ?? '').trim();
-		const university = name ? await findOrCreateUniversity(locals.db, name) : null;
+		const university = name ? await findOrCreateUniversity(locals.db, name, locals.user.id) : null;
 		if (name && !university) return fail(400, { message: '大学名を40文字までで入れてください' });
 
 		await saveTimetableShape(

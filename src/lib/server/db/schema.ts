@@ -215,7 +215,10 @@ export const universities = sqliteTable(
 		// 'user' for a university someone typed in; it has no presets
 		source: text('source', { enum: ['preset', 'user'] })
 			.notNull()
-			.default('preset')
+			.default('preset'),
+		// Who typed it in, for the admin; cleared when their account is deleted. Unknown for
+		// those added before this was kept.
+		createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' })
 	},
 	(t) => [uniqueIndex('universities_name_idx').on(t.name)]
 );
@@ -276,8 +279,8 @@ export const courses = sqliteTable(
 			.notNull()
 			.references(() => timetables.id, { onDelete: 'cascade' }),
 		// shared_courses.id. Not a foreign key: adding one would rebuild this table, and shared
-		// courses are deleted only when an admin folds one into another (mergeShared), which
-		// moves these links first.
+		// courses are deleted only by an admin, folding one into another (mergeShared) or taking
+		// one down (removeShared), which move or clear these links first.
 		sharedCourseId: text('shared_course_id'),
 		syncMode: text('sync_mode', { enum: ['synced', 'personal'] })
 			.notNull()
