@@ -24,7 +24,7 @@
 	<PageHeader title="稼働状況と品質" back="/admin" />
 
 	<section class="ui-section">
-		<h2 class="ui-section-title">お知らせを出す（/status とアプリの上に出ます）</h2>
+		<h2 class="ui-section-title">お知らせを出す（稼働状況ページとアプリの上に出ます）</h2>
 		<form class="add" method="POST" action="?/add" use:enhance>
 			<select name="level" aria-label="種類">
 				<option value="trouble">{NOTE_LABELS.trouble}</option>
@@ -34,6 +34,12 @@
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 			<button class="btn btn-primary" type="submit">出す</button>
 		</form>
+		{#if form?.syncFailed}
+			<form class="add" method="POST" action="?/sync" use:enhance>
+				<p class="error" role="alert">{form.syncFailed}</p>
+				<button class="btn" type="submit">もう一度反映する</button>
+			</form>
+		{/if}
 		{#each open as n (n.id)}
 			<div class="note">
 				<span class="tag">{NOTE_LABELS[n.level]}</span>
@@ -56,7 +62,7 @@
 	</section>
 
 	<section class="ui-section">
-		<h2 class="ui-section-title">いまの様子（/status と同じ）</h2>
+		<h2 class="ui-section-title">いまの様子（稼働状況ページは1分ごとに確認）</h2>
 		<div class="ui-list">
 			{#each data.signals as s (s.id)}
 				<div class="ui-row"><span>{s.label}</span><span class="ui-row-value">{LEVEL_LABELS[s.level]} · {s.text}</span></div>

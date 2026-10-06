@@ -19,6 +19,9 @@ declare global {
 		// Cloudflare Turnstile on the contact form; without both, the form goes without it
 		TURNSTILE_SITE_KEY?: string;
 		TURNSTILE_SECRET_KEY?: string;
+		// A fine-grained GitHub token for STATUS_REPO (Contents: read and write), for the notices
+		// on the status page; without it they stay in the app only
+		STATUS_GITHUB_TOKEN?: string;
 		// Set by worker/entry.js on calls it makes to itself (queue and cron), never by requests
 		KOMA_INTERNAL?: boolean;
 	}

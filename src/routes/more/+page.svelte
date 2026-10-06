@@ -8,6 +8,7 @@
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import { daysLabel } from '$lib/courses';
 	import { subscription } from '$lib/push-client';
+	import { STATUS_PAGE_URL } from '$lib/status';
 	import { THEMES, applyTheme, type Theme } from '$lib/theme';
 
 	let { data, form } = $props();
@@ -157,7 +158,10 @@
 			<div class="ui-list">
 				{@render link('/feedback?from=/more', '不具合・要望を送る')}
 				{@render link('/contact', 'お問い合わせ')}
-				{@render link('/status', '稼働状況')}
+				<a class="ui-row" href={STATUS_PAGE_URL} target="_blank" rel="noopener">
+					<span>稼働状況</span>
+					<span class="ui-row-value"><Icon name="external" size={16} /></span>
+				</a>
 				{#if data.supportUrl}
 					<a class="ui-row" href={data.supportUrl} target="_blank" rel="noopener">
 						<span>開発を応援する</span>

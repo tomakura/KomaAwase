@@ -153,9 +153,8 @@ export async function runSync(
 // registered, the form, the screenshot reader) and the ways of adding people. A copy of one
 // would show a search that can't be searched. Keep the matching links in src/app.css in step.
 const NEEDS_SERVER = /^\/(courses\/(new|search)|import|friends\/add|groups\/new)(\/|$)/;
-// Pages with nothing to load, which open from the app's own files (/status reads its own, and
-// says so when it can't)
-const NEEDS_NOTHING = /^\/(install|terms|privacy|status)$/;
+// Pages with nothing to load, which open from the app's own files
+const NEEDS_NOTHING = /^\/(install|terms|privacy)$/;
 
 const trimmed = (pathname: string) => pathname.replace(/\/+$/, '') || '/';
 
