@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { takeNext, takeVerifyNext } from '$lib/server/auth/next';
 import { finishVerification, peekVerification } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -15,11 +16,13 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ params, locals, url }) => {
+	default: async ({ params, locals, url, cookies }) => {
 		if (!locals.user) redirect(303, `/login?next=${encodeURIComponent(url.pathname)}`);
 		const done = await finishVerification(locals.db, params.token, locals.user.id);
 		if (!done) return fail(400, { message: 'リンクの期限が切れているか、すでに使われています' });
 		if (done === 'other-account' || done === 'taken') return fail(409, { state: done });
-		return { university: done.university };
+		// On to the page that suggested the check, or what was waiting through はじめの設定 (a
+		// friend's link, an invite)
+		return { university: done.university, next: takeVerifyNext(cookies) ?? takeNext(cookies) ?? '/' };
 	}
 };

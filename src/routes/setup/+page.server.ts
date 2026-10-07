@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { takeNext } from '$lib/server/auth/next';
 import { presetsFor, readDays, readShape, saveTimetableShape, thisYear, timetableSettings } from '$lib/server/setup';
 import { findOrCreateUniversity, listUniversities } from '$lib/server/universities';
+import { verifyByGoogle } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -38,8 +39,12 @@ export const actions: Actions = {
 			{ ...shape, universityId: university?.id ?? null },
 			{ daysShown: days, setupAt: new Date() }
 		);
-		// A university whose enrollment can be checked is offered it first (it goes on to `next`)
-		if (university?.emailDomains.length) redirect(303, '/setup/verify');
+		// A university whose enrollment can be checked is offered it first (it goes on to `next`).
+		// Signed in with Google on its address, it is done here and the page only says so.
+		if (university?.emailDomains.length) {
+			const done = await verifyByGoogle(locals.db, locals.user, university);
+			redirect(303, done ? '/setup/verify?done' : '/setup/verify');
+		}
 		redirect(303, takeNext(cookies) ?? '/');
 	}
 };

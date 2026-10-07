@@ -2,6 +2,7 @@ import { and, count, eq, gt, inArray, isNull, lt, max, ne, or, sql } from 'drizz
 import { academicYear, tokyoTime } from '$lib/time';
 import type { RequestEvent } from '@sveltejs/kit';
 import { normalizeEmail, sendRelayMail } from './auth/email';
+import { rememberVerifyNext } from './auth/next';
 import { MAIL_COOLDOWN_MESSAGE, MAIL_COOLDOWN_MS, MAIL_LIMIT_MESSAGES, takeMailBudget } from './mail-limit';
 import { RATE_LIMITED_MESSAGE, isRateLimited } from './rate-limit';
 import { generateToken, hashToken } from './auth/token';
@@ -133,6 +134,38 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 	return { university: university?.name ?? '' };
 }
 
+/**
+ * Confirms enrollment without a mail, for someone who signed in with Google using an address
+ * of their university: Google has just vouched that they hold it (only Workspace and Gmail
+ * accounts sign in, see google.ts). False when it doesn't apply, or the address already
+ * confirms another account; then the mail is offered as usual.
+ */
+export async function verifyByGoogle(
+	db: Db,
+	user: { id: string; email: string; googleSub: string | null },
+	university: { id: string; emailDomains: string[] }
+) {
+	if (!user.googleSub || !emailMatchesDomains(user.email, university.emailDomains)) return false;
+	const values = {
+		userId: user.id,
+		universityId: university.id,
+		email: user.email,
+		verifiedAt: new Date(),
+		expiresAt: verificationExpiry()
+	};
+	try {
+		await db.batch([
+			db.insert(univVerifications).values(values).onConflictDoUpdate({ target: univVerifications.userId, set: values }),
+			db.update(users).set({ verifyPromptStage: null }).where(eq(users.id, user.id))
+		]);
+	} catch (e) {
+		// The address is unique: another account holds it
+		console.error('enrollment check from Google sign-in failed', e);
+		return false;
+	}
+	return true;
+}
+
 export async function verificationOf(db: Db, userId: string) {
 	return (
 		(await db
@@ -229,12 +262,16 @@ export async function markVerifyPrompt(db: Db, userId: string, stage: number) {
 		.where(and(eq(users.id, userId), or(isNull(users.verifyPromptStage), gt(users.verifyPromptStage, stage))));
 }
 
-/** The enrollment mail for the form that was posted: `sentTo`, or the message and status to show. */
+/**
+ * The enrollment mail for the form that was posted: `sentTo`, or the message and status to show.
+ * The form's `next` is where the link goes on to once opened (see rememberVerifyNext).
+ */
 export async function sendVerificationMail(
 	event: RequestEvent
 ): Promise<{ sentTo: string } | { status: number; message: string; email: string }> {
-	const { locals, request, url, platform } = event;
-	const input = String((await request.formData()).get('email') ?? '');
+	const { locals, request, url, platform, cookies } = event;
+	const form = await request.formData();
+	const input = String(form.get('email') ?? '');
 	if (!locals.user || !platform) return { status: 500, message: 'もう一度やり直してください', email: input };
 	if (await isRateLimited(event, platform.env.EMAIL_LINK_LIMITER)) return { status: 429, message: RATE_LIMITED_MESSAGE, email: input };
 
@@ -253,5 +290,6 @@ export async function sendVerificationMail(
 		await dropToken(locals.db, started.token);
 		return { status: 502, message: 'メールを送れませんでした。時間をおいてもう一度やり直してください', email: input };
 	}
+	rememberVerifyNext(cookies, String(form.get('next') ?? ''));
 	return { sentTo: started.email };
 }

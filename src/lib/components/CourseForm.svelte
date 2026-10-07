@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import { verifyHref } from '$lib/verify-prompt';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, absenceLimitOf, courseColor, creditsOf, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
@@ -269,7 +271,7 @@
 					</svg>
 					<span>
 						{#if sync.locked === 'need-verify'}
-							この授業は、あなたの時間割にだけ保存されます。<a href="/more/verify">在籍確認</a>をすると、同じ大学のみんなと授業の情報を共有できます。
+							この授業は、あなたの時間割にだけ保存されます。<a href={verifyHref(page.url)}>在籍確認</a>をすると、同じ大学のみんなと授業の情報を共有できます。
 						{:else}
 							この授業は、あなたの時間割にだけ保存されます。この大学は、まだ在籍確認に対応していません。
 						{/if}

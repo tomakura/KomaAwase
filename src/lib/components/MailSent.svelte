@@ -5,9 +5,14 @@
 	import { motion } from '$lib/motion';
 
 	// What was sent, with a way to send it again once a minute has passed (the server says
-	// the same) and to go back to the form for another address
-	let { email, action, onother, children }: { email: string; action: string; onother: () => void; children: import('svelte').Snippet } =
-		$props();
+	// the same) and to go back to the form for another address. `next` is sent along as the form's was.
+	let {
+		email,
+		action,
+		next,
+		onother,
+		children
+	}: { email: string; action: string; next?: string; onother: () => void; children: import('svelte').Snippet } = $props();
 
 	let left = $state(MAIL_COOLDOWN_SECONDS);
 	let sending = $state(false);
@@ -37,6 +42,7 @@
 	}}
 >
 	<input type="hidden" name="email" value={email} />
+	{#if next}<input type="hidden" name="next" value={next} />{/if}
 	<button class="btn" type="submit" disabled={left > 0 || sending}>
 		{sending ? '送っています…' : left > 0 ? `もう一度送る（${left}秒）` : 'もう一度送る'}
 	</button>

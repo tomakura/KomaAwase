@@ -23,7 +23,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="在籍確認" back="/more" />
+	<PageHeader title="在籍確認" back={data.from ?? '/more'} />
 	<div class="body">
 		{#if data.verification?.current}
 			<div class="status">
@@ -55,7 +55,7 @@
 			</p>
 		{:else if form?.sentTo && !other}
 			{#key form}
-				<MailSent email={form.sentTo} action="" onother={() => (other = true)}>
+				<MailSent email={form.sentTo} action="" next={data.from ?? '/more/verify'} onother={() => (other = true)}>
 					{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
 				</MailSent>
 			{/key}
@@ -75,6 +75,7 @@
 					};
 				}}
 			>
+				<input type="hidden" name="next" value={data.from ?? '/more/verify'} />
 				<label class="field">
 					{data.university.name}のメールアドレス
 					<input
