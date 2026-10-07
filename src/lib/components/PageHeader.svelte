@@ -6,7 +6,7 @@
 </script>
 
 <header>
-	<a class="back" href={back}>
+	<a class="back" href={back} data-back>
 		<Icon name="back" size={22} />
 		<span class="visually-hidden">もどる：</span>
 		<h1>{title}</h1>

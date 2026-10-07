@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { navigating } from '$app/state';
+	import { awaiting } from '$lib/awaiting.svelte';
 
 	// A ring in the middle of the screen while the next page is awaited. The page stays as it
 	// was (going back is instant, and a quick load shouldn't flash anything), so it shows only
@@ -7,7 +8,7 @@
 	const DELAY = 400;
 	let shown = $state(false);
 	$effect(() => {
-		if (!navigating.to) {
+		if (!navigating.to && !awaiting.count) {
 			shown = false;
 			return;
 		}

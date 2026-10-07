@@ -8,7 +8,7 @@
 // the copies. They live in memory, so a reload or signing out clears them. Pages the service
 // worker never keeps (the admin pages, sign-in, …: neverKept) get no copy here either, so
 // they are always asked for and never shown without the server's say.
-import { neverKept } from './offline';
+import { SAVED_AT_HEADER, neverKept } from './offline';
 
 const SUFFIX = '/__data.json';
 const MAX_COPIES = 24;
@@ -59,7 +59,8 @@ export function pageData(
 		const since = generation;
 		try {
 			const res = await ask();
-			if (!res.ok) return;
+			// A copy from the service worker isn't the server's say, and may be older than the one shown
+			if (!res.ok || res.headers.has(SAVED_AT_HEADER)) return;
 			const body = await res.text();
 			if (withNow(body, 0) === withNow(shown.body, 0)) return;
 			keep(key, { body, type: shown.type }, since);

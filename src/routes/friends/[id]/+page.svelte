@@ -36,7 +36,7 @@
 
 <div class="ui-page">
 	<header>
-		<a class="back" href="/friends" aria-label="もどる"><Icon name="back" size={22} /></a>
+		<a class="back" href="/friends" aria-label="もどる" data-back><Icon name="back" size={22} /></a>
 		<UserIcon user={data.person} size={36} />
 		<span class="who">
 			<h1>{name}</h1>

@@ -7,6 +7,7 @@
 	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
 	import { afterNavigate, beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
+	import { navigating } from '$app/state';
 	import { SvelteSet } from 'svelte/reactivity';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
@@ -21,6 +22,7 @@
 	import { connection } from '$lib/connection.svelte';
 	import { forgetOtherAccount } from '$lib/offline';
 	import { pageData } from '$lib/page-data';
+	import { arrived, backLink } from '$lib/back';
 
 	let { data, children } = $props();
 	// The enrollment prompt's stage once closed; until then it holds back the notification prompt
@@ -117,6 +119,8 @@
 		};
 	});
 	beforeNavigate(({ type, to }) => pages?.returningTo(type === 'popstate' && to ? to.url.pathname : null));
+	// Which entries of the history are which pages, for the back links (src/lib/back.ts)
+	afterNavigate(arrived);
 
 	// Offline or on a poor connection: keeps the timetable on screen, refreshes the copies of the
 	// tabs when the server answers, and switches off what needs it (src/lib/connection.svelte.ts).
@@ -128,9 +132,19 @@
 			version,
 			controlled: () => !!navigator.serviceWorker?.controller,
 			fetch: (...args) => (browserFetch ?? fetch)(...args),
-			invalidate: () => refreshAll(),
+			// Not while a page is awaited: that would call it off, and it is fetched anyway
+			invalidate: async () => {
+				if (!navigating.to) await refreshAll();
+			},
 			signedIn
 		});
+	});
+	// A page awaited this long says the connection is bad, without waiting for a check
+	const SLOW_PAGE = 3_000;
+	$effect(() => {
+		if (!navigating.to) return;
+		const timer = setTimeout(() => connection.waited(), SLOW_PAGE);
+		return () => clearTimeout(timer);
 	});
 	// A page that can't be opened now stays where it is, with the reason (not a reload into the offline page)
 	beforeNavigate((navigation) => {
@@ -176,6 +190,8 @@
 	<title>コマあわせ</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<svelte:window onclickcapture={backLink} />
 
 <ConnectionBar />
 <StatusStrip />

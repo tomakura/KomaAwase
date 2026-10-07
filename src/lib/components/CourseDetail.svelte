@@ -12,6 +12,7 @@
 	import { verifyHref } from '$lib/verify-prompt';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
+	import { goBack } from '$lib/back';
 	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
@@ -278,6 +279,7 @@
 		class="scrim"
 		href={timetableHref(data.termParam)}
 		aria-label="閉じて時間割にもどる"
+		data-back={close ? undefined : ''}
 		onclick={(e) => {
 			if (!close) return;
 			e.preventDefault();
@@ -290,7 +292,7 @@
 		class="sheet course-sheet"
 		in:fly|global={{ y: '100%', duration: close && !still() ? 300 : 0, opacity: 1 }}
 		out:fly|global={{ y: '100%', duration: close && !still() ? 240 : 0, opacity: 1 }}
-		use:swipeDown={() => (close ? close() : goto(timetableHref(data.termParam)))}
+		use:swipeDown={() => (close ? close() : goBack(timetableHref(data.termParam)) || goto(timetableHref(data.termParam)))}
 	>
 		<div class="grabber"><span></span></div>
 

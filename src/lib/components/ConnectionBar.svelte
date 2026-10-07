@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { fade, fly, slide } from 'svelte/transition';
 	import Icon from './Icon.svelte';
 	import { STATUS_PAGE_URL } from '$lib/status';
@@ -8,8 +10,9 @@
 
 	// The strip at the top while the app is offline or the connection is poor (and while the
 	// copies are being refreshed, if that takes a moment), with when the information on screen
-	// was fetched and a button to try again. Also the message shown when something that needs the
-	// server is pressed.
+	// was fetched, a button to try again, and away from the timetable one back to it (the timetable
+	// is always on the device, and is shown from there at once). Also the message shown when
+	// something that needs the server is pressed.
 	const link = $derived(connection.link);
 	const busy = $derived(connection.phase !== 'idle');
 	const progress = $derived(connection.phase === 'syncing' ? connection.progress : null);
@@ -64,6 +67,9 @@
 					{#if detail}<span>{detail}</span>{/if}
 					{#if link !== 'online'}<a class="status-link" href={STATUS_PAGE_URL} target="_blank" rel="noopener">稼働状況を見る</a>{/if}
 				</div>
+				{#if link !== 'online' && page.url.pathname !== '/'}
+					<button class="home" type="button" onclick={() => goto('/')}>時間割へ</button>
+				{/if}
 				{#if link !== 'online'}
 					<button class="refresh" type="button" onclick={() => connection.refresh()} disabled={busy} aria-label="最新の情報に更新">
 						<span class="turn" class:spin={busy}><Icon name="sync" size={20} /></span>
@@ -176,6 +182,20 @@
 		border-radius: 12px;
 		background: transparent;
 		color: inherit;
+		cursor: pointer;
+	}
+
+	.home {
+		height: 44px;
+		flex-shrink: 0;
+		padding: 0 12px;
+		border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+		border-radius: 12px;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: 13px;
+		font-weight: 700;
 		cursor: pointer;
 	}
 

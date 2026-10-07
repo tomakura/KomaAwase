@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Connection, type Env } from './connection.svelte';
-import { FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER } from './offline';
+import { COPY_FIRST_HEADER, FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER } from './offline';
 import { SYNC_KEYS } from './sync';
 
 const ORIGIN = 'https://koma.test';
@@ -206,6 +206,38 @@ describe('starting', () => {
 		await fetch('/friends/__data.json');
 		await vi.advanceTimersByTimeAsync(0);
 		expect(JSON.parse(s.stored.get(FRESH_KEY)!).at['/friends/__data.json']).toBeLessThan(Date.now() - 100 * 60_000);
+	});
+
+	it('asks the service worker for the copy at once while the connection is bad, and only for pages', async () => {
+		const s = setup({ synced: true });
+		const seen: Headers[] = [];
+		const fetch = s.connection.observe(
+			(async (input: RequestInfo | URL, init?: RequestInit) => {
+				seen.push(new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)));
+				return new Response('{}');
+			}) as typeof globalThis.fetch,
+			ORIGIN
+		);
+		await fetch('/friends/__data.json');
+		s.net.hang = true;
+		s.connection.link = 'poor';
+		await fetch('/friends/__data.json', { headers: { accept: 'application/json' } });
+		await fetch(new Request(`${ORIGIN}/plans/__data.json`));
+		await fetch('/api/warning');
+		expect(seen.map((h) => h.get(COPY_FIRST_HEADER))).toEqual([null, '1', '1', null]);
+		expect(seen[1].get('accept')).toBe('application/json');
+	});
+
+	it('shows the strip at once when a page is awaited too long, and puts it away when the server answers', async () => {
+		const s = setup({ synced: true });
+		s.net.hang = true;
+		s.connection.waited();
+		expect(s.connection.link).toBe('poor');
+		expect(s.connection.visible).toBe(true);
+		// The check that was asking then gives up; the next one gets an answer
+		s.net.hang = false;
+		await vi.advanceTimersByTimeAsync(12_000);
+		expect(s.connection.link).toBe('online');
 	});
 
 	it('remembers the pages by the version of the app: a new one starts again', async () => {

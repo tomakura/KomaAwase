@@ -67,10 +67,13 @@ export function swipeDown(sheet: HTMLElement, onclose: () => unknown) {
 			setTimeout(
 				async () => {
 					// After leaving the page (not before, or it would flash back), and ready for a
-					// dialog that opens again
-					await close();
-					sheet.style.transition = 'none';
-					sheet.style.transform = '';
+					// dialog that opens again. A move that fails or is called off brings it back.
+					try {
+						await close();
+						sheet.style.transition = 'none';
+					} finally {
+						sheet.style.transform = '';
+					}
 				},
 				reduced.matches ? 0 : 200
 			);

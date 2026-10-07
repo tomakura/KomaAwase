@@ -11,7 +11,7 @@
 // server says the page is gone or no longer the user's, and copies of pages that show other
 // people are only shown for a few days (copyMaxAge).
 import { build, files, version } from '$service-worker';
-import { PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER, copyMaxAge, neverKept } from '$lib/offline';
+import { COPY_FIRST_HEADER, PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER, copyMaxAge, neverKept } from '$lib/offline';
 import { SECURITY_HEADERS, cspHeader, nonceOf } from '$lib/security';
 import { leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from '$lib/wait';
 
@@ -153,17 +153,23 @@ async function networkFirst(event: FetchEvent) {
 	});
 	event.waitUntil(network.then(() => saved, () => {}));
 	const copy = await copyOf(cache, key);
-	// Only for when the network fails: a slow answer is waited for, not swapped for another view
+	// For when the network fails: a slow answer is waited for, not swapped for another view. Except
+	// for the timetable (another term's is better than waiting on a connection that may never
+	// answer), and when the app knows the connection is bad, which it says with COPY_FIRST_HEADER
+	// (it lets the navigation through only to a page it has a copy of, see src/lib/sync.ts).
 	const near = copy ? undefined : await copyOf(cache, nearKey(request));
+	const copyFirst = request.headers.has(COPY_FIRST_HEADER);
+	const stand = copy ?? (copyFirst || new URL(request.url).pathname === '/__data.json' ? near : undefined);
 	try {
 		if (request.mode === 'navigate') {
 			// A quick answer goes straight through; for a slow one the screen gets a spinner
 			const quick = await Promise.race([network, sleep(GRACE_MS)]);
 			return quick ?? waiting(event, network, copy, near);
 		}
-		if (!copy) return await network;
+		if (!stand) return await network;
+		if (copyFirst) return await stamp(request, stand);
 		// With a copy to show, the network gets SLOW_MS to answer
-		return (await Promise.race([network, sleep(SLOW_MS)])) ?? (await stamp(request, copy));
+		return (await Promise.race([network, sleep(SLOW_MS)])) ?? (await stamp(request, stand));
 	} catch {
 		const shown = copy ?? near;
 		return shown ? await stamp(request, shown) : unavailable(request);
