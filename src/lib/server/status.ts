@@ -99,11 +99,15 @@ export async function dailyQuality(db: Db, now = Date.now()) {
 		.map(([day, m]) => {
 			const get = (name: string) => m[name] ?? { n: 0, totalMs: 0 };
 			const importOk = get(METRICS.importOk);
+			const minutes = get(METRICS.notifyMinute);
 			return {
 				day,
 				errors: get(METRICS.serverErrors).n,
 				pushOk: get(METRICS.pushOk).n,
 				pushFailed: get(METRICS.pushFailed).n,
+				// How late the notifications went out on average (seconds), and how many minutes 10 seconds or more late
+				notifyLateSec: minutes.n ? Math.round(minutes.totalMs / minutes.n / 100) / 10 : null,
+				notifyLate: get(METRICS.notifyLate).n,
 				importOk: importOk.n,
 				importFailed: get(METRICS.importFailed).n,
 				importAvgMin: importOk.n ? Math.round(importOk.totalMs / importOk.n / 60000) : null,

@@ -94,40 +94,27 @@ async function enqueue(env: PushEnv, items: PushItem[], attempt: number, delaySe
 /**
  * Sends a message to each phone: the first SENDS_MAX now, the rest through the queue. The
  * ones that fail now are tried again through the queue too. Returns how many it sent now and
- * how many it queued. With `at` still a second or more away, all of them go through the queue,
- * held until then.
+ * how many it queued. With `dropLate`, nothing out of date by now is sent (a minute sent late,
+ * after the clock stopped: src/lib/server/minute-clock.ts).
  */
-export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPush = sendPush, at?: number) {
-	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !all.length) return { sent: 0, queued: 0 };
-	const wait = at === undefined ? 0 : Math.floor((at - Date.now()) / 1000);
-	// How many are held in the queue; if queueing stops partway, the rest are sent now instead
-	let held = 0;
-	if (wait >= 1 && env.PUSH_QUEUE) {
-		try {
-			for (; held < all.length; held += SENDS_MAX) {
-				await env.PUSH_QUEUE.send({ items: all.slice(held, held + SENDS_MAX), attempt: 1 }, { delaySeconds: wait });
-			}
-			return { sent: 0, queued: all.length };
-		} catch (e) {
-			// Better early than not at all
-			console.error('push: queueing for later failed', e);
-		}
-	}
-	const items = all.slice(held);
-	let queued = held;
+export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPush = sendPush, dropLate = false) {
+	const now = Date.now();
+	const items = dropLate ? all.filter((item) => now <= item.expires) : all;
+	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !items.length) return { sent: 0, queued: 0 };
+	let queued = 0;
 	try {
-		queued += await enqueue(env, items.slice(SENDS_MAX), 1);
+		queued = await enqueue(env, items.slice(SENDS_MAX), 1);
 	} catch (e) {
 		console.error('push: queueing failed', e);
 	}
-	const now = items.slice(0, SENDS_MAX);
-	const failed = await sendNow(env, now, send);
+	const first = items.slice(0, SENDS_MAX);
+	const failed = await sendNow(env, first, send);
 	try {
 		await enqueue(env, failed, 2, RETRY_SECONDS);
 	} catch (e) {
 		console.error('push: queueing a retry failed', e);
 	}
-	return { sent: now.length, queued };
+	return { sent: first.length, queued };
 }
 
 /** One part from the queue: sent unless it is out of date, its failures queued again a few times */

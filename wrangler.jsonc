@@ -41,9 +41,8 @@
 	],
 	// Screenshot imports: one at a time, so Groq's per-minute limits hold. Jobs live in D1
 	// (import_jobs); a message only names one, and the daily cron re-sends what is due.
-	// Notifications more than one run can send, and the ones held until their minute starts
-	// (src/lib/server/push-queue.ts): each message is up to 40 phones, sent in a run of its own,
-	// at most a second after it is due (max_batch_timeout). Create it once with `npx wrangler queues create koma-push`.
+	// Notifications more than one run can send (src/lib/server/push-queue.ts): each message is
+	// up to 40 phones, sent in a run of its own. Create it once with `npx wrangler queues create koma-push`.
 	"queues": {
 		"producers": [
 			{ "binding": "IMPORT_QUEUE", "queue": "koma-import" },
@@ -55,9 +54,13 @@
 		]
 	},
 	// 10:00 Japan time, an hour after the AI quotas reset (9:00): retries, cleanup of old images and sessions.
-	// And every minute from 06:00 to 22:59 Japan time: the class reminders. worker/entry.js
-	// tells the two apart by this text.
+	// And every minute: making sure the clock below is running. worker/entry.js tells the two
+	// apart by this text.
 	"triggers": { "crons": ["0 1 * * *", "* * * * *"] },
+	// The clock that wakes the notifications at the start of each minute (MinuteClock in
+	// worker/entry.js, src/lib/server/minute-clock.ts). The cron alone started them a minute late.
+	"durable_objects": { "bindings": [{ "name": "CLOCK", "class_name": "MinuteClock" }] },
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["MinuteClock"] }],
 	// The backup reader for screenshots (Groq, keyed by the GROQ_API_KEY secret, comes first)
 	"ai": { "binding": "AI", "remote": true },
 	// Per-IP limits for endpoints anyone can call. Period must be 10 or 60 seconds.
