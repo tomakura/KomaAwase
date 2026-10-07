@@ -76,7 +76,7 @@ export async function sendPlanEve(env: PushEnv, scheduledTime: number, send: typ
 		message: eveMessage(byUser.get(d.userId) ?? [], tomorrow),
 		expires
 	}));
-	const { sent, queued } = await deliver(env, items, send);
+	const { sent, queued } = await deliver(env, items, send, scheduledTime);
 	console.log(`plan eve: sent ${sent}, queued ${queued}`);
 	return sent + queued;
 }
