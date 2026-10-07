@@ -94,11 +94,12 @@ async function enqueue(env: PushEnv, items: PushItem[], attempt: number, delaySe
 /**
  * Sends a message to each phone: the first SENDS_MAX now, the rest through the queue. The
  * ones that fail now are tried again through the queue too. Returns how many it sent now and
- * how many it queued. Given the time it is `at`, nothing out of date by then is sent (a minute
- * sent late, after the clock stopped: src/lib/server/minute-clock.ts).
+ * how many it queued. With `dropLate`, nothing out of date by now is sent (a minute sent late,
+ * after the clock stopped: src/lib/server/minute-clock.ts).
  */
-export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPush = sendPush, at?: number) {
-	const items = at === undefined ? all : all.filter((item) => at <= item.expires);
+export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPush = sendPush, dropLate = false) {
+	const now = Date.now();
+	const items = dropLate ? all.filter((item) => now <= item.expires) : all;
 	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !items.length) return { sent: 0, queued: 0 };
 	let queued = 0;
 	try {
@@ -106,14 +107,14 @@ export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPu
 	} catch (e) {
 		console.error('push: queueing failed', e);
 	}
-	const now = items.slice(0, SENDS_MAX);
-	const failed = await sendNow(env, now, send);
+	const first = items.slice(0, SENDS_MAX);
+	const failed = await sendNow(env, first, send);
 	try {
 		await enqueue(env, failed, 2, RETRY_SECONDS);
 	} catch (e) {
 		console.error('push: queueing a retry failed', e);
 	}
-	return { sent: now.length, queued };
+	return { sent: first.length, queued };
 }
 
 /** One part from the queue: sent unless it is out of date, its failures queued again a few times */

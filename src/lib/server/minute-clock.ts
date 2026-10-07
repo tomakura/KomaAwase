@@ -1,8 +1,10 @@
 // The notifications due at a set minute (class reminders, homework, the 20:00 one) go out when
 // that minute begins. The every-minute cron started a minute or more late, so a Durable
 // Object's alarm wakes them instead (MinuteClock in worker/entry.js): each alarm sets the next
-// one first, then sends its minute. The cron only makes sure an alarm is set. After a stop the
-// minutes missed are sent too, a few at most; what is out of date by then is dropped (deliver).
+// one first, then sends its minute. The cron only makes sure an alarm is set. After a stop, or a
+// minute whose lookup failed, the minutes missed are sent too, a few at most (a minute sent
+// twice only shows its notifications again in place); what is out of date by then is dropped
+// (deliver).
 // Relative imports only, because the Worker's entry file (worker/entry.js) reaches it directly.
 import { METRICS, countMetric } from './metrics';
 import { sendPlanEve } from './plan-eve';
@@ -29,15 +31,20 @@ export function minutesDue(last: number | undefined, now: number) {
 	return out;
 }
 
-/** Sends one minute's notifications, and counts how late that was. Never throws. */
+/**
+ * Sends one minute's notifications, and counts how late that was. Returns false when looking
+ * them up failed (D1), so the minute is tried again with the next alarm; sending itself retries
+ * through the queue. Never throws.
+ */
 export async function runMinute(env: PushEnv, minute: number, now = Date.now()) {
 	const late = Math.max(0, now - minute);
 	await countMetric(env.DB, METRICS.notifyMinute, 1, late, now);
 	if (late >= 10_000) await countMetric(env.DB, METRICS.notifyLate, 1, 0, now);
 	const results = await Promise.allSettled([
-		sendDueReminders(env, minute, undefined, now),
-		sendPlanEve(env, minute, undefined, now),
-		sendTaskReminders(env, minute, undefined, now)
+		sendDueReminders(env, minute, undefined, true),
+		sendPlanEve(env, minute, undefined, true),
+		sendTaskReminders(env, minute, undefined, true)
 	]);
 	for (const r of results) if (r.status === 'rejected') console.error('notifications for the minute failed', r.reason);
+	return results.every((r) => r.status === 'fulfilled');
 }

@@ -42,7 +42,8 @@ export class MinuteClock extends DurableObject {
 		/** @type {number | undefined} */
 		const last = await this.ctx.storage.get('last');
 		for (const minute of minutesDue(last, now)) {
-			await runMinute(this.env, minute, now);
+			// A minute that failed stays unsent, to be tried with the next alarm
+			if (!(await runMinute(this.env, minute, now))) break;
 			await this.ctx.storage.put('last', minute);
 		}
 	}

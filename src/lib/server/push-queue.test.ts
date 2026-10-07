@@ -29,7 +29,8 @@ describe('deliver', () => {
 	it('sends nothing that is out of date', async () => {
 		const { env, queued } = setup();
 		const sent: string[] = [];
-		const result = await deliver(env, [item(1, 500), item(2, 2_000)], async (s) => (sent.push(s.endpoint), 'sent'), 1_000);
+		const now = Date.now();
+		const result = await deliver(env, [item(1, now - 1_000), item(2, now + 60_000)], async (s) => (sent.push(s.endpoint), 'sent'), true);
 		expect([result, sent, queued.length]).toEqual([{ sent: 1, queued: 0 }, ['https://push.example.test/2'], 0]);
 	});
 
