@@ -8,6 +8,8 @@
 	import StepsField from '$lib/components/StepsField.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import { verifyHref } from '$lib/verify-prompt';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
 	import { wrapTitle } from '$lib/wrap-title';
@@ -357,7 +359,7 @@
 					みんなの授業データ（変更の履歴・報告）
 				</a>
 			{:else if data.shared}
-				<a class="shared-link" href="/more/verify">在籍確認をすると、みんなの授業データを見られます</a>
+				<a class="shared-link" href={verifyHref(page.url)}>在籍確認をすると、みんなの授業データを見られます</a>
 			{/if}
 		</div>
 

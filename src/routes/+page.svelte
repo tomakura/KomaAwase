@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto, preloadData, pushState, refreshAll, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
+	import { verifyHref } from '$lib/verify-prompt';
 	import { untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
@@ -187,7 +188,7 @@
 								<li>授業をさがす（同じ大学の人の授業から選ぶ）</li>
 								<li>スクショから読み込む</li>
 							</ul>
-							<a class="btn btn-primary" href="/more/verify">在籍確認する</a>
+							<a class="btn btn-primary" href={verifyHref(page.url)}>在籍確認する</a>
 						</div>
 					{/if}
 					<a class="way" href="/courses/new{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
