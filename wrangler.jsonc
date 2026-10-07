@@ -41,8 +41,9 @@
 	],
 	// Screenshot imports: one at a time, so Groq's per-minute limits hold. Jobs live in D1
 	// (import_jobs); a message only names one, and the daily cron re-sends what is due.
-	// Notifications more than one run can send (src/lib/server/push-queue.ts): each message is
-	// up to 40 phones, sent in a run of its own. Create it once with `npx wrangler queues create koma-push`.
+	// Notifications more than one run can send, and the ones held until their minute starts
+	// (src/lib/server/push-queue.ts): each message is up to 40 phones, sent in a run of its own,
+	// at most a second after it is due (max_batch_timeout). Create it once with `npx wrangler queues create koma-push`.
 	"queues": {
 		"producers": [
 			{ "binding": "IMPORT_QUEUE", "queue": "koma-import" },

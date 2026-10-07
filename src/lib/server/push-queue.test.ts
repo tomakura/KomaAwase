@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deliver, sendPart, type PushEnv, type PushItem, type PushPart } from './push-queue';
 
 const item = (n: number, expires = 1_000): PushItem => ({
@@ -45,10 +45,14 @@ describe('deliver', () => {
 });
 
 describe('deliver at a set time', () => {
+	const NOW = Date.UTC(2026, 9, 7, 5, 9, 30);
+	beforeEach(() => vi.useFakeTimers({ now: NOW }));
+	afterEach(() => vi.useRealTimers());
+
 	it('queues all of them, held until then', async () => {
 		const { env, queued } = setup();
 		const sent: string[] = [];
-		const result = await deliver(env, Array.from({ length: 50 }, (_, n) => item(n)), async (s) => (sent.push(s.endpoint), 'sent'), Date.now() + 30_500);
+		const result = await deliver(env, Array.from({ length: 50 }, (_, n) => item(n)), async (s) => (sent.push(s.endpoint), 'sent'), NOW + 30_500);
 		expect(result).toEqual({ sent: 0, queued: 50 });
 		expect(sent).toHaveLength(0);
 		expect(queued.map((q) => [q.part.items.length, q.part.attempt, q.delay])).toEqual([
@@ -60,7 +64,7 @@ describe('deliver at a set time', () => {
 	it('sends now when the time has come', async () => {
 		const { env, queued } = setup();
 		const sent: string[] = [];
-		const result = await deliver(env, [item(1)], async (s) => (sent.push(s.endpoint), 'sent'), Date.now() - 5_000);
+		const result = await deliver(env, [item(1)], async (s) => (sent.push(s.endpoint), 'sent'), NOW - 5_000);
 		expect([result, sent.length, queued.length]).toEqual([{ sent: 1, queued: 0 }, 1, 0]);
 	});
 
@@ -68,8 +72,26 @@ describe('deliver at a set time', () => {
 		const { env } = setup();
 		env.PUSH_QUEUE = { send: async () => Promise.reject(new Error('down')) };
 		const sent: string[] = [];
-		const result = await deliver(env, [item(1)], async (s) => (sent.push(s.endpoint), 'sent'), Date.now() + 30_000);
+		const result = await deliver(env, [item(1)], async (s) => (sent.push(s.endpoint), 'sent'), NOW + 30_000);
 		expect([result, sent.length]).toEqual([{ sent: 1, queued: 0 }, 1]);
+	});
+
+	it('sends now only the ones it could not queue, when queueing stops partway', async () => {
+		const { env } = setup();
+		const held: string[] = [];
+		let calls = 0;
+		env.PUSH_QUEUE = {
+			send: async (part) => {
+				if (++calls > 1) throw new Error('down');
+				held.push(...part.items.map((i) => i.endpoint));
+			}
+		};
+		const sent: string[] = [];
+		const result = await deliver(env, Array.from({ length: 50 }, (_, n) => item(n)), async (s) => (sent.push(s.endpoint), 'sent'), NOW + 30_000);
+		expect(result).toEqual({ sent: 10, queued: 40 });
+		expect(held).toHaveLength(40);
+		expect(sent).toHaveLength(10);
+		expect(new Set([...held, ...sent]).size).toBe(50);
 	});
 });
 
