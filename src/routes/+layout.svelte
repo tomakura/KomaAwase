@@ -6,7 +6,7 @@
 	import '@fontsource/zen-maru-gothic/500.css';
 	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
-	import { beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
 	import { SvelteSet } from 'svelte/reactivity';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
@@ -38,6 +38,27 @@
 		await refreshAll();
 	}
 
+	// A warning sent while the app is open. The layout's data is read only when the app opens (or
+	// comes back after STALE_AFTER), so it is looked for as pages change and when the app comes
+	// back to the front, at most once every WARNING_CHECK_EVERY.
+	const WARNING_CHECK_EVERY = 10 * 1000;
+	let warningCheckedAt = 0;
+	async function checkWarning() {
+		if (!data.signedIn || warning || connection.blocked || Date.now() - warningCheckedAt < WARNING_CHECK_EVERY) return;
+		warningCheckedAt = Date.now();
+		try {
+			const res = await fetch('/api/warning');
+			if (!res.ok) return;
+			const { id } = (await res.json()) as { id: string | null };
+			if (id && !answered.has(id)) await refreshAll();
+		} catch {
+			// Asked again at the next page
+		}
+	}
+	afterNavigate(({ type }) => {
+		if (type !== 'enter') void checkWarning();
+	});
+
 	// Back in the app after a while (it stays open in the background on a phone): show what
 	// changed meanwhile, such as a friend's timetable or a finished screenshot. (refreshAll, not
 	// invalidateAll, which would also close a course opened over the timetable.)
@@ -49,6 +70,7 @@
 			// Not while the connection is down: the copy on screen is all there is (src/lib/connection.svelte.ts
 			// loads it again once it's back)
 			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER && !connection.blocked) refreshAll();
+			else if (hiddenAt) void checkWarning();
 		};
 		document.addEventListener('visibilitychange', changed);
 		return () => document.removeEventListener('visibilitychange', changed);
@@ -158,14 +180,15 @@
 <ConnectionBar />
 <StatusStrip />
 <NavigationWait />
-<!-- Behind a warning nothing can be reached -->
-<div style="display: contents" inert={!!warning}>{@render children()}</div>
+<!-- A warning is all there is until it is answered: nothing else is drawn behind it or over it
+	 (a sheet or a dialog would cover it), and the page from the server is the warning alone -->
 {#if warning}
 	<WarningScreen id={warning.id} body={warning.body} onack={() => acknowledge(warning.id)} />
+{:else}
+	{@render children()}
+	<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
+	<!-- One screen at a time: the notification one waits while the enrollment one is due -->
+	<ConfirmDialog />
+	<Toast />
+	<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />
 {/if}
-
-<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
-<!-- One screen at a time: the notification one waits while the enrollment one is due -->
-<ConfirmDialog />
-<Toast />
-<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />
