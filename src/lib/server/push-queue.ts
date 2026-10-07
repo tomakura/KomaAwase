@@ -94,29 +94,15 @@ async function enqueue(env: PushEnv, items: PushItem[], attempt: number, delaySe
 /**
  * Sends a message to each phone: the first SENDS_MAX now, the rest through the queue. The
  * ones that fail now are tried again through the queue too. Returns how many it sent now and
- * how many it queued. With `at` still a second or more away, all of them go through the queue,
- * held until then.
+ * how many it queued. Given the time it is `at`, nothing out of date by then is sent (a minute
+ * sent late, after the clock stopped: src/lib/server/minute-clock.ts).
  */
 export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPush = sendPush, at?: number) {
-	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !all.length) return { sent: 0, queued: 0 };
-	const wait = at === undefined ? 0 : Math.floor((at - Date.now()) / 1000);
-	// How many are held in the queue; if queueing stops partway, the rest are sent now instead
-	let held = 0;
-	if (wait >= 1 && env.PUSH_QUEUE) {
-		try {
-			for (; held < all.length; held += SENDS_MAX) {
-				await env.PUSH_QUEUE.send({ items: all.slice(held, held + SENDS_MAX), attempt: 1 }, { delaySeconds: wait });
-			}
-			return { sent: 0, queued: all.length };
-		} catch (e) {
-			// Better early than not at all
-			console.error('push: queueing for later failed', e);
-		}
-	}
-	const items = all.slice(held);
-	let queued = held;
+	const items = at === undefined ? all : all.filter((item) => at <= item.expires);
+	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !items.length) return { sent: 0, queued: 0 };
+	let queued = 0;
 	try {
-		queued += await enqueue(env, items.slice(SENDS_MAX), 1);
+		queued = await enqueue(env, items.slice(SENDS_MAX), 1);
 	} catch (e) {
 		console.error('push: queueing failed', e);
 	}

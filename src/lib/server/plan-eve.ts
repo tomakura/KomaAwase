@@ -35,7 +35,7 @@ LEFT JOIN courses c ON c.id = e.course_id
 WHERE e.date = ?`;
 
 /** Sends this minute's share. Returns how many notifications it tried to send. */
-export async function sendPlanEve(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush) {
+export async function sendPlanEve(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush, sendAt?: number) {
 	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return 0;
 	const now = tokyoTime(scheduledTime);
 	const slot = Math.floor(now.minutes) - EVE_START;
@@ -76,7 +76,7 @@ export async function sendPlanEve(env: PushEnv, scheduledTime: number, send: typ
 		message: eveMessage(byUser.get(d.userId) ?? [], tomorrow),
 		expires
 	}));
-	const { sent, queued } = await deliver(env, items, send, scheduledTime);
+	const { sent, queued } = await deliver(env, items, send, sendAt);
 	console.log(`plan eve: sent ${sent}, queued ${queued}`);
 	return sent + queued;
 }

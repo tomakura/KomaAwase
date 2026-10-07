@@ -11,6 +11,10 @@ export const METRICS = {
 	// Notifications that reached the push service, and the ones that didn't
 	pushOk: 'push_ok',
 	pushFailed: 'push_failed',
+	// Each minute the notifications were looked for (total_ms: how late after the minute began),
+	// and the ones 10 seconds or more late
+	notifyMinute: 'notify_minute',
+	notifyLate: 'notify_late',
 	// Screenshots read (total_ms: from upload to done) and the ones that failed
 	importOk: 'import_ok',
 	importFailed: 'import_failed',

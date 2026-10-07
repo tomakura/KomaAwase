@@ -75,7 +75,7 @@
 		<div class="table">
 			<table>
 				<thead>
-					<tr><th>日</th><th>エラー</th><th>通知の失敗</th><th>読み取り</th><th>失敗</th><th>平均</th><th>メール失敗</th></tr>
+					<tr><th>日</th><th>エラー</th><th>通知の失敗</th><th>通知の遅れ</th><th>読み取り</th><th>失敗</th><th>平均</th><th>メール失敗</th></tr>
 				</thead>
 				<tbody>
 					{#each data.days as d (d.day)}
@@ -83,13 +83,14 @@
 							<td>{d.day.slice(5).replace('-', '/')}</td>
 							<td>{d.errors}</td>
 							<td>{percent(d.pushFailed, d.pushOk)}</td>
+							<td>{d.notifyLateSec === null ? '-' : `${d.notifyLateSec}秒`}{d.notifyLate ? `（10秒以上 ${d.notifyLate}回）` : ''}</td>
 							<td>{d.importOk + d.importFailed}</td>
 							<td>{percent(d.importFailed, d.importOk)}</td>
 							<td>{d.importAvgMin === null ? '-' : `${d.importAvgMin}分`}</td>
 							<td>{d.mailFailed}</td>
 						</tr>
 					{:else}
-						<tr><td colspan="7">まだ数がありません</td></tr>
+						<tr><td colspan="8">まだ数がありません</td></tr>
 					{/each}
 				</tbody>
 			</table>

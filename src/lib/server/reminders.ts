@@ -94,7 +94,7 @@ type Row = {
  * once go through the push queue: src/lib/server/push-queue.ts). Returns how many it sent or
  * queued. A notification not sent by the time the class starts is dropped.
  */
-export async function sendDueReminders(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush) {
+export async function sendDueReminders(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush, sendAt?: number) {
 	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return 0;
 	const now = tokyoTime(scheduledTime);
 	const year = academicYear(now.date);
@@ -123,7 +123,7 @@ export async function sendDueReminders(env: PushEnv, scheduledTime: number, send
 		// Not after the class has started
 		expires: scheduledTime + (r.lead + 1) * 60_000
 	}));
-	const { sent, queued } = await deliver(env, items, send, scheduledTime);
+	const { sent, queued } = await deliver(env, items, send, sendAt);
 	console.log(`class reminders: sent ${sent}, queued ${queued}`);
 	return sent + queued;
 }
