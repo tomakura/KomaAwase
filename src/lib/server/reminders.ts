@@ -123,7 +123,7 @@ export async function sendDueReminders(env: PushEnv, scheduledTime: number, send
 		// Not after the class has started
 		expires: scheduledTime + (r.lead + 1) * 60_000
 	}));
-	const { sent, queued } = await deliver(env, items, send);
+	const { sent, queued } = await deliver(env, items, send, scheduledTime);
 	console.log(`class reminders: sent ${sent}, queued ${queued}`);
 	return sent + queued;
 }

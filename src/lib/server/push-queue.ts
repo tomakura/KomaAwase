@@ -94,10 +94,20 @@ async function enqueue(env: PushEnv, items: PushItem[], attempt: number, delaySe
 /**
  * Sends a message to each phone: the first SENDS_MAX now, the rest through the queue. The
  * ones that fail now are tried again through the queue too. Returns how many it sent now and
- * how many it queued.
+ * how many it queued. With `at` still a second or more away, all of them go through the queue,
+ * held until then.
  */
-export async function deliver(env: PushEnv, items: PushItem[], send: typeof sendPush = sendPush) {
+export async function deliver(env: PushEnv, items: PushItem[], send: typeof sendPush = sendPush, at?: number) {
 	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !items.length) return { sent: 0, queued: 0 };
+	const wait = at === undefined ? 0 : Math.floor((at - Date.now()) / 1000);
+	if (wait >= 1 && env.PUSH_QUEUE) {
+		try {
+			return { sent: 0, queued: await enqueue(env, items, 1, wait) };
+		} catch (e) {
+			// Better early than not at all
+			console.error('push: queueing for later failed', e);
+		}
+	}
 	let queued = 0;
 	try {
 		queued = await enqueue(env, items.slice(SENDS_MAX), 1);

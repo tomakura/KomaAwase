@@ -72,10 +72,13 @@ export default {
 	 */
 	async scheduled(controller, env, ctx) {
 		if (controller.cron === REMINDER_CRON) {
-			ctx.waitUntil(sendDueReminders(env, controller.scheduledTime));
+			// The cron can start a minute or so late, so each run looks for what is due the next
+			// minute and has the push queue hold it until then
+			const next = controller.scheduledTime + 60_000;
+			ctx.waitUntil(sendDueReminders(env, next));
 			// 20:00 to 20:09 in Japan (11:00 UTC), when it has anything to do
-			ctx.waitUntil(sendPlanEve(env, controller.scheduledTime));
-			ctx.waitUntil(sendTaskReminders(env, controller.scheduledTime));
+			ctx.waitUntil(sendPlanEve(env, next));
+			ctx.waitUntil(sendTaskReminders(env, next));
 		} else {
 			ctx.waitUntil(internal(env, ctx, '/internal/daily', {}));
 		}

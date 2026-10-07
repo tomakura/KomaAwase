@@ -44,6 +44,35 @@ describe('deliver', () => {
 	});
 });
 
+describe('deliver at a set time', () => {
+	it('queues all of them, held until then', async () => {
+		const { env, queued } = setup();
+		const sent: string[] = [];
+		const result = await deliver(env, Array.from({ length: 50 }, (_, n) => item(n)), async (s) => (sent.push(s.endpoint), 'sent'), Date.now() + 30_500);
+		expect(result).toEqual({ sent: 0, queued: 50 });
+		expect(sent).toHaveLength(0);
+		expect(queued.map((q) => [q.part.items.length, q.part.attempt, q.delay])).toEqual([
+			[40, 1, 30],
+			[10, 1, 30]
+		]);
+	});
+
+	it('sends now when the time has come', async () => {
+		const { env, queued } = setup();
+		const sent: string[] = [];
+		const result = await deliver(env, [item(1)], async (s) => (sent.push(s.endpoint), 'sent'), Date.now() - 5_000);
+		expect([result, sent.length, queued.length]).toEqual([{ sent: 1, queued: 0 }, 1, 0]);
+	});
+
+	it('sends now when it cannot queue', async () => {
+		const { env } = setup();
+		env.PUSH_QUEUE = { send: async () => Promise.reject(new Error('down')) };
+		const sent: string[] = [];
+		const result = await deliver(env, [item(1)], async (s) => (sent.push(s.endpoint), 'sent'), Date.now() + 30_000);
+		expect([result, sent.length]).toEqual([{ sent: 1, queued: 0 }, 1]);
+	});
+});
+
 describe('sendPart', () => {
 	it('sends what is not out of date', async () => {
 		const { env } = setup();
