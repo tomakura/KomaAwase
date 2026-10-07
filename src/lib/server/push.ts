@@ -106,7 +106,9 @@ export async function sendPush(
 			'content-encoding': 'aes128gcm',
 			'content-type': 'application/octet-stream',
 			ttl: String(24 * 60 * 60),
-			urgency: 'normal'
+			// Every message is due at a set time; at 'normal' the push service may hold it about a
+			// minute to save the phone's battery
+			urgency: 'high'
 		},
 		body,
 		signal: AbortSignal.timeout(10_000)
