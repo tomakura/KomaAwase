@@ -228,6 +228,7 @@
 		<a
 			class="back"
 			href={backHref}
+			data-back={onback ? undefined : ''}
 			onclick={(e) => {
 				if (!onback) return;
 				e.preventDefault();

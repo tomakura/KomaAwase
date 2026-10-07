@@ -12,7 +12,9 @@
 	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
 	import UnscheduledCards from '$lib/components/UnscheduledCards.svelte';
+	import { awaited } from '$lib/awaiting.svelte';
 	import { liveClock } from '$lib/clock.svelte';
+	import { connection } from '$lib/connection.svelte';
 	import { courseHref, timetableHref } from '$lib/courses';
 	import { motion } from '$lib/motion';
 	import { currentTerm, termIsOn } from '$lib/terms';
@@ -49,6 +51,8 @@
 	// goes the usual way.
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
 	const EDIT = /^\/courses\/(?!new$|search$)[^/]+\/edit$/;
+	// How long a course may take to be read before the connection counts as bad
+	const SLOW_COURSE = 3_000;
 
 	// On a wide screen (a computer) the course opens beside the timetable instead of over it,
 	// and is edited there too; the timetable stays usable next to it.
@@ -87,8 +91,15 @@
 		e.preventDefault();
 		const href = url.pathname + url.search;
 		try {
-			const result = await preloadData(href);
-			if (result.type === 'loaded' && result.status === 200) {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const result = await awaited(
+				Promise.race([preloadData(href), new Promise<null>((resolve) => (timer = setTimeout(resolve, SLOW_COURSE, null)))])
+			);
+			clearTimeout(timer);
+			// Too slow: the connection is likely bad. The course opens as a page of its own, from
+			// the copy on the device if there is one (or says it can't be opened now)
+			if (!result) connection.waited();
+			else if (result.type === 'loaded' && result.status === 200) {
 				if (editing) return pushState(href, { course: page.state.course, edit: result.data as NonNullable<typeof page.state.edit> });
 				const state = { course: result.data as NonNullable<typeof page.state.course> };
 				// Beside the timetable, another course takes the place of the one open
