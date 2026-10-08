@@ -304,6 +304,12 @@
 					</svg>
 					編集
 				</a>
+				{#if close}
+					<!-- Shown only beside the timetable on a wide screen (see the home page), where there is no backdrop to tap -->
+					<button class="side-close" type="button" aria-label="閉じる" onclick={() => close()}>
+						<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+					</button>
+				{/if}
 			</div>
 			<div class="chips">
 				{#each course.slots as slot, i (i)}
@@ -925,6 +931,21 @@
 		font-size: 13px;
 		font-weight: 700;
 		text-decoration: none;
+	}
+
+	.side-close {
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
+		display: none;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: 1px solid var(--line-bold);
+		border-radius: 10px;
+		background: none;
+		color: var(--ink);
+		cursor: pointer;
 	}
 
 	svg {

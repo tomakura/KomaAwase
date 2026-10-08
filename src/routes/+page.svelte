@@ -75,6 +75,15 @@
 		});
 	}
 
+	// Beside the timetable, Escape closes the course (not while editing it, typing, or in a dialog)
+	function closeOnEscape(e: KeyboardEvent) {
+		if (e.key !== 'Escape' || e.defaultPrevented || !wide || !page.state.course || page.state.edit) return;
+		const target = e.target as Element | null;
+		if (target?.closest?.('input, textarea, select, [contenteditable], dialog')) return;
+		if (document.querySelector('dialog[open]')) return;
+		history.back();
+	}
+
 	async function openCourse(e: MouseEvent) {
 		if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 		const link = (e.target as Element | null)?.closest?.('a');
@@ -119,7 +128,7 @@
 	}
 </script>
 
-<svelte:window onclickcapture={openCourse} />
+<svelte:window onclickcapture={openCourse} onkeydown={closeOnEscape} />
 
 <svelte:head>
 	<title>時間割 · コマあわせ</title>
@@ -298,6 +307,10 @@
 		.course-over.side :global(.scrim),
 		.course-over.side :global(.grabber) {
 			display: none;
+		}
+
+		.course-over.side :global(.side-close) {
+			display: flex;
 		}
 
 		.course-over.side :global(.course-sheet) {
