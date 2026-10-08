@@ -13,7 +13,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="退会する" back="/more" />
+	<PageHeader title="退会する" back="/more/account" />
 	<form
 		class="body"
 		method="POST"

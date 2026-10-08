@@ -11,7 +11,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="ニックネーム" back="/more" />
+	<PageHeader title="ニックネーム" back="/more/account" />
 	<form method="POST" use:enhance>
 		<label class="field">
 			ニックネーム（友だちに表示されます）

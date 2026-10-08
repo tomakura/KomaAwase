@@ -23,7 +23,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="ログイン中の端末" back="/more" />
+	<PageHeader title="ログイン中の端末" back="/more/account" />
 	<div class="body">
 		<p class="ui-note">ログインしている端末を確かめて、ログアウトさせられます。</p>
 		<div class="ui-list">
