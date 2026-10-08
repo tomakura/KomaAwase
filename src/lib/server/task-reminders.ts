@@ -8,7 +8,7 @@ import { eveSlot } from '../plan-eve';
 import { LEADS, MORNING_MINUTES, MORNING_START, leadMessage, morningMessage, type TaskItem } from '../task-reminders';
 import { addDays, tokyoTime } from '../time';
 import { sendPush } from './push';
-import { deliver, type PushEnv } from './push-queue';
+import { deliver, type DeliverOptions, type PushEnv } from './push-queue';
 
 type Row = TaskItem & { userId: string; notify: string | null };
 type Device = { id: string; userId: string; endpoint: string; p256dh: string; auth: string };
@@ -48,7 +48,7 @@ function allowed(r: Row, kind: NotifyKind, minutes: number) {
 }
 
 /** Sends this minute's homework notifications. Returns how many it sent or queued. */
-export async function sendTaskReminders(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush, dropLate = false) {
+export async function sendTaskReminders(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush, options: DeliverOptions = {}) {
 	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return 0;
 	const now = tokyoTime(scheduledTime);
 	const minute = Math.floor(now.minutes);
@@ -87,7 +87,7 @@ export async function sendTaskReminders(env: PushEnv, scheduledTime: number, sen
 			.map((d) => ({ deviceId: d.id, endpoint: d.endpoint, p256dh: d.p256dh, auth: d.auth, message: i.message, expires: i.expires }))
 	);
 	if (!out.length) return 0;
-	const { sent, queued } = await deliver(env, out, send, dropLate);
+	const { sent, queued } = await deliver(env, out, send, options);
 	console.log(`task reminders: sent ${sent}, queued ${queued}`);
 	return sent + queued;
 }
