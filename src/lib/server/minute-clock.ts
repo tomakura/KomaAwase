@@ -40,8 +40,8 @@ export function isApple(endpoint: string) {
 	}
 }
 
-// One notification on one phone; notifications of one thing share a tag
-const keyOf = (item: PushItem) => `${item.deviceId} ${(item.message as { tag?: string }).tag ?? JSON.stringify(item.message)}`;
+// One notification on one phone, as it reads (one changed since is sent again, in its place)
+const keyOf = (item: PushItem) => JSON.stringify([item.deviceId, item.message]);
 
 async function sendAll(env: PushEnv, minute: number, options: DeliverOptions) {
 	const results = await Promise.allSettled([

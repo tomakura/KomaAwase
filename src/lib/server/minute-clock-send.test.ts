@@ -54,12 +54,18 @@ describe('iPhones sent early', () => {
 		const early = await runEarly(env, MINUTE_2259);
 		expect(sent).toEqual([`${IPHONE} あと1時間：レポート`]);
 
-		// Homework added in between
+		// Homework added, and another changed, in between
 		run(`INSERT INTO course_notes (id, course_id, kind, body, due, due_time) VALUES ('n2', 'c1', 'task', '小テスト', '2026-09-29', '23:59')`);
+		run(`UPDATE course_notes SET body = 'レポート2' WHERE id = 'n1'`);
 		sent.length = 0;
 		vi.setSystemTime(MINUTE_2259);
 		expect(await runMinute(env, MINUTE_2259, MINUTE_2259, new Set(early))).toBe(true);
-		expect(sent.sort()).toEqual([`${ANDROID} あと1時間：レポート`, `${ANDROID} あと1時間：小テスト`, `${IPHONE} あと1時間：小テスト`]);
+		expect(sent.sort()).toEqual([
+			`${ANDROID} あと1時間：レポート2`,
+			`${ANDROID} あと1時間：小テスト`,
+			`${IPHONE} あと1時間：レポート2`,
+			`${IPHONE} あと1時間：小テスト`
+		]);
 		vi.useRealTimers();
 	});
 });
