@@ -37,13 +37,21 @@
 
 	// A course's page. It is the page of /courses/[id], and also opens over the timetable without
 	// leaving it (see the home page): then `close` and `refresh` are given, since the timetable
-	// stays where it was and this is only shown on top of it.
+	// stays where it was and this is only shown on top of it. `side`: beside the timetable on a
+	// wide screen, where the home page moves it in and out instead of it sliding up.
 	let {
 		data,
 		form,
 		close,
-		refresh
-	}: { data: PageData; form?: ActionData; close?: () => unknown; refresh?: () => unknown } = $props();
+		refresh,
+		side = false
+	}: {
+		data: PageData;
+		form?: ActionData;
+		close?: () => unknown;
+		refresh?: () => unknown;
+		side?: boolean;
+	} = $props();
 
 	// After a form is answered. Over the timetable, everything is not loaded again (the address
 	// is the course's own page, which is where that would take us): the course is read again.
@@ -307,8 +315,8 @@
 	<!-- Over the timetable it slides up and down itself (a page change is animated by the browser, see app.css) -->
 	<div
 		class="sheet course-sheet"
-		in:fly|global={{ y: '100%', duration: close && !still() ? 300 : 0, opacity: 1 }}
-		out:fly|global={{ y: '100%', duration: close && !still() ? 240 : 0, opacity: 1 }}
+		in:fly|global={{ y: '100%', duration: close && !side && !still() ? 300 : 0, opacity: 1 }}
+		out:fly|global={{ y: '100%', duration: close && !side && !still() ? 240 : 0, opacity: 1 }}
 		use:swipeDown={dismiss}
 	>
 		<div class="grabber"><span></span></div>

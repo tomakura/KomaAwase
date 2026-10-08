@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { verifyHref } from '$lib/verify-prompt';
 	import { untrack } from 'svelte';
-	import { fade } from 'svelte/transition';
+	import { fade, fly } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import CourseDetail from '$lib/components/CourseDetail.svelte';
 	import CourseEdit from './courses/[id]/edit/+page.svelte';
@@ -64,6 +64,13 @@
 		query.addEventListener('change', changed);
 		return () => query.removeEventListener('change', changed);
 	});
+
+	// Beside the timetable the course comes out from behind it, to the right, as the timetable
+	// moves over to the left (see .screen below), and goes back behind it the same way. Over the
+	// timetable it fades in, and slides up and down itself.
+	const SIDE_MS = 300;
+	const enter = (node: Element) => (wide ? fly(node, { x: -240, ...motion(SIDE_MS) }) : fade(node, motion(200)));
+	const leave = (node: Element) => (wide ? fly(node, { x: -240, ...motion(SIDE_MS) }) : fade(node, motion(240)));
 
 	// Back to the course from editing it, once the browser has gone back
 	function back() {
@@ -243,7 +250,7 @@
 </div>
 
 {#if page.state.course}
-	<div class="course-over" class:side={wide} data-swipe-scroll in:fade={motion(200)} out:fade={motion(240)}>
+	<div class="course-over" class:side={wide} data-swipe-scroll in:enter out:leave>
 		{#if wide && page.state.edit}
 			<CourseEdit
 				data={page.state.edit}
@@ -256,7 +263,7 @@
 				}}
 			/>
 		{:else}
-			<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} />
+			<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} side={wide} />
 		{/if}
 	</div>
 {/if}
@@ -294,8 +301,23 @@
 
 	/* Beside the timetable: the two side by side in the middle of the screen */
 	@media (min-width: 1024px) {
+		/* In front of the course beside it, which comes out from behind it */
+		.screen {
+			position: relative;
+			z-index: 31;
+			margin-left: calc(50% - 240px);
+			background: var(--bg);
+		}
+
 		.screen.with-side {
 			margin-left: calc(50% - 468px);
+		}
+
+		@media (prefers-reduced-motion: no-preference) {
+			.screen {
+				/* With the course (SIDE_MS, cubicOut) */
+				transition: margin-left 300ms cubic-bezier(0.215, 0.61, 0.355, 1);
+			}
 		}
 
 		.course-over.side {
