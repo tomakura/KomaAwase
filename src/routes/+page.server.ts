@@ -1,16 +1,19 @@
 import { redirect } from '@sveltejs/kit';
 import { takeNext } from '$lib/server/auth/next';
+import { SYNC_HEADER } from '$lib/offline';
 import { unreviewedImport } from '$lib/server/import/jobs';
 import { getOrCreateTimetable, loadTimetable } from '$lib/server/timetable';
 import { sharedAccess } from '$lib/server/verify';
 import { academicYear, tokyoTime } from '$lib/time';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, url, cookies }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies, request }) => {
 	if (!locals.user) redirect(303, '/login');
 	if (!locals.user.nickname) redirect(303, '/welcome');
 	if (!locals.user.setupAt) redirect(303, '/setup');
-	const next = takeNext(cookies);
+	// Only when the person opens the page: the app refreshing its copy in the background would
+	// use up the waiting place without anyone going there
+	const next = request.headers.has(SYNC_HEADER) ? null : takeNext(cookies);
 	if (next) redirect(303, next);
 	// Passed down so the first render in the browser matches the server's.
 	const now = Date.now();
