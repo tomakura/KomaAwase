@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MINUTE, minutesDue, nextMinute } from './minute-clock';
+import { MINUTE, isApple, isEarly, minutesDue, nextAlarm, nextMinute } from './minute-clock';
 
 const at = (hhmmss: string) => Date.parse(`2026-10-07T${hhmmss}Z`);
 
@@ -29,5 +29,34 @@ describe('nextMinute', () => {
 		expect(nextMinute(at('13:03:00'))).toBe(at('13:04:00'));
 		expect(nextMinute(at('13:03:59.999'))).toBe(at('13:04:00'));
 		expect(nextMinute(at('13:03:00')) - at('13:03:00')).toBe(MINUTE);
+	});
+});
+
+describe('nextAlarm', () => {
+	it('is 15 seconds before the next minute, for the iPhones', () => {
+		expect(nextAlarm(at('13:03:00.004'))).toBe(at('13:03:45'));
+		expect(nextAlarm(at('13:03:44.999'))).toBe(at('13:03:45'));
+	});
+
+	it('is the next minute once those are sent', () => {
+		expect(nextAlarm(at('13:03:45'))).toBe(at('13:04:00'));
+		expect(nextAlarm(at('13:03:59.999'))).toBe(at('13:04:00'));
+	});
+});
+
+describe('isEarly', () => {
+	it('is the last 15 seconds of a minute', () => {
+		expect(isEarly(at('13:03:45.010'))).toBe(true);
+		expect(isEarly(at('13:03:00.010'))).toBe(false);
+		expect(isEarly(at('13:03:44.999'))).toBe(false);
+	});
+});
+
+describe('isApple', () => {
+	it('is the phones Apple sends to', () => {
+		expect(isApple('https://web.push.apple.com/QGx')).toBe(true);
+		expect(isApple('https://fcm.googleapis.com/fcm/send/abc')).toBe(false);
+		expect(isApple('https://evil.example/web.push.apple.com')).toBe(false);
+		expect(isApple('not a url')).toBe(false);
 	});
 });

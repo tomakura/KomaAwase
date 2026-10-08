@@ -30,8 +30,15 @@ describe('deliver', () => {
 		const { env, queued } = setup();
 		const sent: string[] = [];
 		const now = Date.now();
-		const result = await deliver(env, [item(1, now - 1_000), item(2, now + 60_000)], async (s) => (sent.push(s.endpoint), 'sent'), true);
+		const result = await deliver(env, [item(1, now - 1_000), item(2, now + 60_000)], async (s) => (sent.push(s.endpoint), 'sent'), { dropLate: true });
 		expect([result, sent, queued.length]).toEqual([{ sent: 1, queued: 0 }, ['https://push.example.test/2'], 0]);
+	});
+
+	it('sends only the phones picked', async () => {
+		const { env } = setup();
+		const sent: string[] = [];
+		await deliver(env, [item(1), item(2), item(3)], async (s) => (sent.push(s.endpoint), 'sent'), { pick: (i) => !i.endpoint.endsWith('2') });
+		expect(sent).toEqual(['https://push.example.test/1', 'https://push.example.test/3']);
 	});
 
 	it('sends 40 now and queues the rest in parts of 40', async () => {
