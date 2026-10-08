@@ -53,6 +53,21 @@
 		await refresh?.();
 	}
 
+	// Back to the timetable: over it, by going back; as a page of its own, as the back link does
+	function dismiss() {
+		if (close) close();
+		else goBack(timetableHref(data.termParam)) || goto(timetableHref(data.termParam));
+	}
+
+	// Escape closes it too (not while typing, or in a dialog over it)
+	function closeOnEscape(e: KeyboardEvent) {
+		if (e.key !== 'Escape' || e.defaultPrevented) return;
+		const target = e.target as Element | null;
+		if (target?.closest?.('input, textarea, select, [contenteditable], dialog')) return;
+		if (document.querySelector('dialog[open]')) return;
+		dismiss();
+	}
+
 	const course = $derived(data.course);
 	const periodNumbers = $derived(data.periods.map((p) => p.number));
 	const slotLabels = $derived(
@@ -274,6 +289,8 @@
 	</form>
 {/snippet}
 
+<svelte:window onkeydown={closeOnEscape} />
+
 <div class="page" class:over={!!close}>
 	<a
 		class="scrim"
@@ -292,7 +309,7 @@
 		class="sheet course-sheet"
 		in:fly|global={{ y: '100%', duration: close && !still() ? 300 : 0, opacity: 1 }}
 		out:fly|global={{ y: '100%', duration: close && !still() ? 240 : 0, opacity: 1 }}
-		use:swipeDown={() => (close ? close() : goBack(timetableHref(data.termParam)) || goto(timetableHref(data.termParam)))}
+		use:swipeDown={dismiss}
 	>
 		<div class="grabber"><span></span></div>
 
@@ -308,12 +325,10 @@
 					</svg>
 					編集
 				</a>
-				{#if close}
-					<!-- Shown only beside the timetable on a wide screen (see the home page), where there is no backdrop to tap -->
-					<button class="side-close" type="button" aria-label="閉じる" onclick={() => close()}>
-						<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-					</button>
-				{/if}
+				<!-- With a mouse, which can't pull the sheet down, and beside the timetable (see the home page) -->
+				<button class="close-x" type="button" aria-label="閉じる" onclick={dismiss}>
+					<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+				</button>
 			</div>
 			<div class="chips">
 				{#each course.slots as slot, i (i)}
@@ -937,7 +952,7 @@
 		text-decoration: none;
 	}
 
-	.side-close {
+	.close-x {
 		width: 36px;
 		height: 36px;
 		flex-shrink: 0;
@@ -950,6 +965,12 @@
 		background: none;
 		color: var(--ink);
 		cursor: pointer;
+	}
+
+	@media (hover: hover) and (pointer: fine) {
+		.close-x {
+			display: flex;
+		}
 	}
 
 	svg {
