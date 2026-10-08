@@ -97,7 +97,7 @@
 			use:enhance={() => async ({ update }) => update({ reset: false })}
 		>
 			<div class="share">
-				<span class="share-label">このグループへの時間割の見せ方</span>
+				<span class="field-label">このグループへの時間割の見せ方</span>
 				<Segmented
 					options={SHARE_CHOICES}
 					bind:value={share}
@@ -344,9 +344,9 @@
 			}}
 	>
 		<p class="ui-note">今の招待リンクは使えなくなります。</p>
-		<span class="share-label">使える期間</span>
+		<span class="field-label">使える期間</span>
 		<Segmented options={DAY_OPTIONS} bind:value={days} label="使える期間" name="days" />
-		<span class="share-label">参加できる人数</span>
+		<span class="field-label">参加できる人数</span>
 		<Segmented options={USE_OPTIONS} bind:value={uses} label="参加できる人数" name="uses" />
 		<button class="btn btn-primary" type="submit">作り直す</button>
 	</form>
@@ -445,7 +445,7 @@
 		padding: 12px;
 	}
 
-	.share-label {
+	.field-label {
 		font-size: 14px;
 		font-weight: 700;
 	}

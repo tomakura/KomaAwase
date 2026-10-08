@@ -23,7 +23,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="在籍確認" back={data.from ?? '/more'} />
+	<PageHeader title="在籍確認" back={data.from ?? '/more/account'} />
 	<div class="body">
 		{#if data.verification?.current}
 			<div class="status">
