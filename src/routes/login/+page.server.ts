@@ -12,6 +12,8 @@ export const load: PageServerLoad = ({ locals, url, cookies, platform }) => {
 	// Signed in already: only asked to sign in again (before leaving the app, say)
 	const reauth = locals.user ? readReauth(url.searchParams.get('reauth')) : null;
 	if (locals.user && !reauth) redirect(303, safeNext(next) ?? '/');
+	// A sign-in again left unfinished must not steer this ordinary one
+	if (!reauth) rememberReauthNext(cookies, null);
 	return {
 		next: reauth ? rememberReauthNext(cookies, next) : rememberNext(cookies, next),
 		reauth: reauth && { lead: REAUTH[reauth].lead, back: REAUTH[reauth].back },
