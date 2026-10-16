@@ -3,6 +3,7 @@
 declare global {
 	// Set by vite.config.ts from scripts/app-version.mjs
 	const __APP_VERSION__: string;
+	const __PR_VERSIONS__: Record<string, string>;
 
 	// Secrets are not in wrangler.jsonc, so `wrangler types` does not know about them.
 	interface Env {

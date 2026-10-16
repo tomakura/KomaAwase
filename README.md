@@ -35,7 +35,7 @@ npm run db:generate        # src/lib/server/db/schema.ts を変えたあと、�
 
 `main` に push（PR のマージ）すると、Cloudflare の Workers Builds が `npm run build` と `npx wrangler deploy` を実行して本番に出す。手元から出すときも同じ2つ。GitHub Actions は型チェック・テスト・ビルドだけ行う。
 
-アプリで見える変更は、PR で `src/lib/releases.ts`（更新情報）の出す日の所に「〜を追加」「〜を修正」の形で1行足す。バージョン（例：`2026.10.16-002`）はビルドのときに、その日の何回目の `main` への変更かから付く（`scripts/app-version.mjs`）。
+アプリで見える変更は、PR で `src/lib/releases.ts`（更新情報）の先頭に、PR の番号と出す日で「〜を追加」「〜を修正」の形の1件を足す。バージョン（例：`2026.10.16-002`）はビルドのときに、その日の何回目の `main` への変更かから付き、更新情報の見出しも PR の番号から同じように付く（`scripts/app-version.mjs`）。
 
 マイグレーションは自動では適用されない。テーブルやカラムを変える変更は、マージの前に `npx wrangler d1 migrations apply DB --remote` を流す（その前に Time Travel の bookmark を控える）。
 

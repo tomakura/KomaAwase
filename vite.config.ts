@@ -2,7 +2,9 @@ import adapter from '@sveltejs/adapter-cloudflare';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, type Plugin } from 'vite';
 import { CSP_DIRECTIVES } from './src/lib/security.ts';
-import { appVersion } from './scripts/app-version.mjs';
+import { appVersions } from './scripts/app-version.mjs';
+
+const versions = appVersions();
 
 // Fontsource's CSS offers each font as woff2 with a woff fallback. Every browser the app
 // runs in takes woff2, so the woff copies are left out of the build.
@@ -16,7 +18,7 @@ const woff2Only: Plugin = {
 
 export default defineConfig({
 	// Shown on このアプリについて and 更新情報 (src/lib/version.ts)
-	define: { __APP_VERSION__: JSON.stringify(appVersion()) },
+	define: { __APP_VERSION__: JSON.stringify(versions.current), __PR_VERSIONS__: JSON.stringify(versions.byPr) },
 	plugins: [
 		woff2Only,
 		sveltekit({
