@@ -6,6 +6,7 @@
 export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
+	{ pr: 65, date: '2026-10-16', items: ['更新情報の見出しをバージョンごとに変更'] },
 	{ pr: 64, date: '2026-10-16', items: ['アプリの説明文を見直し'] },
 	{ pr: 63, date: '2026-10-16', items: ['更新情報のページを追加。バージョンを日付で表示するように変更'] },
 	{
