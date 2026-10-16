@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { passkeys, users } from '$lib/server/db/schema';
 import { SUSPENDED_MESSAGE } from '$lib/moderation';
 import { consumeEmailToken, peekEmailToken } from '$lib/server/auth/email';
-import { takeNext } from '$lib/server/auth/next';
+import { takeSignInNext } from '$lib/server/auth/next';
 import { signIn } from '$lib/server/auth/session';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -30,6 +30,6 @@ export const actions: Actions = {
 			.where(eq(passkeys.userId, user.id))
 			.get();
 		// Until the nickname, passkey and はじめの設定 are done, `next` waits for the home page.
-		redirect(303, user.nickname && hasPasskey ? (user.setupAt ? (takeNext(cookies) ?? '/') : '/setup') : '/welcome');
+		redirect(303, user.nickname && hasPasskey ? (user.setupAt ? (takeSignInNext(cookies) ?? '/') : '/setup') : '/welcome');
 	}
 };

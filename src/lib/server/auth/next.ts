@@ -32,6 +32,28 @@ export function takeNext(cookies: Cookies) {
 	return next;
 }
 
+// Where to go after signing in again (the admin pages, leaving the app). Kept apart from `next`,
+// which the home page follows: someone who backs out of signing in again must not be sent there
+// later. Only the sign-in itself reads it, and it doesn't outlast the sign-in mail.
+const REAUTH_NEXT_COOKIE = 'reauth_next';
+
+export function rememberReauthNext(cookies: Cookies, value: string | null) {
+	const next = safeNext(value);
+	if (next) cookies.set(REAUTH_NEXT_COOKIE, next, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 });
+	else cookies.delete(REAUTH_NEXT_COOKIE, { path: '/' });
+	return next;
+}
+
+/** Where a finished sign-in goes: back to what asked to sign in again, or else `next`. */
+export function takeSignInNext(cookies: Cookies) {
+	const again = safeNext(cookies.get(REAUTH_NEXT_COOKIE));
+	if (again) {
+		cookies.delete(REAUTH_NEXT_COOKIE, { path: '/' });
+		return again;
+	}
+	return takeNext(cookies);
+}
+
 // Where to go back to once the link in an enrollment mail is opened: the page that suggested
 // the check. Kept apart from `next`, which the home page follows as soon as it loads. The mail
 // relay takes only bare links, so this can't ride in the link and works in the same browser.
