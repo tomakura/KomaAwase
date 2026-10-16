@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { version } from '$app/environment';
 	import Icon from '$lib/components/Icon.svelte';
 	import LegalPage from '$lib/components/LegalPage.svelte';
+	import { APP_VERSION } from '$lib/version';
 
 	let { data } = $props();
 </script>
@@ -27,6 +27,9 @@
 				<span>開発を応援する</span><span class="ui-row-value"><Icon name="external" size={16} /></span>
 			</a>
 		{/if}
+		<a class="ui-row" href="/about/updates">
+			<span>更新情報</span><span class="ui-row-value">{APP_VERSION}<Icon name="chevron" size={16} /></span>
+		</a>
 		<a class="ui-row" href="/intro"><span>コマあわせとは（機能の紹介）</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/install"><span>ホーム画面に追加する方法</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
 		<a class="ui-row" href="/feedback?from=/about"><span>不具合・要望を送る</span><span class="ui-row-value"><Icon name="chevron" size={16} /></span></a>
@@ -42,7 +45,6 @@
 	<p class="small">
 		文字は Zen Maru Gothic と Zen Kaku Gothic New（SIL Open Font License）。SvelteKit、Drizzle ORM、SimpleWebAuthn、uqr などのオープンソースのソフトウェアと、Cloudflare の上で動いています。
 	</p>
-	<p class="small">バージョン {version}</p>
 </LegalPage>
 
 <style>

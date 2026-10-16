@@ -4,8 +4,9 @@
 	import PageHeader from './PageHeader.svelte';
 
 	// Terms, privacy and about: readable signed in or not.
-	let { title, updated, children }: { title: string; updated?: string; children: Snippet } = $props();
-	const back = $derived(page.data.signedIn ? '/more' : '/login');
+	let { title, updated, back: to, children }: { title: string; updated?: string; back?: string; children: Snippet } =
+		$props();
+	const back = $derived(to ?? (page.data.signedIn ? '/more' : '/login'));
 </script>
 
 <svelte:head>
