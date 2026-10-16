@@ -18,12 +18,12 @@ export function appVersion() {
 			try {
 				git('fetch', '--quiet', '--unshallow');
 			} catch {
-				// Counted below only if the day's commits are all there anyway
+				// Still shallow: only the date, below
 			}
 		}
 		const days = git('log', '--first-parent', '--format=%cd', '--date=format-local:%Y.%m.%d', 'HEAD').split('\n');
+		if (git('rev-parse', '--is-shallow-repository') === 'true') return days[0];
 		const other = days.findIndex((day) => day !== days[0]);
-		if (other === -1 && git('rev-parse', '--is-shallow-repository') === 'true') return days[0];
 		const count = other === -1 ? days.length : other;
 		return `${days[0]}-${String(count).padStart(3, '0')}`;
 	} catch {
