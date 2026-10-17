@@ -8,12 +8,16 @@ const BASE = 'https://koma.invalid';
 
 // Only paths on this site, never //other.example or /\other.example. The value is read the
 // way a browser reads it (tabs and newlines dropped, \ as /), so /%09/other.example can't
-// slip through either, and the path comes back in that read form.
+// slip through either, and the path comes back in that read form. That read form is checked
+// again: /.//other.example or /..//other.example reads back as //other.example, which a
+// browser takes as another site.
 export function safeNext(value: string | null | undefined) {
 	if (!value?.startsWith('/')) return null;
 	try {
 		const url = new URL(value, BASE);
-		return url.origin === BASE ? url.pathname + url.search + url.hash : null;
+		if (url.origin !== BASE) return null;
+		const path = url.pathname + url.search + url.hash;
+		return path.startsWith('//') || path.startsWith('/\\') ? null : path;
 	} catch {
 		return null;
 	}
