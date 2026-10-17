@@ -167,6 +167,7 @@ export async function verifyByGoogle(
 		userId: user.id,
 		universityId: university.id,
 		email: user.email,
+		mailbox: mailboxOf(user.email),
 		verifiedAt: new Date(),
 		expiresAt: verificationExpiry()
 	};
@@ -176,7 +177,7 @@ export async function verifyByGoogle(
 			db.update(users).set({ verifyPromptStage: null }).where(eq(users.id, user.id))
 		]);
 	} catch (e) {
-		// The address is unique: another account holds it
+		// The address and its mailbox are unique: another account holds one of them
 		console.error('enrollment check from Google sign-in failed', e);
 		return false;
 	}

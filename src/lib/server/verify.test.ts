@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import type { RequestEvent } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { finishVerification, mailboxOf, peekVerification, sendVerificationMail, startVerification, verificationOf } from './verify';
+import { finishVerification, mailboxOf, peekVerification, sendVerificationMail, startVerification, verificationOf, verifyByGoogle } from './verify';
 import { testDatabase } from '../../test/db';
 
 function world() {
@@ -29,7 +29,10 @@ async function confirm(t: World, userId: string, address: string) {
 
 const checks = (t: World) => t.rows(`SELECT user_id, email, mailbox FROM univ_verifications ORDER BY user_id`);
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
+});
 
 describe('mailboxOf', () => {
 	it('drops a +tag from the name, and nothing else', () => {
@@ -57,6 +60,7 @@ describe('enrollment checks by mailbox', () => {
 			locals: { user: { id: 'a', universityId: 'uni' }, db: t.db },
 			request: new Request('https://koma.example.test/more/verify', { method: 'POST', body: new URLSearchParams({ email: ' Taro+Koma@u.ac.jp ' }) }),
 			url: new URL('https://koma.example.test/more/verify'),
+			cookies: { get: () => undefined, set: () => {}, delete: () => {} },
 			platform: {
 				env: { EMAIL_LINK_LIMITER: { limit: async () => ({ success: true }) }, RELAY_URL: 'https://relay.example.test/send.php', RELAY_SECRET: 'secret' }
 			},
@@ -122,6 +126,19 @@ describe('enrollment checks by mailbox', () => {
 	});
 
 	// As migration 0030 leaves a second account on one mailbox: still checked, without the mailbox
+	it('holds the mailbox for a check from Google sign-in too', async () => {
+		const t = world();
+		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
+		expect(await verifyByGoogle(t.db, { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a' }, uni)).toBe(true);
+		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
+		// The mail can't add a second account on that mailbox, nor can another Google sign-in
+		const token = await link(t, 'b', 'taro+x@u.ac.jp');
+		expect(await finishVerification(t.db, token, 'b')).toBe('taken');
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		expect(await verifyByGoogle(t.db, { id: 'c', email: 'taro+y@u.ac.jp', googleSub: 'g-c' }, uni)).toBe(false);
+		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
+	});
+
 	it('refuses a check from before 0030 without its mailbox when it confirms again, and keeps it till then', async () => {
 		const t = world();
 		const later = Date.now() + 1000 * 60 * 60 * 24 * 30;
