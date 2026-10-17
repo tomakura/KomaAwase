@@ -814,6 +814,9 @@ export const contactMessages = sqliteTable(
 
 // Enrollment checks: a link sent to a university address was opened. One address
 // verifies one account at a time. Checks lapse each spring, when students re-confirm.
+// `email` is the address as verified; `mailbox` is it without a +tag (mailboxOf in verify.ts),
+// so taro+1@ and taro+2@ can't verify two accounts. Null only for checks from before 0030
+// whose mailbox another account's check already had.
 export const univVerifications = sqliteTable('univ_verifications', {
 	userId: text('user_id')
 		.primaryKey()
@@ -822,6 +825,7 @@ export const univVerifications = sqliteTable('univ_verifications', {
 		.notNull()
 		.references(() => universities.id),
 	email: text('email').notNull().unique(),
+	mailbox: text('mailbox').unique(),
 	verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }).notNull(),
 	expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
 });

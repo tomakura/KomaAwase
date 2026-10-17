@@ -20,6 +20,18 @@ export function verificationExpiry(now = Date.now()) {
 	return new Date(`${year + 1}-05-01T00:00:00+09:00`);
 }
 
+/**
+ * The mailbox an address reaches: without a +tag (taro+koma@u.ac.jp is taro@u.ac.jp), since
+ * university mail (Google Workspace, Microsoft 365) delivers those to the same inbox. One
+ * mailbox confirms one account. Subdomains stay apart. The mail still goes to the address as
+ * typed, and that is the address the check keeps and shows. Same as the backfill in 0030.
+ */
+export function mailboxOf(email: string) {
+	const at = email.indexOf('@');
+	const plus = email.indexOf('+');
+	return plus > 0 && plus < at ? email.slice(0, plus) + email.slice(at) : email;
+}
+
 /** The address to check, or the message to show. */
 export async function startVerification(db: Db, user: { id: string; universityId: string | null }, input: string) {
 	const email = normalizeEmail(input);
@@ -60,9 +72,12 @@ export async function dropToken(db: Db, token: string) {
 	await db.delete(verifyTokens).where(eq(verifyTokens.id, await hashToken(token)));
 }
 
+// The check that already has this address, or another address of its mailbox
+const heldBy = (email: string) => or(eq(univVerifications.email, email), eq(univVerifications.mailbox, mailboxOf(email)));
+
 /**
  * What an enrollment link is for, while it works: whose account, which university and
- * address, and whether that address already confirms someone else's account.
+ * address, and whether that address (or its mailbox) already confirms someone else's account.
  */
 export async function peekVerification(db: Db, token: string) {
 	const row = await db
@@ -82,15 +97,15 @@ export async function peekVerification(db: Db, token: string) {
 	const other = await db
 		.select({ userId: univVerifications.userId })
 		.from(univVerifications)
-		.where(and(eq(univVerifications.email, row.email), ne(univVerifications.userId, row.userId)))
+		.where(and(heldBy(row.email), ne(univVerifications.userId, row.userId)))
 		.get();
 	return { userId: row.userId, email: row.email, university: row.university ?? '', nickname: row.nickname, taken: !!other };
 }
 
 /**
  * Uses the link, for the account that asked for it only. An address that confirms another
- * account is refused ('taken'): the check never moves between accounts, so a link that
- * reached the wrong hands can't take it over.
+ * account, or another address of its mailbox, is refused ('taken'): the check never moves
+ * between accounts, so a link that reached the wrong hands can't take it over.
  */
 export async function finishVerification(db: Db, token: string, userId: string) {
 	const id = await hashToken(token);
@@ -105,11 +120,13 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 		userId: row.userId,
 		universityId: row.universityId,
 		email: row.email,
+		mailbox: mailboxOf(row.email),
 		verifiedAt: new Date(),
 		expiresAt: verificationExpiry()
 	};
 	// The link is used up in the same batch, so if saving fails it still works. The address
-	// is unique: when another account holds it, the insert fails and nothing changes.
+	// and its mailbox are unique: when another account holds either, the insert fails and
+	// nothing changes.
 	try {
 		await db.batch([
 			db
@@ -124,7 +141,7 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 		const taken = await db
 			.select({ userId: univVerifications.userId })
 			.from(univVerifications)
-			.where(and(eq(univVerifications.email, row.email), ne(univVerifications.userId, row.userId)))
+			.where(and(heldBy(row.email), ne(univVerifications.userId, row.userId)))
 			.get();
 		if (taken) return 'taken' as const;
 		throw e;
