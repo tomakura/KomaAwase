@@ -201,6 +201,15 @@ describe('cleanTitle', () => {
 		expect(cleanTitle('Sample Eng (Sample-A)')).toBe('Sample Eng (Sample-A)');
 		expect(cleanTitle('Sample (G)')).toBe('Sample (G)');
 	});
+
+	it('reads a long title quickly, however it is made', () => {
+		const start = performance.now();
+		expect(cleanTitle('a' + ' '.repeat(100_000) + 'a')).toBe('a');
+		expect(cleanTitle('【' + '履'.repeat(100_000) + '】】')).toBe('');
+		expect(cleanTitle('【履'.repeat(2_000) + '】x')).toBe('');
+		expect(cleanTitle('a' + '(G1)'.repeat(25_000))).toBe('a');
+		expect(performance.now() - start).toBeLessThan(1000);
+	});
 });
 
 describe('readImport titles', () => {
