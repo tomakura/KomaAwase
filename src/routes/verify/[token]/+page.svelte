@@ -15,7 +15,7 @@
 <AuthScreen subtitle="在籍確認">
 	{#if form?.university !== undefined}
 		<p role="status">{form.university}の在籍を確認できました。友だちや同じグループの人に「在籍確認済み」の印が見えます。</p>
-		<a class="btn btn-primary" href="/more/verify">コマあわせを開く</a>
+		<a class="btn btn-primary" href={form.next}>続ける</a>
 	{:else if form?.message || view === 'expired'}
 		<p class="error" role="alert">{form?.message ?? 'リンクの期限が切れているか、すでに使われています'}</p>
 		<a class="btn" href="/more/verify">もう一度申し込む</a>

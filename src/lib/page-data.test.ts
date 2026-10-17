@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SAVED_AT_HEADER } from './offline';
 import { pageData } from './page-data';
 
 const ORIGIN = 'https://koma.test';
@@ -106,6 +107,21 @@ describe('pageData', () => {
 		expect(await s.back('/friends')).toBe('A');
 		await settle();
 		expect(s.refreshed()).toBe(0);
+	});
+
+	it("does not take a copy from the device for the server's answer: it may be older than the one shown", async () => {
+		// The server answered "A" on the way in; behind the return, the service worker hands back its older copy
+		const answers = [new Response('A'), new Response('old', { headers: { [SAVED_AT_HEADER]: '1' } })];
+		let refreshed = 0;
+		const kept = pageData((async () => answers.shift()!) as typeof fetch, { origin: ORIGIN, path: () => '/friends', now: () => NOW, refresh: () => refreshed++ });
+		await kept.fetch(data('/friends'), {});
+		await settle();
+		kept.returningTo('/friends');
+		expect(await (await kept.fetch(data('/friends'), {})).text()).toBe('A');
+		await settle();
+		expect(refreshed).toBe(0);
+		kept.returningTo('/friends');
+		expect(await (await kept.fetch(data('/friends'), {})).text()).toBe('A');
 	});
 
 	it('goes to the server for a visit that is not a return', async () => {

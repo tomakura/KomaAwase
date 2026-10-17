@@ -148,7 +148,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="データの保存と復元" back="/more" />
+	<PageHeader title="データの保存と復元" back="/more/account" />
 
 	<section class="ui-section">
 		<h2 class="ui-section-title">保存する</h2>

@@ -17,6 +17,6 @@ export const actions: Actions = {
 			return fail(400, { message: `ニックネームは1〜${NICKNAME_MAX}文字で入れてください` });
 		}
 		await locals.db.update(users).set({ nickname }).where(eq(users.id, locals.user.id));
-		redirect(303, '/more');
+		redirect(303, '/more/account');
 	}
 };

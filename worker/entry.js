@@ -1,11 +1,10 @@
 // The Worker's entry point. SvelteKit answers web requests; the screenshot queue and the
 // daily sweep reuse its routes by calling them in-process, with a flag on env that a request
 // from outside can never carry (see src/lib/server/internal.ts).
+import { DurableObject } from 'cloudflare:workers';
 import sveltekit from '../.svelte-kit/cloudflare/_worker.js';
-import { sendPlanEve } from '../src/lib/server/plan-eve.ts';
+import { MINUTE, isEarly, minutesDue, nextAlarm, nextMinute, runEarly, runMinute } from '../src/lib/server/minute-clock.ts';
 import { sendPart } from '../src/lib/server/push-queue.ts';
-import { sendDueReminders } from '../src/lib/server/reminders.ts';
-import { sendTaskReminders } from '../src/lib/server/task-reminders.ts';
 
 // The cron in wrangler.jsonc that runs every minute; the other one is the daily sweep
 const REMINDER_CRON = '* * * * *';
@@ -23,6 +22,39 @@ function internal(env, ctx, path, body) {
 		body: JSON.stringify(body)
 	});
 	return sveltekit.fetch(request, Object.create(env, { KOMA_INTERNAL: { value: true } }), ctx);
+}
+
+/**
+ * Wakes the notifications at the start of each minute, and the iPhones' a little before
+ * (src/lib/server/minute-clock.ts). One of it, named 'minute'. Its alarm sets the next one
+ * before sending, so a failure can't stop it.
+ */
+export class MinuteClock extends DurableObject {
+	/** Sets the alarm when there is none, or when it should have gone off a while ago */
+	async ensure() {
+		const at = await this.ctx.storage.getAlarm();
+		const now = Date.now();
+		if (at === null || at < now - 2 * MINUTE) await this.ctx.storage.setAlarm(nextAlarm(now));
+	}
+
+	async alarm() {
+		const now = Date.now();
+		await this.ctx.storage.setAlarm(nextAlarm(now));
+		/** @type {number | undefined} */
+		const last = await this.ctx.storage.get('last');
+		/** @type {{ minute: number, sent: string[] } | undefined} */
+		const early = await this.ctx.storage.get('early');
+		for (const minute of minutesDue(last, now)) {
+			const sentEarly = early?.minute === minute ? new Set(early.sent) : undefined;
+			// A minute that failed stays unsent, to be tried with the next alarm
+			if (!(await runMinute(this.env, minute, now, sentEarly))) break;
+			await this.ctx.storage.put('last', minute);
+		}
+		if (isEarly(now)) {
+			const minute = nextMinute(now);
+			await this.ctx.storage.put('early', { minute, sent: await runEarly(this.env, minute) });
+		}
+	}
 }
 
 export default {
@@ -64,18 +96,14 @@ export default {
 	},
 
 	/**
-	 * The class reminders don't go through SvelteKit: they run every minute, so they must stay
-	 * light (src/lib/server/reminders.ts).
+	 * Every minute: only makes sure the clock that sends the notifications is running.
 	 * @param {ScheduledController} controller
 	 * @param {Env} env
 	 * @param {ExecutionContext} ctx
 	 */
 	async scheduled(controller, env, ctx) {
 		if (controller.cron === REMINDER_CRON) {
-			ctx.waitUntil(sendDueReminders(env, controller.scheduledTime));
-			// 20:00 to 20:09 in Japan (11:00 UTC), when it has anything to do
-			ctx.waitUntil(sendPlanEve(env, controller.scheduledTime));
-			ctx.waitUntil(sendTaskReminders(env, controller.scheduledTime));
+			ctx.waitUntil(env.CLOCK.get(env.CLOCK.idFromName('minute')).ensure());
 		} else {
 			ctx.waitUntil(internal(env, ctx, '/internal/daily', {}));
 		}

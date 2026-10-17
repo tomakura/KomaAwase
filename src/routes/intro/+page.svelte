@@ -58,7 +58,7 @@
 			時間割を友だちや仲間と重ねて、みんなが空いているコマをすぐ見つけられるアプリです。「今度いつ集まれる？」を話し合わずに決められます。
 		</p>
 		<div class="notes">
-			<span>無料</span><span>広告なし</span><span>スマホ・パソコンで使える</span>
+			<span>無料</span><span>スマホ・パソコンで使える</span>
 		</div>
 	</section>
 
@@ -106,7 +106,7 @@
 		{:else}
 			<a class="btn btn-primary" href="/login">はじめる</a>
 		{/if}
-		<p class="small">個人で開発して、無料で運営しています。</p>
+		<p class="small">個人で開発しています。</p>
 		<p class="small links"><a href="/terms">利用規約</a><a href="/privacy">プライバシーポリシー</a><a href="/about">このアプリについて</a></p>
 	</section>
 </div>

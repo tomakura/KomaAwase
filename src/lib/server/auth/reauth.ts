@@ -6,7 +6,7 @@ const MINUTE = 60 * 1000;
 
 // What asks to sign in again first: leaving the app, and the admin pages
 export const REAUTH = {
-	delete: { lead: '本人確認のため、もう一度ログインしてください。', back: '/more' },
+	delete: { lead: '本人確認のため、もう一度ログインしてください。', back: '/more/account' },
 	admin: { lead: '運営の画面を開く前に、もう一度ログインしてください。', back: '/more' }
 } as const;
 export type Reauth = keyof typeof REAUTH;
