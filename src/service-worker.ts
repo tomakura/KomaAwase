@@ -13,7 +13,7 @@
 import { build, files, version } from '$service-worker';
 import { PAGE_CACHE_PREFIX, SAVED_AT_HEADER, SYNC_HEADER, copyMaxAge, neverKept } from '$lib/offline';
 import { SECURITY_HEADERS, cspHeader, nonceOf } from '$lib/security';
-import { leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from '$lib/wait';
+import { isHtml, leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from '$lib/wait';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 const ASSETS = `assets-${version}`;
@@ -32,6 +32,11 @@ const sleep = (ms: number) => new Promise<null>((resolve) => setTimeout(resolve,
 
 // What the server answers when a page isn't the user's to see (any more), or not there
 const REFUSED = new Set([401, 403, 404, 410]);
+
+// Addresses that answered a slow navigation with something other than a page, which the
+// document waiting() writes can't show: they are opened again (see follow), and that time
+// handed to the network, for the browser to show as what they are
+const notPages = new Set<string>();
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -157,6 +162,8 @@ async function networkFirst(event: FetchEvent) {
 	const near = copy ? undefined : await copyOf(cache, nearKey(request));
 	try {
 		if (request.mode === 'navigate') {
+			// Not a page (see notPages): the browser is given the answer as it comes
+			if (notPages.delete(request.url)) return await network;
 			// A quick answer goes straight through; for a slow one the screen gets a spinner
 			const quick = await Promise.race([network, sleep(GRACE_MS)]);
 			return quick ?? waiting(event, network, copy, near);
@@ -176,11 +183,13 @@ async function networkFirst(event: FetchEvent) {
 // The document goes out before the server's headers are known, so it carries the same
 // security headers and policy as the server's pages (src/lib/security.ts), under a nonce of its
 // own that the page's scripts are given as they pass (renonce). Its status is always 200: an
-// error page still comes in it, as the page that says so.
+// error page still comes in it, as the page that says so. Only a page goes into it (isHtml):
+// a copy of anything else counts as none, and an answer of anything else is opened again.
 function waiting(event: FetchEvent, network: Promise<Response>, copy: Response | undefined, near: Response | undefined) {
 	const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
 	const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
-	event.waitUntil(follow(event.request, writable, network, copy, near, nonce));
+	const page = (kept: Response | undefined) => (kept && isHtml(kept.headers.get('content-type')) ? kept : undefined);
+	event.waitUntil(follow(event.request, writable, network, page(copy), page(near), nonce));
 	return new Response(readable, {
 		headers: { ...SECURITY_HEADERS, 'content-security-policy': cspHeader(nonce), 'content-type': 'text/html; charset=utf-8' }
 	});
@@ -215,6 +224,12 @@ async function follow(
 				() => null
 			);
 			await write(target ? leaveScript(target, nonce) : OFFLINE);
+		} else if (answer?.body && !isHtml(answer.headers.get('content-type'))) {
+			// Not a page (an icon photo, say), which would be read as HTML here: opened again,
+			// from the network this time (see notPages)
+			answer.body.cancel().catch(() => {});
+			notPages.add(request.url);
+			await write(leaveScript(request.url, nonce));
 		} else if (answer?.body) {
 			// Read whole to give its scripts the nonce (a tag can be split between two chunks)
 			await write(renonce(await answer.text(), nonceOf(answer.headers.get('content-security-policy')), nonce));

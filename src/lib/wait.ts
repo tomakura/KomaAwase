@@ -51,7 +51,15 @@ export function waitShell(theme: Theme, nonce: string) {
 /** The end of the stream, once the page is all there: the spinner goes (its stylesheets have loaded by now) */
 export const waitDone = (nonce: string) => `<script nonce="${nonce}">var e=document.getElementById("${WAIT_ID}");e&&e.remove()</script>`;
 
-/** For an answer that is a redirect, which a stream can't pass on: go where it goes */
+/**
+ * Whether an answer is a page, by its content type. Only a page may be written into the
+ * document: anything else (an icon photo, say) would be read there as HTML, whatever it is.
+ */
+export function isHtml(contentType: string | null) {
+	return /^text\/html\s*(;|$)/i.test(contentType?.trim() ?? '');
+}
+
+/** For an answer a stream can't pass on (a redirect, or what isn't a page): go where it goes */
 export function leaveScript(url: string, nonce: string) {
 	// "</script>" or "<!--" in an address must not end the script
 	return `<script nonce="${nonce}">location.replace(${JSON.stringify(url).replace(/</g, '\\u003c')})</script>`;
