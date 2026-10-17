@@ -205,10 +205,18 @@ describe('cleanTitle', () => {
 	it('reads a long title quickly, however it is made', () => {
 		const start = performance.now();
 		expect(cleanTitle('a' + ' '.repeat(100_000) + 'a')).toBe('a');
-		expect(cleanTitle('【' + '履'.repeat(100_000) + '】】')).toBe('');
-		expect(cleanTitle('【履'.repeat(2_000) + '】x')).toBe('');
+		expect(cleanTitle('【' + '履'.repeat(100_000) + '】】')).toBe('【' + '履'.repeat(199));
+		expect(cleanTitle('【履'.repeat(2_000) + '】x')).toBe('【履'.repeat(100));
 		expect(cleanTitle('a' + '(G1)'.repeat(25_000))).toBe('a');
 		expect(performance.now() - start).toBeLessThan(1000);
+	});
+
+	it('keeps a long title that is only tags up to the cut, so its row is still read', () => {
+		const title = '(G1)'.repeat(50) + '線形代数';
+		expect(cleanTitle(title)).toBe('(G1)'.repeat(50));
+		expect(readImport({ courses: [{ title, weekday: 1, period: 1 }] })).toMatchObject([{ title: '(G1)'.repeat(15) }]);
+		// A short title that is only a tag is still nothing, as before
+		expect(cleanTitle('【セット履修】')).toBe('');
 	});
 });
 

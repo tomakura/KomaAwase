@@ -231,11 +231,14 @@ const TITLE_READ_MAX = 200;
 
 /** A title as it is kept: Roman numerals as letters, the portal's tags left off */
 export function cleanTitle(title: string) {
-	let t = clip(title, TITLE_READ_MAX).replace(ROMAN, (c) => c.normalize('NFKC'));
+	const read = clip(title, TITLE_READ_MAX).replace(ROMAN, (c) => c.normalize('NFKC'));
+	let t = read;
 	for (let before = ''; before !== t; ) {
 		before = t;
 		t = withoutTag(t);
 	}
+	// A cut can leave only tags, with the name past it: keep the cut title, so the row isn't lost
+	if (!t.trim() && [...title.trim()].length > TITLE_READ_MAX) return read;
 	return t.trim();
 }
 
