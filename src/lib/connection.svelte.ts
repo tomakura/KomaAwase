@@ -6,7 +6,7 @@
 // copies are refreshed as soon as the server answers again (a small request checks, backing off),
 // and whatever needs the server is switched off with a message instead of failing.
 // The service worker (src/service-worker.ts) keeps the copies; src/lib/sync.ts lists the pages.
-import { CACHED_AT_ATTRIBUTE, FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER, cachedKeys, dataCopyKey } from './offline';
+import { CACHED_AT_ATTRIBUTE, COPY_FIRST_HEADER, FRESH_KEY, SAVED_AT_HEADER, SYNC_HEADER, cachedKeys, dataCopyKey } from './offline';
 import {
 	SYNC_KEYS,
 	SYNC_STEPS,
@@ -205,6 +205,13 @@ export class Connection {
 				this.tell(this.#say());
 				throw new TypeError('offline');
 			}
+			// A page while the connection is bad: the copy on the device at once (src/service-worker.ts)
+			if (ours && !change && this.blocked && url.pathname.endsWith('/__data.json')) {
+				const headers = new Headers(init?.headers ?? request?.headers);
+				headers.set(COPY_FIRST_HEADER, '1');
+				if (request) input = new Request(request, { headers });
+				else init = { ...init, headers };
+			}
 			let res: Response;
 			try {
 				res = await original(input, init);
@@ -234,6 +241,17 @@ export class Connection {
 			return false;
 		}
 		return true;
+	}
+
+	/**
+	 * A page has been awaited for a while: the connection is likely bad. The strip shows now (with
+	 * the way back to the timetable), not after a check that could take as long again, and the
+	 * check that follows puts it away if the server answers.
+	 */
+	waited() {
+		if (this.blocked || !this.#env) return;
+		this.link = onLine() ? 'poor' : 'offline';
+		void this.attempt();
 	}
 
 	tell(text: string) {

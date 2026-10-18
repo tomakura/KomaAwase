@@ -16,7 +16,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="大学" back="/more" />
+	<PageHeader title="大学" back="/more/account" />
 	<form method="POST" use:enhance>
 		<label class="field">
 			大学

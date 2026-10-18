@@ -63,7 +63,7 @@
 
 <div class="page">
 	<header>
-		<a class="back" href={timetableHref(data.termParam)}>
+		<a class="back" href={timetableHref(data.termParam)} data-back>
 			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
 			<span class="visually-hidden">もどる：</span>
 			<h1>授業を追加</h1>

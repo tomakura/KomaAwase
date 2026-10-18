@@ -30,6 +30,9 @@ export const CACHED_AT_ATTRIBUTE = 'data-cached-at';
 // Set on the requests the app makes itself to refresh the copies (see src/lib/sync.ts): the
 // service worker asks the network only, saves the answer and never falls back to a copy.
 export const SYNC_HEADER = 'x-koma-sync';
+// Set by the app on a page's data request while it knows the connection is down or poor: the
+// service worker shows the copy at once instead of giving the network a few seconds first
+export const COPY_FIRST_HEADER = 'x-koma-copy-first';
 // When each page's copy was last fetched, on this device (with the app's version, since a new
 // version clears the copies)
 export const FRESH_KEY = 'koma:fresh';

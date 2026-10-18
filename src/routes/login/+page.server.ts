@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { consumeEmailToken, createEmailToken, normalizeEmail, sendSignInEmail } from '$lib/server/auth/email';
 import { googleEnabled } from '$lib/server/auth/google';
-import { rememberNext, safeNext } from '$lib/server/auth/next';
+import { rememberNext, rememberReauthNext, safeNext } from '$lib/server/auth/next';
 import { REAUTH, readReauth } from '$lib/server/auth/reauth';
 import { MAIL_COOLDOWN_MESSAGE, MAIL_LIMIT_MESSAGES, takeMailBudget } from '$lib/server/mail-limit';
 import { RATE_LIMITED_MESSAGE, isRateLimited } from '$lib/server/rate-limit';
@@ -12,8 +12,10 @@ export const load: PageServerLoad = ({ locals, url, cookies, platform }) => {
 	// Signed in already: only asked to sign in again (before leaving the app, say)
 	const reauth = locals.user ? readReauth(url.searchParams.get('reauth')) : null;
 	if (locals.user && !reauth) redirect(303, safeNext(next) ?? '/');
+	// A sign-in again left unfinished must not steer this ordinary one
+	if (!reauth) rememberReauthNext(cookies, null);
 	return {
-		next: rememberNext(cookies, next),
+		next: reauth ? rememberReauthNext(cookies, next) : rememberNext(cookies, next),
 		reauth: reauth && { lead: REAUTH[reauth].lead, back: REAUTH[reauth].back },
 		bye: url.searchParams.has('bye'),
 		google: googleEnabled(platform?.env),

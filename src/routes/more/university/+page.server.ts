@@ -38,6 +38,6 @@ export const actions: Actions = {
 			terms: preset?.terms ?? settings.terms,
 			periods: preset?.periods ?? settings.periods
 		});
-		redirect(303, '/more');
+		redirect(303, '/more/account');
 	}
 };

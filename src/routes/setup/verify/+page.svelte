@@ -19,14 +19,25 @@
 </svelte:head>
 
 <main>
-	<header>
-		<h1>在籍確認をしませんか</h1>
-		<p>{data.university.name}のメールアドレスに届くリンクを開くと確認できます。確認すると、次のことができます。</p>
-	</header>
+	{#if data.done}
+		<header>
+			<h1>在籍を確認しました</h1>
+			<p>{data.done} でログインしたので、{data.university.name}の在籍を確認しました。次のことができます。</p>
+		</header>
+	{:else}
+		<header>
+			<h1>在籍確認をしませんか</h1>
+			<p>{data.university.name}のメールアドレスに届くリンクを開くと確認できます。確認すると、次のことができます。</p>
+		</header>
+	{/if}
 
 	<VerifyBenefits />
 
-	{#if form?.sentTo && !other}
+	{#if data.done}
+		<form method="POST" action="?/skip" use:enhance>
+			<button class="btn btn-primary" type="submit">はじめる</button>
+		</form>
+	{:else if form?.sentTo && !other}
 		{#key form}
 			<MailSent email={form.sentTo} action="?/send" onother={() => (other = true)}>
 				{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。

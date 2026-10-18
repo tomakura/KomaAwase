@@ -36,7 +36,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="パスキー" back="/more" />
+	<PageHeader title="パスキー" back="/more/account" />
 	<div class="body">
 		<p class="ui-note">
 			パスキーがあると、スマホの顔認証や指紋認証だけでログインできます。すべて消しても、メールアドレスでログインできます。

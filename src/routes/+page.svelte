@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto, preloadData, pushState, refreshAll, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
+	import { verifyHref } from '$lib/verify-prompt';
 	import { untrack } from 'svelte';
-	import { fade } from 'svelte/transition';
+	import { fade, fly } from 'svelte/transition';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import CourseDetail from '$lib/components/CourseDetail.svelte';
 	import CourseEdit from './courses/[id]/edit/+page.svelte';
@@ -11,7 +12,9 @@
 	import TermBar from '$lib/components/TermBar.svelte';
 	import TimetableGrid from '$lib/components/TimetableGrid.svelte';
 	import UnscheduledCards from '$lib/components/UnscheduledCards.svelte';
+	import { awaited } from '$lib/awaiting.svelte';
 	import { liveClock } from '$lib/clock.svelte';
+	import { connection } from '$lib/connection.svelte';
 	import { courseHref, timetableHref } from '$lib/courses';
 	import { motion } from '$lib/motion';
 	import { currentTerm, termIsOn } from '$lib/terms';
@@ -48,6 +51,8 @@
 	// goes the usual way.
 	const COURSE = /^\/courses\/(?!new$|search$)[^/]+$/;
 	const EDIT = /^\/courses\/(?!new$|search$)[^/]+\/edit$/;
+	// How long a course may take to be read before the connection counts as bad
+	const SLOW_COURSE = 3_000;
 
 	// On a wide screen (a computer) the course opens beside the timetable instead of over it,
 	// and is edited there too; the timetable stays usable next to it.
@@ -59,6 +64,13 @@
 		query.addEventListener('change', changed);
 		return () => query.removeEventListener('change', changed);
 	});
+
+	// Beside the timetable the course comes out from behind it, to the right, as the timetable
+	// moves over to the left (see .screen below), and goes back behind it the same way. Over the
+	// timetable it fades in, and slides up and down itself.
+	const SIDE_MS = 300;
+	const enter = (node: Element) => (wide ? fly(node, { x: -240, ...motion(SIDE_MS) }) : fade(node, motion(200)));
+	const leave = (node: Element) => (wide ? fly(node, { x: -240, ...motion(SIDE_MS) }) : fade(node, motion(240)));
 
 	// Back to the course from editing it, once the browser has gone back
 	function back() {
@@ -86,8 +98,15 @@
 		e.preventDefault();
 		const href = url.pathname + url.search;
 		try {
-			const result = await preloadData(href);
-			if (result.type === 'loaded' && result.status === 200) {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const result = await awaited(
+				Promise.race([preloadData(href), new Promise<null>((resolve) => (timer = setTimeout(resolve, SLOW_COURSE, null)))])
+			);
+			clearTimeout(timer);
+			// Too slow: the connection is likely bad. The course opens as a page of its own, from
+			// the copy on the device if there is one (or says it can't be opened now)
+			if (!result) connection.waited();
+			else if (result.type === 'loaded' && result.status === 200) {
 				if (editing) return pushState(href, { course: page.state.course, edit: result.data as NonNullable<typeof page.state.edit> });
 				const state = { course: result.data as NonNullable<typeof page.state.course> };
 				// Beside the timetable, another course takes the place of the one open
@@ -187,7 +206,7 @@
 								<li>授業をさがす（同じ大学の人の授業から選ぶ）</li>
 								<li>スクショから読み込む</li>
 							</ul>
-							<a class="btn btn-primary" href="/more/verify">在籍確認する</a>
+							<a class="btn btn-primary" href={verifyHref(page.url)}>在籍確認する</a>
 						</div>
 					{/if}
 					<a class="way" href="/courses/new{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
@@ -231,7 +250,7 @@
 </div>
 
 {#if page.state.course}
-	<div class="course-over" class:side={wide} data-swipe-scroll in:fade={motion(200)} out:fade={motion(240)}>
+	<div class="course-over" class:side={wide} data-swipe-scroll in:enter out:leave>
 		{#if wide && page.state.edit}
 			<CourseEdit
 				data={page.state.edit}
@@ -244,7 +263,7 @@
 				}}
 			/>
 		{:else}
-			<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} />
+			<CourseDetail data={page.state.course} form={page.form} close={() => history.back()} refresh={refreshCourse} side={wide} />
 		{/if}
 	</div>
 {/if}
@@ -282,8 +301,23 @@
 
 	/* Beside the timetable: the two side by side in the middle of the screen */
 	@media (min-width: 1024px) {
+		/* In front of the course beside it, which comes out from behind it */
+		.screen {
+			position: relative;
+			z-index: 31;
+			margin-left: calc(50% - 240px);
+			background: var(--bg);
+		}
+
 		.screen.with-side {
 			margin-left: calc(50% - 468px);
+		}
+
+		@media (prefers-reduced-motion: no-preference) {
+			.screen {
+				/* With the course (SIDE_MS, cubicOut) */
+				transition: margin-left 300ms cubic-bezier(0.215, 0.61, 0.355, 1);
+			}
 		}
 
 		.course-over.side {
@@ -298,6 +332,10 @@
 		.course-over.side :global(.scrim),
 		.course-over.side :global(.grabber) {
 			display: none;
+		}
+
+		.course-over.side :global(.close-x) {
+			display: flex;
 		}
 
 		.course-over.side :global(.course-sheet) {

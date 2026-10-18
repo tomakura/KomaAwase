@@ -204,8 +204,9 @@ const ROMAN = /[\u2160-\u217F]/g;
 
 // What the student portal adds after a name. 【ｾｯﾄ履修】 is often misread (ｾｯﾄ comes out as セツト,
 // "ﾉ ﾉ" and the like), so any trailing bracket with 履 in it goes, closed or not; a bracket
-// without 履 is part of the name.
-const SET_TAG = /\s*[【[［][^】\]］]*履[^】\]］]*(?:[】\]］]|$)\s*$/;
+// without 履 is part of the name. Up to its first 履 the bracket is read without 履, so there is
+// one way to split it and a long title can't make the match try every split.
+const SET_TAG = /\s*[【[［][^】\]］履]*履[^】\]］]*(?:[】\]］]|$)\s*$/;
 // The other tags are parentheses holding a class group or a code: (G1), (G2-SA), (SA-01). They
 // are told from a name in parentheses by a segment that is G and a number, or SA.
 const PAREN_TAIL = /\s*[(（]([^()（）]*)(?:[)）]|$)\s*$/;
@@ -224,13 +225,22 @@ function withoutTag(title: string) {
 	return PORTAL_CODE.test(code) ? title.slice(0, paren.index) : title;
 }
 
+// The patterns above slow down sharply on a long string, and a title from a CSV can be as long
+// as the file. A title is cut to this length before they run; no course name comes near it.
+const TITLE_READ_MAX = 200;
+
 /** A title as it is kept: Roman numerals as letters, the portal's tags left off */
 export function cleanTitle(title: string) {
-	let t = title.replace(ROMAN, (c) => c.normalize('NFKC'));
+	const read = clip(title, TITLE_READ_MAX).replace(ROMAN, (c) => c.normalize('NFKC'));
+	const cut = [...title.trim()].length > TITLE_READ_MAX;
+	// A cut inside parentheses, as in (G, leaves half a tag that hides the whole ones before it
+	let t = cut ? read.replace(/[(（][^()（）]*$/, '') : read;
 	for (let before = ''; before !== t; ) {
 		before = t;
 		t = withoutTag(t);
 	}
+	// A cut can leave only tags, with the name past it: keep the cut title, so the row isn't lost
+	if (!t.trim() && cut) return read;
 	return t.trim();
 }
 

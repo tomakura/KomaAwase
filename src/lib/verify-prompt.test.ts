@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysLeft, verifyPrompt } from './verify-prompt';
+import { daysLeft, verifyHref, verifyPrompt } from './verify-prompt';
 
 const DAY = 24 * 60 * 60 * 1000;
 const now = Date.UTC(2027, 2, 1);
@@ -49,5 +49,12 @@ describe('verifyPrompt', () => {
 		expect(at({ check: inDays(-1), shown: 7 })).toEqual({ kind: 'lapsed', stage: 0 });
 		expect(at({ check: inDays(-1), shown: 0 })).toBe(null);
 		expect(at({ check: inDays(0), shown: null })).toEqual({ kind: 'lapsed', stage: 0 });
+	});
+});
+
+describe('verifyHref', () => {
+	it('comes back to the page with its query', () => {
+		expect(verifyHref(new URL('https://koma.invalid/courses/search?q=a b'))).toBe('/more/verify?from=%2Fcourses%2Fsearch%3Fq%3Da%2520b');
+		expect(verifyHref('/')).toBe('/more/verify?from=%2F');
 	});
 });
