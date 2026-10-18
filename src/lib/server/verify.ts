@@ -151,6 +151,10 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 	return { university: university?.name ?? '' };
 }
 
+// How long a Google sign-in counts for verifyByGoogle: enough for the nickname, the passkey and
+// はじめの設定 that come after a first sign-in
+const GOOGLE_FRESH_MS = 60 * 60 * 1000;
+
 /**
  * Confirms enrollment without a mail, for someone who signed in with Google using an address
  * of their university: Google has just vouched that they hold it (only Workspace and Gmail
@@ -159,10 +163,13 @@ export async function finishVerification(db: Db, token: string, userId: string) 
  */
 export async function verifyByGoogle(
 	db: Db,
-	user: { id: string; email: string; googleSub: string | null },
+	user: { id: string; email: string; googleSub: string | null; googleAt: Date | null },
 	university: { id: string; emailDomains: string[] }
 ) {
 	if (!user.googleSub || !emailMatchesDomains(user.email, university.emailDomains)) return false;
+	// Only a recent Google sign-in speaks for the address now: one from long ago (say, before
+	// the school deleted the account) would renew the check every time はじめの設定 is sent
+	if (!user.googleAt || Date.now() - user.googleAt.getTime() > GOOGLE_FRESH_MS) return false;
 	const values = {
 		userId: user.id,
 		universityId: university.id,

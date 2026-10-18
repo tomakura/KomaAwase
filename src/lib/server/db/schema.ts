@@ -47,6 +47,8 @@ export const users = sqliteTable('users', {
 	email: text('email').notNull().unique(),
 	nickname: text('nickname'),
 	googleSub: text('google_sub').unique(),
+	// The last Google sign-in: when Google last vouched that the account holds its address
+	googleAt: integer('google_at', { mode: 'timestamp_ms' }),
 	// A character on a color, or a photo; null until the user picks one (the nickname's first character is shown)
 	icon: text('icon', { mode: 'json' }).$type<UserIcon>(),
 	theme: text('theme', { enum: ['system', 'light', 'dark'] })

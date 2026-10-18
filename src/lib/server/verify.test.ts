@@ -129,13 +129,26 @@ describe('enrollment checks by mailbox', () => {
 	it('holds the mailbox for a check from Google sign-in too', async () => {
 		const t = world();
 		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
-		expect(await verifyByGoogle(t.db, { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a' }, uni)).toBe(true);
+		expect(await verifyByGoogle(t.db, { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a', googleAt: new Date() }, uni)).toBe(true);
 		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
 		// The mail can't add a second account on that mailbox, nor can another Google sign-in
 		const token = await link(t, 'b', 'taro+x@u.ac.jp');
 		expect(await finishVerification(t.db, token, 'b')).toBe('taken');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
-		expect(await verifyByGoogle(t.db, { id: 'c', email: 'taro+y@u.ac.jp', googleSub: 'g-c' }, uni)).toBe(false);
+		expect(await verifyByGoogle(t.db, { id: 'c', email: 'taro+y@u.ac.jp', googleSub: 'g-c', googleAt: new Date() }, uni)).toBe(false);
+		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
+	});
+
+	it('confirms by Google only right after a Google sign-in', async () => {
+		const t = world();
+		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
+		const user = { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a' };
+		// A sign-in from long ago (the school may have deleted the account since), or none
+		expect(await verifyByGoogle(t.db, { ...user, googleAt: new Date(Date.now() - 2 * 60 * 60 * 1000) }, uni)).toBe(false);
+		expect(await verifyByGoogle(t.db, { ...user, googleAt: null }, uni)).toBe(false);
+		expect(checks(t)).toEqual([]);
+		// Within the hour that the nickname, passkey and はじめの設定 take
+		expect(await verifyByGoogle(t.db, { ...user, googleAt: new Date(Date.now() - 30 * 60 * 1000) }, uni)).toBe(true);
 		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
 	});
 
