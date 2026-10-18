@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { mailtoHref } from '$lib/mail';
 	import { tokyoTime } from '$lib/time';
 
 	let { data } = $props();
@@ -31,7 +32,7 @@
 				</div>
 				<p class="body">{c.body}</p>
 				<div class="foot">
-					<a href="mailto:{c.email}?subject={encodeURIComponent('コマあわせへのお問い合わせ')}">{c.email}</a>
+					<a href={mailtoHref(c.email, 'コマあわせへのお問い合わせ')}>{c.email}</a>
 					<form method="POST" action="?/closeContact" use:enhance>
 						<input type="hidden" name="id" value={c.id} />
 						<button class="small" type="submit">対応済み</button>
