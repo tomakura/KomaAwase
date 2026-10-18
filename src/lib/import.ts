@@ -232,13 +232,15 @@ const TITLE_READ_MAX = 200;
 /** A title as it is kept: Roman numerals as letters, the portal's tags left off */
 export function cleanTitle(title: string) {
 	const read = clip(title, TITLE_READ_MAX).replace(ROMAN, (c) => c.normalize('NFKC'));
-	let t = read;
+	const cut = [...title.trim()].length > TITLE_READ_MAX;
+	// A cut inside parentheses, as in (G, leaves half a tag that hides the whole ones before it
+	let t = cut ? read.replace(/[(（][^()（）]*$/, '') : read;
 	for (let before = ''; before !== t; ) {
 		before = t;
 		t = withoutTag(t);
 	}
 	// A cut can leave only tags, with the name past it: keep the cut title, so the row isn't lost
-	if (!t.trim() && [...title.trim()].length > TITLE_READ_MAX) return read;
+	if (!t.trim() && cut) return read;
 	return t.trim();
 }
 
