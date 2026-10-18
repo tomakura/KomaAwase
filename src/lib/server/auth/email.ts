@@ -14,7 +14,13 @@ const MAX_LIVE_TOKENS_PER_EMAIL = 3;
 export function normalizeEmail(input: string): string | null {
 	const email = input.trim().toLowerCase();
 	// Deliberately loose: the sign-in link proves the address works.
-	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+	// The same check as /^[^\s@]+@[^\s@]+\.[^\s@]+$/, done without that regex, which takes
+	// quadratic time on a long run of dots: one '@' with something before it, no
+	// whitespace, and a '.' in the domain that is neither its first nor its last character.
+	const at = email.indexOf('@');
+	if (at < 1 || email.includes('@', at + 1) || /\s/.test(email)) return null;
+	const dot = email.indexOf('.', at + 2);
+	return dot !== -1 && dot < email.length - 1 ? email : null;
 }
 
 /**

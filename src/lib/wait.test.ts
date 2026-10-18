@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WAIT_ID, leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from './wait';
+import { WAIT_ID, isHtml, leaveScript, renonce, stampHtml, themeOf, waitDone, waitShell } from './wait';
 
 // What a page from the server starts with
 const page = (theme: string) => `<!doctype html>\n<html lang="ja" data-theme="${theme}">\n<head><meta charset="utf-8"></head><body></body></html>`;
@@ -69,6 +69,25 @@ describe('nonces', () => {
 		const html = '<script nonce="srv">a</script><p>nonce="other"</p><script nonce="srv">b</script>';
 		expect(renonce(html, 'srv', 'sw')).toBe('<script nonce="sw">a</script><p>nonce="other"</p><script nonce="sw">b</script>');
 		expect(renonce(html, null, 'sw')).toBe(html);
+	});
+});
+
+describe('isHtml', () => {
+	it('is true for the pages the server sends, and the ones the service worker makes', () => {
+		expect(isHtml('text/html')).toBe(true);
+		expect(isHtml('text/html; charset=utf-8')).toBe(true);
+		expect(isHtml('Text/HTML;charset=utf-8')).toBe(true);
+	});
+
+	it('is false for anything else, which must not be written into the document', () => {
+		expect(isHtml('image/jpeg')).toBe(false);
+		expect(isHtml('application/json')).toBe(false);
+		expect(isHtml('text/plain')).toBe(false);
+		expect(isHtml('application/xhtml+xml')).toBe(false);
+		expect(isHtml('text/htmlx')).toBe(false);
+		expect(isHtml('image/jpeg; text/html')).toBe(false);
+		expect(isHtml('')).toBe(false);
+		expect(isHtml(null)).toBe(false);
 	});
 });
 
