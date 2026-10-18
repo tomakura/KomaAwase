@@ -172,6 +172,27 @@ describe('enrollment checks by mailbox', () => {
 		]);
 		expect(await confirm(t, 'a', 'taro+y@u.ac.jp')).toEqual({ university: 'テスト大学' });
 	});
+
+	it("keeps a mailbox from a third account once its holder is gone, while a check from before 0030 still has it", async () => {
+		const t = world();
+		const later = Date.now() + 1000 * 60 * 60 * 24 * 30;
+		t.run(
+			`INSERT INTO univ_verifications (user_id, university_id, email, mailbox, verified_at, expires_at) VALUES ('a', 'uni', 'taro@u.ac.jp', 'taro@u.ac.jp', 1, ?), ('b', 'uni', 'taro+x@u.ac.jp', NULL, 2, ?)`,
+			later,
+			later
+		);
+		// a leaves the app
+		t.run(`DELETE FROM univ_verifications WHERE user_id = 'a'`);
+		const token = await link(t, 'c', 'taro+y@u.ac.jp');
+		expect(await peekVerification(t.db, token)).toMatchObject({ taken: true });
+		expect(await finishVerification(t.db, token, 'c')).toBe('taken');
+		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
+		expect(await verifyByGoogle(t.db, { id: 'c', email: 'taro@u.ac.jp', googleSub: 'g-c', googleAt: new Date() }, uni)).toBe(false);
+		// b itself confirms again, and then holds the mailbox
+		t.run(`UPDATE verify_tokens SET expires_at = expires_at - 120000`);
+		expect(await confirm(t, 'b', 'taro+x@u.ac.jp')).toEqual({ university: 'テスト大学' });
+		expect(checks(t)).toEqual([{ user_id: 'b', email: 'taro+x@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
+	});
 });
 
 describe('migration 0030', () => {

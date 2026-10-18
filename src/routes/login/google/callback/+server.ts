@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { passkeys, users } from '$lib/server/db/schema';
 import { finishGoogle, googleEnabled, userForGoogle } from '$lib/server/auth/google';
 import { takeSignInNext } from '$lib/server/auth/next';
@@ -20,8 +20,12 @@ export const GET: RequestHandler = async ({ platform, url, cookies, locals, requ
 	if (user === 'use-mail') redirect(303, '/login?error=google-mail');
 	if (!user) redirect(303, '/login?error=google');
 	if (user.suspendedAt) redirect(303, '/login?error=suspended');
-	// For the enrollment check by Google (verifyByGoogle), which goes by how recent this is
-	await locals.db.update(users).set({ googleAt: new Date() }).where(eq(users.id, user.id));
+	// For the enrollment check by Google (verifyByGoogle), which goes by how recent this is. Only
+	// for the Google account linked to it: one found by its address may be linked to another
+	await locals.db
+		.update(users)
+		.set({ googleAt: new Date() })
+		.where(and(eq(users.id, user.id), eq(users.googleSub, account.sub)));
 	await signIn(locals.db, cookies, request, user.id);
 
 	const hasPasskey = await locals.db.select({ id: passkeys.id }).from(passkeys).where(eq(passkeys.userId, user.id)).get();

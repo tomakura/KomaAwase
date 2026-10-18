@@ -73,8 +73,39 @@ export async function dropToken(db: Db, token: string) {
 	await db.delete(verifyTokens).where(eq(verifyTokens.id, await hashToken(token)));
 }
 
-// The check that already has this address, or another address of its mailbox
-const heldBy = (email: string) => or(eq(univVerifications.email, email), eq(univVerifications.mailbox, mailboxOf(email)));
+// mailboxOf in SQL, for checks from before 0030 that were left without their mailbox (it is
+// held by another account's check, which may since have gone)
+const e = univVerifications.email;
+const mailboxOfStored = sql`CASE WHEN instr(substr(${e}, 1, instr(${e}, '@') - 1), '+') > 1 THEN substr(${e}, 1, instr(${e}, '+') - 1) || substr(${e}, instr(${e}, '@')) ELSE ${e} END`;
+
+/**
+ * Another account's check on the address or another address of its mailbox. A check left
+ * without its mailbox counts too, so that a third account can't take the mailbox once its
+ * holder is gone; but not against the account that holds the mailbox itself, which keeps it.
+ * The unique indexes stand behind all but those left without one.
+ */
+async function heldByOther(db: Db, email: string, userId: string) {
+	const mailbox = mailboxOf(email);
+	const other = ne(univVerifications.userId, userId);
+	const held = await db
+		.select({ userId: univVerifications.userId })
+		.from(univVerifications)
+		.where(and(or(eq(univVerifications.email, email), eq(univVerifications.mailbox, mailbox)), other))
+		.get();
+	if (held) return held;
+	const left = await db
+		.select({ userId: univVerifications.userId })
+		.from(univVerifications)
+		.where(and(isNull(univVerifications.mailbox), eq(mailboxOfStored, mailbox), other))
+		.get();
+	if (!left) return undefined;
+	const own = await db
+		.select({ userId: univVerifications.userId })
+		.from(univVerifications)
+		.where(and(eq(univVerifications.userId, userId), eq(univVerifications.mailbox, mailbox)))
+		.get();
+	return own ? undefined : left;
+}
 
 /**
  * What an enrollment link is for, while it works: whose account, which university and
@@ -95,11 +126,7 @@ export async function peekVerification(db: Db, token: string) {
 		.where(eq(verifyTokens.id, await hashToken(token)))
 		.get();
 	if (!row || row.expiresAt.getTime() <= Date.now()) return null;
-	const other = await db
-		.select({ userId: univVerifications.userId })
-		.from(univVerifications)
-		.where(and(heldBy(row.email), ne(univVerifications.userId, row.userId)))
-		.get();
+	const other = await heldByOther(db, row.email, row.userId);
 	return { userId: row.userId, email: row.email, university: row.university ?? '', nickname: row.nickname, taken: !!other };
 }
 
@@ -117,6 +144,7 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 		return null;
 	}
 	if (row.userId !== userId) return 'other-account' as const;
+	if (await heldByOther(db, row.email, row.userId)) return 'taken' as const;
 	const values = {
 		userId: row.userId,
 		universityId: row.universityId,
@@ -139,12 +167,7 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 			db.update(users).set({ verifyPromptStage: null }).where(eq(users.id, row.userId))
 		]);
 	} catch (e) {
-		const taken = await db
-			.select({ userId: univVerifications.userId })
-			.from(univVerifications)
-			.where(and(heldBy(row.email), ne(univVerifications.userId, row.userId)))
-			.get();
-		if (taken) return 'taken' as const;
+		if (await heldByOther(db, row.email, row.userId)) return 'taken' as const;
 		throw e;
 	}
 	const university = await db.select({ name: universities.name }).from(universities).where(eq(universities.id, row.universityId)).get();
@@ -170,6 +193,7 @@ export async function verifyByGoogle(
 	// Only a recent Google sign-in speaks for the address now: one from long ago (say, before
 	// the school deleted the account) would renew the check every time はじめの設定 is sent
 	if (!user.googleAt || Date.now() - user.googleAt.getTime() > GOOGLE_FRESH_MS) return false;
+	if (await heldByOther(db, user.email, user.id)) return false;
 	const values = {
 		userId: user.id,
 		universityId: university.id,
