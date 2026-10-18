@@ -21,6 +21,18 @@ export function verificationExpiry(now = Date.now()) {
 	return new Date(`${year + 1}-05-01T00:00:00+09:00`);
 }
 
+/**
+ * The mailbox an address reaches: without a +tag (taro+koma@u.ac.jp is taro@u.ac.jp), since
+ * university mail (Google Workspace, Microsoft 365) delivers those to the same inbox. One
+ * mailbox confirms one account. Subdomains stay apart. The mail still goes to the address as
+ * typed, and that is the address the check keeps and shows. Same as the backfill in 0030.
+ */
+export function mailboxOf(email: string) {
+	const at = email.indexOf('@');
+	const plus = email.indexOf('+');
+	return plus > 0 && plus < at ? email.slice(0, plus) + email.slice(at) : email;
+}
+
 /** The address to check, or the message to show. */
 export async function startVerification(db: Db, user: { id: string; universityId: string | null }, input: string) {
 	const email = normalizeEmail(input);
@@ -61,9 +73,43 @@ export async function dropToken(db: Db, token: string) {
 	await db.delete(verifyTokens).where(eq(verifyTokens.id, await hashToken(token)));
 }
 
+// mailboxOf in SQL, for checks from before 0030 that were left without their mailbox (it is
+// held by another account's check, which may since have gone)
+const e = univVerifications.email;
+const mailboxOfStored = sql`CASE WHEN instr(substr(${e}, 1, instr(${e}, '@') - 1), '+') > 1 THEN substr(${e}, 1, instr(${e}, '+') - 1) || substr(${e}, instr(${e}, '@')) ELSE ${e} END`;
+
+/**
+ * Another account's check on the address or another address of its mailbox. A check left
+ * without its mailbox counts too, so that a third account can't take the mailbox once its
+ * holder is gone; but not against the account that holds the mailbox itself, which keeps it.
+ * The unique indexes stand behind all but those left without one.
+ */
+async function heldByOther(db: Db, email: string, userId: string) {
+	const mailbox = mailboxOf(email);
+	const other = ne(univVerifications.userId, userId);
+	const held = await db
+		.select({ userId: univVerifications.userId })
+		.from(univVerifications)
+		.where(and(or(eq(univVerifications.email, email), eq(univVerifications.mailbox, mailbox)), other))
+		.get();
+	if (held) return held;
+	const left = await db
+		.select({ userId: univVerifications.userId })
+		.from(univVerifications)
+		.where(and(isNull(univVerifications.mailbox), eq(mailboxOfStored, mailbox), other))
+		.get();
+	if (!left) return undefined;
+	const own = await db
+		.select({ userId: univVerifications.userId })
+		.from(univVerifications)
+		.where(and(eq(univVerifications.userId, userId), eq(univVerifications.mailbox, mailbox)))
+		.get();
+	return own ? undefined : left;
+}
+
 /**
  * What an enrollment link is for, while it works: whose account, which university and
- * address, and whether that address already confirms someone else's account.
+ * address, and whether that address (or its mailbox) already confirms someone else's account.
  */
 export async function peekVerification(db: Db, token: string) {
 	const row = await db
@@ -80,18 +126,14 @@ export async function peekVerification(db: Db, token: string) {
 		.where(eq(verifyTokens.id, await hashToken(token)))
 		.get();
 	if (!row || row.expiresAt.getTime() <= Date.now()) return null;
-	const other = await db
-		.select({ userId: univVerifications.userId })
-		.from(univVerifications)
-		.where(and(eq(univVerifications.email, row.email), ne(univVerifications.userId, row.userId)))
-		.get();
+	const other = await heldByOther(db, row.email, row.userId);
 	return { userId: row.userId, email: row.email, university: row.university ?? '', nickname: row.nickname, taken: !!other };
 }
 
 /**
  * Uses the link, for the account that asked for it only. An address that confirms another
- * account is refused ('taken'): the check never moves between accounts, so a link that
- * reached the wrong hands can't take it over.
+ * account, or another address of its mailbox, is refused ('taken'): the check never moves
+ * between accounts, so a link that reached the wrong hands can't take it over.
  */
 export async function finishVerification(db: Db, token: string, userId: string) {
 	const id = await hashToken(token);
@@ -102,15 +144,18 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 		return null;
 	}
 	if (row.userId !== userId) return 'other-account' as const;
+	if (await heldByOther(db, row.email, row.userId)) return 'taken' as const;
 	const values = {
 		userId: row.userId,
 		universityId: row.universityId,
 		email: row.email,
+		mailbox: mailboxOf(row.email),
 		verifiedAt: new Date(),
 		expiresAt: verificationExpiry()
 	};
 	// The link is used up in the same batch, so if saving fails it still works. The address
-	// is unique: when another account holds it, the insert fails and nothing changes.
+	// and its mailbox are unique: when another account holds either, the insert fails and
+	// nothing changes.
 	try {
 		await db.batch([
 			db
@@ -122,17 +167,16 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 			db.update(users).set({ verifyPromptStage: null }).where(eq(users.id, row.userId))
 		]);
 	} catch (e) {
-		const taken = await db
-			.select({ userId: univVerifications.userId })
-			.from(univVerifications)
-			.where(and(eq(univVerifications.email, row.email), ne(univVerifications.userId, row.userId)))
-			.get();
-		if (taken) return 'taken' as const;
+		if (await heldByOther(db, row.email, row.userId)) return 'taken' as const;
 		throw e;
 	}
 	const university = await db.select({ name: universities.name }).from(universities).where(eq(universities.id, row.universityId)).get();
 	return { university: university?.name ?? '' };
 }
+
+// How long a Google sign-in counts for verifyByGoogle: enough for the nickname, the passkey and
+// はじめの設定 that come after a first sign-in
+const GOOGLE_FRESH_MS = 60 * 60 * 1000;
 
 /**
  * Confirms enrollment without a mail, for someone who signed in with Google using an address
@@ -142,14 +186,19 @@ export async function finishVerification(db: Db, token: string, userId: string) 
  */
 export async function verifyByGoogle(
 	db: Db,
-	user: { id: string; email: string; googleSub: string | null },
+	user: { id: string; email: string; googleSub: string | null; googleAt: Date | null },
 	university: { id: string; emailDomains: string[] }
 ) {
 	if (!user.googleSub || !emailMatchesDomains(user.email, university.emailDomains)) return false;
+	// Only a recent Google sign-in speaks for the address now: one from long ago (say, before
+	// the school deleted the account) would renew the check every time はじめの設定 is sent
+	if (!user.googleAt || Date.now() - user.googleAt.getTime() > GOOGLE_FRESH_MS) return false;
+	if (await heldByOther(db, user.email, user.id)) return false;
 	const values = {
 		userId: user.id,
 		universityId: university.id,
 		email: user.email,
+		mailbox: mailboxOf(user.email),
 		verifiedAt: new Date(),
 		expiresAt: verificationExpiry()
 	};
@@ -159,7 +208,7 @@ export async function verifyByGoogle(
 			db.update(users).set({ verifyPromptStage: null }).where(eq(users.id, user.id))
 		]);
 	} catch (e) {
-		// The address is unique: another account holds it
+		// The address and its mailbox are unique: another account holds one of them
 		console.error('enrollment check from Google sign-in failed', e);
 		return false;
 	}
