@@ -16,7 +16,7 @@ export const actions: Actions = {
 		const icon = readIcon(await request.formData());
 		if ('message' in icon) return fail(400, { message: icon.message });
 		await saveIcon(locals.db, locals.user, icon);
-		redirect(303, '/more');
+		redirect(303, '/more/account');
 	},
 	removePhoto: async ({ locals }) => {
 		if (!locals.user) redirect(303, '/login');

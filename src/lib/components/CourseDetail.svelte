@@ -8,8 +8,11 @@
 	import StepsField from '$lib/components/StepsField.svelte';
 	import Switch from '$lib/components/Switch.svelte';
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import { verifyHref } from '$lib/verify-prompt';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
+	import { goBack } from '$lib/back';
 	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
@@ -34,13 +37,21 @@
 
 	// A course's page. It is the page of /courses/[id], and also opens over the timetable without
 	// leaving it (see the home page): then `close` and `refresh` are given, since the timetable
-	// stays where it was and this is only shown on top of it.
+	// stays where it was and this is only shown on top of it. `side`: beside the timetable on a
+	// wide screen, where the home page moves it in and out instead of it sliding up.
 	let {
 		data,
 		form,
 		close,
-		refresh
-	}: { data: PageData; form?: ActionData; close?: () => unknown; refresh?: () => unknown } = $props();
+		refresh,
+		side = false
+	}: {
+		data: PageData;
+		form?: ActionData;
+		close?: () => unknown;
+		refresh?: () => unknown;
+		side?: boolean;
+	} = $props();
 
 	// After a form is answered. Over the timetable, everything is not loaded again (the address
 	// is the course's own page, which is where that would take us): the course is read again.
@@ -48,6 +59,21 @@
 	async function settle(update: Update, options: { reset?: boolean } = {}) {
 		await update({ ...options, invalidateAll: !refresh });
 		await refresh?.();
+	}
+
+	// Back to the timetable: over it, by going back; as a page of its own, as the back link does
+	function dismiss() {
+		if (close) close();
+		else goBack(timetableHref(data.termParam)) || goto(timetableHref(data.termParam));
+	}
+
+	// Escape closes it too (not while typing, or in a dialog over it)
+	function closeOnEscape(e: KeyboardEvent) {
+		if (e.key !== 'Escape' || e.defaultPrevented) return;
+		const target = e.target as Element | null;
+		if (target?.closest?.('input, textarea, select, [contenteditable], dialog')) return;
+		if (document.querySelector('dialog[open]')) return;
+		dismiss();
 	}
 
 	const course = $derived(data.course);
@@ -271,11 +297,14 @@
 	</form>
 {/snippet}
 
+<svelte:window onkeydown={closeOnEscape} />
+
 <div class="page" class:over={!!close}>
 	<a
 		class="scrim"
 		href={timetableHref(data.termParam)}
 		aria-label="閉じて時間割にもどる"
+		data-back={close ? undefined : ''}
 		onclick={(e) => {
 			if (!close) return;
 			e.preventDefault();
@@ -286,9 +315,9 @@
 	<!-- Over the timetable it slides up and down itself (a page change is animated by the browser, see app.css) -->
 	<div
 		class="sheet course-sheet"
-		in:fly|global={{ y: '100%', duration: close && !still() ? 300 : 0, opacity: 1 }}
-		out:fly|global={{ y: '100%', duration: close && !still() ? 240 : 0, opacity: 1 }}
-		use:swipeDown={() => (close ? close() : goto(timetableHref(data.termParam)))}
+		in:fly|global={{ y: '100%', duration: close && !side && !still() ? 300 : 0, opacity: 1 }}
+		out:fly|global={{ y: '100%', duration: close && !side && !still() ? 240 : 0, opacity: 1 }}
+		use:swipeDown={dismiss}
 	>
 		<div class="grabber"><span></span></div>
 
@@ -304,6 +333,10 @@
 					</svg>
 					編集
 				</a>
+				<!-- With a mouse, which can't pull the sheet down, and beside the timetable (see the home page) -->
+				<button class="close-x" type="button" aria-label="閉じる" onclick={dismiss}>
+					<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+				</button>
 			</div>
 			<div class="chips">
 				{#each course.slots as slot, i (i)}
@@ -357,7 +390,7 @@
 					みんなの授業データ（変更の履歴・報告）
 				</a>
 			{:else if data.shared}
-				<a class="shared-link" href="/more/verify">在籍確認をすると、みんなの授業データを見られます</a>
+				<a class="shared-link" href={verifyHref(page.url)}>在籍確認をすると、みんなの授業データを見られます</a>
 			{/if}
 		</div>
 
@@ -925,6 +958,27 @@
 		font-size: 13px;
 		font-weight: 700;
 		text-decoration: none;
+	}
+
+	.close-x {
+		width: 36px;
+		height: 36px;
+		flex-shrink: 0;
+		display: none;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: 1px solid var(--line-bold);
+		border-radius: 10px;
+		background: none;
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	@media (hover: hover) and (pointer: fine) {
+		.close-x {
+			display: flex;
+		}
 	}
 
 	svg {

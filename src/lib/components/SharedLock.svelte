@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { verifyHref } from '$lib/verify-prompt';
 	// Shown where a feature needs an enrollment check: what it is, and the way to get it.
 	let {
 		access,
@@ -25,7 +26,7 @@
 	{:else}
 		<b>{what}は、在籍確認をすると使えます</b>
 		<span>大学のメールアドレスに届くリンクを開くと確認できます。</span>
-		<a class="btn btn-primary" href="/more/verify">在籍確認する</a>
+		<a class="btn btn-primary" href={verifyHref(from)}>在籍確認する</a>
 	{/if}
 </div>
 

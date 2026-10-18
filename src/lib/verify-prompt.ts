@@ -43,3 +43,9 @@ export function verifyPrompt(o: {
 	if (o.check) return o.shown !== null && o.shown <= STAGE_LAPSED ? null : { kind: 'lapsed', stage: STAGE_LAPSED };
 	return o.shown === null ? { kind: 'need', stage: STAGE_NEED } : null;
 }
+
+/** The enrollment check screen, coming back to `from` once the link in the mail is opened */
+export function verifyHref(from: URL | string) {
+	const path = typeof from === 'string' ? from : from.pathname + from.search;
+	return `/more/verify?from=${encodeURIComponent(path)}`;
+}

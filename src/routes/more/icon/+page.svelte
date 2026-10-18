@@ -24,7 +24,7 @@
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="アイコン" back="/more" />
+	<PageHeader title="アイコン" back="/more/account" />
 
 	<div class="preview">
 		<UserIcon user={preview} size={88} />

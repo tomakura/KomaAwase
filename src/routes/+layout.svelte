@@ -6,7 +6,8 @@
 	import '@fontsource/zen-maru-gothic/500.css';
 	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
-	import { beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
+	import { navigating } from '$app/state';
 	import { SvelteSet } from 'svelte/reactivity';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
@@ -21,6 +22,7 @@
 	import { connection } from '$lib/connection.svelte';
 	import { forgetOtherAccount } from '$lib/offline';
 	import { pageData } from '$lib/page-data';
+	import { arrived, backLink } from '$lib/back';
 
 	let { data, children } = $props();
 	// The enrollment prompt's stage once closed; until then it holds back the notification prompt
@@ -38,6 +40,27 @@
 		await refreshAll();
 	}
 
+	// A warning sent while the app is open. The layout's data is read only when the app opens (or
+	// comes back after STALE_AFTER), so it is looked for as pages change and when the app comes
+	// back to the front, at most once every WARNING_CHECK_EVERY.
+	const WARNING_CHECK_EVERY = 10 * 1000;
+	let warningCheckedAt = 0;
+	async function checkWarning() {
+		if (!data.signedIn || warning || connection.blocked || Date.now() - warningCheckedAt < WARNING_CHECK_EVERY) return;
+		warningCheckedAt = Date.now();
+		try {
+			const res = await fetch('/api/warning');
+			if (!res.ok) return;
+			const { id } = (await res.json()) as { id: string | null };
+			if (id && !answered.has(id)) await refreshAll();
+		} catch {
+			// Asked again at the next page
+		}
+	}
+	afterNavigate(({ type }) => {
+		if (type !== 'enter') void checkWarning();
+	});
+
 	// Back in the app after a while (it stays open in the background on a phone): show what
 	// changed meanwhile, such as a friend's timetable or a finished screenshot. (refreshAll, not
 	// invalidateAll, which would also close a course opened over the timetable.)
@@ -49,6 +72,7 @@
 			// Not while the connection is down: the copy on screen is all there is (src/lib/connection.svelte.ts
 			// loads it again once it's back)
 			else if (hiddenAt && Date.now() - hiddenAt > STALE_AFTER && !connection.blocked) refreshAll();
+			else if (hiddenAt) void checkWarning();
 		};
 		document.addEventListener('visibilitychange', changed);
 		return () => document.removeEventListener('visibilitychange', changed);
@@ -95,6 +119,8 @@
 		};
 	});
 	beforeNavigate(({ type, to }) => pages?.returningTo(type === 'popstate' && to ? to.url.pathname : null));
+	// Which entries of the history are which pages, for the back links (src/lib/back.ts)
+	afterNavigate(arrived);
 
 	// Offline or on a poor connection: keeps the timetable on screen, refreshes the copies of the
 	// tabs when the server answers, and switches off what needs it (src/lib/connection.svelte.ts).
@@ -106,9 +132,19 @@
 			version,
 			controlled: () => !!navigator.serviceWorker?.controller,
 			fetch: (...args) => (browserFetch ?? fetch)(...args),
-			invalidate: () => refreshAll(),
+			// Not while a page is awaited: that would call it off, and it is fetched anyway
+			invalidate: async () => {
+				if (!navigating.to) await refreshAll();
+			},
 			signedIn
 		});
+	});
+	// A page awaited this long says the connection is bad, without waiting for a check
+	const SLOW_PAGE = 3_000;
+	$effect(() => {
+		if (!navigating.to) return;
+		const timer = setTimeout(() => connection.waited(), SLOW_PAGE);
+		return () => clearTimeout(timer);
 	});
 	// A page that can't be opened now stays where it is, with the reason (not a reload into the offline page)
 	beforeNavigate((navigation) => {
@@ -155,17 +191,20 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<svelte:window onclickcapture={backLink} />
+
 <ConnectionBar />
 <StatusStrip />
 <NavigationWait />
-<!-- Behind a warning nothing can be reached -->
-<div style="display: contents" inert={!!warning}>{@render children()}</div>
+<!-- A warning is all there is until it is answered: nothing else is drawn behind it or over it
+	 (a sheet or a dialog would cover it), and the page from the server is the warning alone -->
 {#if warning}
 	<WarningScreen id={warning.id} body={warning.body} onack={() => acknowledge(warning.id)} />
+{:else}
+	{@render children()}
+	<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
+	<!-- One screen at a time: the notification one waits while the enrollment one is due -->
+	<ConfirmDialog />
+	<Toast />
+	<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />
 {/if}
-
-<VerifyPrompt prompt={data.verifyPrompt} setupDone={data.setupDone} bind:dismissed={verifyDismissed} />
-<!-- One screen at a time: the notification one waits while the enrollment one is due -->
-<ConfirmDialog />
-<Toast />
-<NotifyPrompt signedIn={data.signedIn} setupDone={data.setupDone} publicKey={data.pushKey} hold={!!data.verifyPrompt && data.verifyPrompt.stage !== verifyDismissed} />

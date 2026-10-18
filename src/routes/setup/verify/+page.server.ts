@@ -9,17 +9,21 @@ import type { Actions, PageServerLoad } from './$types';
 // After はじめの設定: shown once to someone whose university can be confirmed, so the
 // enrollment check is offered before anything else. Skipping is fine; it comes up again
 // only through the screens that suggest it (VerifyPrompt).
-export const load: PageServerLoad = async ({ locals, cookies }) => {
+export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	if (!locals.user) redirect(303, '/login');
 	if (!locals.user.setupAt) redirect(303, '/setup');
 	const university = locals.user.universityId
 		? await locals.db.select().from(universities).where(eq(universities.id, locals.user.universityId)).get()
 		: undefined;
 	const verification = await verificationOf(locals.db, locals.user.id);
-	if (!university?.emailDomains.length || (verification?.universityId === university.id && verification.expiresAt.getTime() > Date.now())) {
-		redirect(303, takeNext(cookies) ?? '/');
+	if (!university?.emailDomains.length) redirect(303, takeNext(cookies) ?? '/');
+	const current = verification?.universityId === university.id && verification.expiresAt.getTime() > Date.now();
+	// Just confirmed by the Google sign-in (see /setup): said once, then on to `next`
+	if (current && url.searchParams.has('done')) {
+		return { university: { name: university.name, domains: university.emailDomains }, done: verification.email };
 	}
-	return { university: { name: university.name, domains: university.emailDomains } };
+	if (current) redirect(303, takeNext(cookies) ?? '/');
+	return { university: { name: university.name, domains: university.emailDomains }, done: null };
 };
 
 export const actions: Actions = {

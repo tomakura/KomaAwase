@@ -1,11 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
+import { safeNext } from '$lib/server/auth/next';
 import { universities } from '$lib/server/db/schema';
 import { daysLeft } from '$lib/verify-prompt';
 import { sendVerificationMail, verificationOf } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
 	const [verification, university] = await Promise.all([
 		verificationOf(locals.db, locals.user.id),
@@ -14,6 +15,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			: undefined
 	]);
 	return {
+		// The page that suggested the check: the back button and the link in the mail go there
+		from: safeNext(url.searchParams.get('from')),
 		university: university ? { name: university.name, domains: university.emailDomains } : null,
 		verification:
 			verification && {
