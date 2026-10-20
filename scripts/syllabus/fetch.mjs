@@ -35,15 +35,31 @@ const save = () => {
 };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const ROWS = '[id="funcForm:table_data"] tr[data-ri]';
+const DIALOG = '.ui-dialog[aria-hidden="false"]';
+
 const browser = await chromium.launch({ headless: false });
-const page = await browser.newPage();
-await page.goto(url);
+const context = await browser.newContext();
+const first = await context.newPage();
+await first.goto(url);
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 await rl.question('条件を選んで「検索」を押し、表示件数を100にしたら Enter を押してください ');
 rl.close();
 
-const ROWS = '[id="funcForm:table_data"] tr[data-ri]';
-const DIALOG = '.ui-dialog[aria-hidden="false"]';
+// The portal may open the syllabus search in a new tab: read the tab that shows the results
+let page;
+for (const p of context.pages().reverse()) {
+	if (await p.$(ROWS).catch(() => null)) {
+		page = p;
+		break;
+	}
+}
+if (!page) {
+	console.error('検索結果の一覧が見つかりません。開いているタブ：');
+	for (const p of context.pages()) console.error(`  ${await p.title().catch(() => '')} ${p.url()}`);
+	await browser.close();
+	process.exit(1);
+}
 
 async function readRows() {
 	return page.$$eval(ROWS, (trs) =>
