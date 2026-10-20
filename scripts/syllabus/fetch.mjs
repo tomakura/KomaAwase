@@ -65,14 +65,16 @@ async function readRows() {
 	return page.$$eval(ROWS, (trs) =>
 		trs.map((tr) => {
 			const td = [...tr.querySelectorAll('td')].map((c) => c.innerText.trim());
-			return { slots: td[0], title: td[1], teachers: td[2], kind: td[3], terms: td[4].split('\n'), credits: td[5] };
+			// data-ri counts across pages (100… on the second), as the row's ids do
+			const ri = tr.getAttribute('data-ri');
+			return { ri, slots: td[0], title: td[1], teachers: td[2], kind: td[3], terms: td[4].split('\n'), credits: td[5] };
 		})
 	);
 }
 
-// The シラバス照会 dialog of row i: its label and value cells, in order
-async function readDialog(i, code) {
-	await page.click(`[id="funcForm:table:${i}:jugyoKmkName"]`);
+// The シラバス照会 dialog of row ri: its label and value cells, in order
+async function readDialog(ri, code) {
+	await page.click(`[id="funcForm:table:${ri}:jugyoKmkName"]`);
 	await page.waitForFunction(
 		([sel, c]) => [...document.querySelectorAll(sel)].some((d) => d.innerText.includes(c) && d.innerText.includes('授業概要')),
 		[DIALOG, code],
@@ -90,13 +92,14 @@ let pageNo = 1;
 for (;;) {
 	const rows = await readRows();
 	console.log(`${pageNo}ページ目：${rows.length}件`);
-	for (const [i, row] of rows.entries()) {
+	for (const row of rows) {
 		const listed = parseCourse(row);
 		const code = listed.course.code;
 		if (!code) continue;
 		file.year ??= listed.year;
 		const had = byCode.get(code);
-		if (had && !again) {
+		// A course whose details couldn't be read is tried again
+		if (had && !again && (listOnly || had.outline || had.schedule)) {
 			// The same course in another quarter's search: only its terms grow
 			had.terms = [...new Set([...had.terms, ...listed.course.terms])].sort();
 			continue;
@@ -104,7 +107,7 @@ for (;;) {
 		let pairs = [];
 		if (!listOnly) {
 			try {
-				pairs = await readDialog(i, code);
+				pairs = await readDialog(row.ri, code);
 			} catch {
 				console.log(`  ${code}：詳しい内容を読めませんでした（一覧の内容だけ入れます）`);
 			}
@@ -113,6 +116,7 @@ for (;;) {
 		const { course } = parseCourse(row, pairs);
 		byCode.set(code, had ? { ...course, terms: [...new Set([...had.terms, ...course.terms])].sort() } : course);
 		console.log(`  ${code} ${course.title}`);
+		save();
 	}
 	save();
 	// The paginator is drawn above and below the table, and one of them can be hidden
