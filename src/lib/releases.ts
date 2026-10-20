@@ -8,7 +8,7 @@ export type Release = { pr: number; date: string; items: string[] };
 export const RELEASES: Release[] = [
 	{
 		pr: 69,
-		date: '2026-10-20',
+		date: '2026-10-21',
 		items: [
 			'シラバスの授業を追加。シラバスから入れた授業には、授業概要と回ごとの授業内容のメモが最初から入るように',
 			'シラバスの授業は、授業名・先生・曜日時限がシラバスのままになり、教室だけをみんなで入力できるように',
