@@ -10,7 +10,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import { verifyHref } from '$lib/verify-prompt';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll, refreshAll } from '$app/navigation';
 	import { swipeDown } from '$lib/swipe';
 	import { goBack } from '$lib/back';
 	import { wrapTitle } from '$lib/wrap-title';
@@ -55,10 +55,13 @@
 
 	// After a form is answered. Over the timetable, everything is not loaded again (the address
 	// is the course's own page, which is where that would take us): the course is read again.
+	// `timetable`: what the timetable shows changed too (its mark for changes by others), so it is
+	// read again as well, and the open course with it.
 	type Update = (options?: { reset?: boolean; invalidateAll?: boolean }) => Promise<void>;
-	async function settle(update: Update, options: { reset?: boolean } = {}) {
-		await update({ ...options, invalidateAll: !refresh });
-		await refresh?.();
+	async function settle(update: Update, options: { reset?: boolean; timetable?: boolean } = {}) {
+		const { timetable, ...rest } = options;
+		await update({ ...rest, invalidateAll: !refresh });
+		if (refresh) await (timetable ? refreshAll() : refresh());
 	}
 
 	// Back to the timetable: over it, by going back; as a page of its own, as the back link does
@@ -380,7 +383,7 @@
 						{/each}
 					</ul>
 					<div class="changed-actions">
-						<form method="POST" action={actionHref('seenShared', data.termParam)} use:enhance={() => async ({ update }) => settle(update)}>
+						<form method="POST" action={actionHref('seenShared', data.termParam)} use:enhance={() => async ({ update }) => settle(update, { timetable: true })}>
 							<button class="btn btn-primary" type="submit">確認した</button>
 						</form>
 						<form
@@ -388,7 +391,7 @@
 							action={actionHref('keepBefore', data.termParam)}
 							use:enhance={async ({ cancel }) => {
 								if (!(await ask({ message: '直される前の内容で、自分だけで使う授業にします。この授業の同期は止まります', ok: '切り替える' }))) return cancel();
-								return async ({ update }) => settle(update);
+								return async ({ update }) => settle(update, { timetable: true });
 							}}
 						>
 							<button class="btn" type="submit">自分用に切り替える</button>
