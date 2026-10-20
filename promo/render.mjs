@@ -52,14 +52,29 @@ const ff = spawn(FFMPEG, [
 	'-c:a', 'aac', '-b:a', '256k', '-t', String(DUR),
 	'-movflags', '+faststart', mp4
 ], { stdio: ['pipe', 'inherit', 'inherit'] });
+// FFmpeg not starting, or exiting with an error, fails the render instead of reporting "done"
+const finished = new Promise((resolve, reject) => {
+	ff.on('error', reject);
+	ff.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited with code ${code}`))));
+});
+// It can fail while frames are still being taken; the loop and the final await read it then
+finished.catch(() => {});
+// Writing after FFmpeg has stopped breaks the pipe; `finished` reports why
+ff.stdin.on('error', () => {});
 
-for (let i = 0; i < DUR * FPS; i++) {
-	await page.evaluate((t) => window.seek(t), i / FPS);
-	const png = await page.screenshot({ type: 'png' });
-	if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once('drain', r));
-	if (i % 150 === 0) console.log(`frame ${i}/${DUR * FPS}`);
+try {
+	for (let i = 0; i < DUR * FPS; i++) {
+		await page.evaluate((t) => window.seek(t), i / FPS);
+		const png = await page.screenshot({ type: 'png' });
+		if (!ff.stdin.write(png)) await Promise.race([new Promise((r) => ff.stdin.once('drain', r)), finished]);
+		if (i % 150 === 0) console.log(`frame ${i}/${DUR * FPS}`);
+	}
+	ff.stdin.end();
+	await finished;
+	console.log('done', mp4);
+} catch (e) {
+	console.error('render failed:', e.message);
+	process.exitCode = 1;
+} finally {
+	await browser.close();
 }
-ff.stdin.end();
-await new Promise((r) => ff.on('close', r));
-await browser.close();
-console.log('done', mp4);

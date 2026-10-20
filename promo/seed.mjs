@@ -1,7 +1,8 @@
 // Demo data for the promo screenshots. Local D1 only: every id starts with "dm-", and the
 // university, people, classes and teachers are all made up.
 //   node promo/seed.mjs && npx wrangler d1 execute DB --local --file promo/out/seed.sql
-// It signs in as あおい with a fixed session token (local only), which capture.mjs uses.
+// It signs in as あおい with a fixed session token, which capture.mjs uses. The token is public,
+// so never run this against the remote D1, and no demo user gets the admin role.
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -29,7 +30,7 @@ for (const [id, email, nick, color, text] of people) {
 	ins('users', {
 		id, email, nickname: nick, icon: JSON.stringify({ color, text }), theme: 'system', days_shown: '[1,2,3,4,5]',
 		university_id: UNIV, setup_at: now - 20 * 864e5, friend_code: `DM${id.slice(3).toUpperCase().padEnd(8, 'X')}`.slice(0, 10),
-		role: id === 'dm-me' ? 'admin' : null, notify: '{}', share_cancellations: 1, import_consent_at: null, created_at: now - 30 * 864e5
+		role: null, notify: '{}', share_cancellations: 1, import_consent_at: null, created_at: now - 30 * 864e5
 	});
 	ins('univ_verifications', { user_id: id, university_id: UNIV, email: `${id.slice(3)}@minato.example.ac.jp`, verified_at: now - 20 * 864e5, expires_at: Date.UTC(2027, 3, 30, 15) });
 	const tt = `dm-tt-${id.slice(3)}`;
