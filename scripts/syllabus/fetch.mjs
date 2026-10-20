@@ -75,17 +75,20 @@ async function readRows() {
 // The シラバス照会 dialog of row ri: its label and value cells, in order
 async function readDialog(ri, code) {
 	await page.click(`[id="funcForm:table:${ri}:jugyoKmkName"]`);
-	await page.waitForFunction(
-		([sel, c]) => [...document.querySelectorAll(sel)].some((d) => d.innerText.includes(c) && d.innerText.includes('授業概要')),
-		[DIALOG, code],
-		{ timeout: 20000 }
-	);
-	const pairs = await page.$$eval(`${DIALOG} .ui-widget-header.colStyle`, (hs) =>
-		hs.map((h) => ({ label: h.innerText.trim(), text: h.nextElementSibling?.innerText ?? '' }))
-	);
-	await page.click(`${DIALOG} .ui-dialog-titlebar-close`);
-	await page.waitForSelector(DIALOG, { state: 'detached', timeout: 5000 }).catch(() => {});
-	return pairs;
+	try {
+		await page.waitForFunction(
+			([sel, c]) => [...document.querySelectorAll(sel)].some((d) => d.innerText.includes(c) && d.innerText.includes('授業概要')),
+			[DIALOG, code],
+			{ timeout: 20000 }
+		);
+		return await page.$$eval(`${DIALOG} .ui-widget-header.colStyle`, (hs) =>
+			hs.map((h) => ({ label: h.innerText.trim(), text: h.nextElementSibling?.innerText ?? '' }))
+		);
+	} finally {
+		// Closed even when it couldn't be read, or it stays over the next page's button
+		await page.click(`${DIALOG} .ui-dialog-titlebar-close`, { timeout: 5000 }).catch(() => {});
+		await page.waitForSelector(DIALOG, { state: 'detached', timeout: 5000 }).catch(() => {});
+	}
 }
 
 let pageNo = 1;
@@ -111,7 +114,7 @@ for (;;) {
 			} catch {
 				console.log(`  ${code}：詳しい内容を読めませんでした（一覧の内容だけ入れます）`);
 			}
-			await wait(1000);
+			await wait(200);
 		}
 		const { course } = parseCourse(row, pairs);
 		byCode.set(code, had ? { ...course, terms: [...new Set([...had.terms, ...course.terms])].sort() } : course);

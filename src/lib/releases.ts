@@ -7,6 +7,14 @@ export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
 	{
+		pr: 70,
+		date: '2026-10-21',
+		items: [
+			'2026年度のシラバス（Q1〜Q4）の授業を取り込み',
+			'授業の変更を「確認した」あと、時間割の黄色い印が残ったままになる不具合を修正'
+		]
+	},
+	{
 		pr: 69,
 		date: '2026-10-21',
 		items: [
