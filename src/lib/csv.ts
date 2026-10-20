@@ -35,7 +35,7 @@ export function parseCsv(text: string, maxRows = 500) {
 	return rows.filter((r) => r.some((c) => c.trim()));
 }
 
-export const CSV_COLUMNS = ['授業名', '曜日', '時限', 'コマ数', '教室', '先生', '単位'] as const;
+export const CSV_COLUMNS = ['授業名', '曜日', '時限', 'コマ数', '教室', '先生', '単位', '授業コード'] as const;
 type Column = (typeof CSV_COLUMNS)[number];
 
 // Other headings people may write for each column
@@ -46,11 +46,12 @@ const ALIASES: Record<Column, string[]> = {
 	コマ数: ['コマ数', '連続'],
 	教室: ['教室', '場所'],
 	先生: ['先生', '教員', '担当', '担当教員', '教員名'],
-	単位: ['単位', '単位数']
+	単位: ['単位', '単位数'],
+	授業コード: ['授業コード', '科目コード', 'コード', '授業番号', '科目番号']
 };
 
 /** A filled-in example, for the template file */
-export const CSV_TEMPLATE = `${CSV_COLUMNS.join(',')}\r\n線形代数,月,2,1,A101,山田 太郎,2\r\n英語コミュニケーション,水,3,2,B205,"佐藤、鈴木",1\r\n`;
+export const CSV_TEMPLATE = `${CSV_COLUMNS.join(',')}\r\n線形代数,月,2,1,A101,山田 太郎,2,\r\n英語コミュニケーション,水,3,2,B205,"佐藤、鈴木",1,\r\n`;
 
 const WEEKDAYS = ['月', '火', '水', '木', '金', '土', '日'];
 
@@ -103,6 +104,7 @@ export function coursesOfCsv(rows: string[][]) {
 				.split(/[、,，/／]+/)
 				.map((t) => t.trim())
 				.filter(Boolean),
+			...(get('授業コード') ? { code: get('授業コード') } : {}),
 			...(credits !== null && Number.isFinite(credits) ? { credits } : {})
 		});
 	});

@@ -17,10 +17,24 @@ import { sharedAccess } from '../verify';
 
 type Timetable = { id: string; year: number; universityId: string | null };
 
-// Shared courses at the slots that were read, best matches first
+// Shared courses at the slots that were read, best matches first. A course from the syllabus
+// whose code was read comes first wherever it is held, so a name read a little wrong still finds it.
 export async function suggestions(db: Db, timetable: Timetable, groups: ReturnType<typeof groupImported>) {
 	const pairs = [...new Set(groups.flatMap((g) => g.slots.map((s) => `${s.weekday}-${s.period}`)))].slice(0, 40);
+	const codes = [...new Set(groups.flatMap((g) => (g.code ? [g.code] : [])))].slice(0, IMPORT_COURSES_MAX);
 	if (!timetable.universityId || !pairs.length) return groups.map(() => []);
+	const coded = codes.length
+		? await db
+				.select({ id: sharedCourses.id, code: sharedCourses.code })
+				.from(sharedCourses)
+				.where(
+					and(
+						eq(sharedCourses.universityId, timetable.universityId),
+						eq(sharedCourses.year, timetable.year),
+						inArray(sharedCourses.code, codes)
+					)
+				)
+		: [];
 	const rows = await db
 		.selectDistinct({ id: sharedCourses.id, weekday: sharedCourseSlots.weekday, period: sharedCourseSlots.periodNumber })
 		.from(sharedCourseSlots)
@@ -37,21 +51,20 @@ export async function suggestions(db: Db, timetable: Timetable, groups: ReturnTy
 				)
 			)
 		);
-	const shared = await loadSharedCourses(
-		db,
-		rows.map((r) => r.id)
-	);
+	const shared = await loadSharedCourses(db, [...new Set([...coded.map((r) => r.id), ...rows.map((r) => r.id)])]);
 	return groups.map((g) => {
-		const here = new Set(
-			rows.filter((r) => g.slots.some((s) => s.weekday === r.weekday && s.period === r.period)).map((r) => r.id)
-		);
+		const byCode = coded.find((r) => g.code && r.code === g.code)?.id;
+		const here = new Set([
+			...(byCode ? [byCode] : []),
+			...rows.filter((r) => g.slots.some((s) => s.weekday === r.weekday && s.period === r.period)).map((r) => r.id)
+		]);
 		const title = normalizeTitle(g.title);
 		return [...here]
 			.flatMap((id) => {
 				const course = shared.get(id);
 				if (!course) return [];
 				const other = normalizeTitle(course.values.title);
-				const score = other === title ? 3 : other.includes(title) || title.includes(other) ? 2 : 1;
+				const score = id === byCode ? 4 : other === title ? 3 : other.includes(title) || title.includes(other) ? 2 : 1;
 				return [{ id, version: course.version, terms: course.terms, score, ...course.values }];
 			})
 			.sort((a, b) => b.score - a.score)

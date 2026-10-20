@@ -27,6 +27,11 @@ describe('coursesOfCsv', () => {
 		expect(skipped).toEqual([3, 4]);
 	});
 
+	it('reads a course code column', () => {
+		const { courses } = coursesOfCsv(parseCsv('科目コード,授業名,曜日,時限\n10000001,物理,火,3'));
+		expect(readImport({ courses })?.[0]).toMatchObject({ title: '物理', code: '10000001' });
+	});
+
 	it('takes the template order without a heading row', () => {
 		expect(coursesOfCsv(parseCsv('統計,Thu,4')).courses[0]).toMatchObject({ title: '統計', weekday: 4, period: 4 });
 	});

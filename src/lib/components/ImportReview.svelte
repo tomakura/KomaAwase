@@ -61,10 +61,10 @@
 		const names = terms.filter((t) => chosen.includes(t.id)).map((t) => t.name);
 		return suggestions.filter((s) => !s.terms.length || s.terms.some((n) => names.includes(n)));
 	}
-	// A same-named course others already added is used as it is
+	// A same-named course others already added, or the syllabus course with the code that was read, is used as it is
 	const autoShared = (suggestions: Suggestion[], chosen: string[]) => {
 		const best = fitting(suggestions, chosen)[0];
-		return best?.score === 3 ? best.id : null;
+		return best && best.score >= 3 ? best.id : null;
 	};
 	const compare = (g: { title: string; slots: Slot[]; teachers: string; sharedId: string | null }, chosen: string[]) =>
 		compareCourse({ title: g.title, slots: g.slots, teachers: splitTeachers(g.teachers), sharedId: g.sharedId }, chosen, existing);

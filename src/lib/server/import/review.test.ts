@@ -1,6 +1,6 @@
 // Saving reviewed courses: new ones added, a chosen one already there set to what was read
 import { describe, expect, it } from 'vitest';
-import { saveReviewed } from './review';
+import { saveReviewed, suggestions } from './review';
 import { testDatabase } from '../../../test/db';
 
 function world() {
@@ -66,5 +66,22 @@ describe('saveReviewed', () => {
 			saveReviewed(t.db, 'u1', timetable, form([{ title: 'x', teachers: [], slots: [{ weekday: 1, period: 1, span: 1, room: '' }], updateId: 'other' }]))
 		).rejects.toMatchObject({ status: 400 });
 		expect(t.rows(`SELECT count(*) AS n FROM course_slots WHERE course_id = 'other'`)[0].n).toBe(0);
+	});
+});
+
+describe('suggestions', () => {
+	it('puts the syllabus course with the code that was read first, even at another slot and with another name read', async () => {
+		const t = testDatabase();
+		t.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
+		t.run(
+			`INSERT INTO shared_courses (id, university_id, year, title, source, code) VALUES ('syl', 'uni', 2026, '演習A', 'syllabus', '10000001'), ('usr', 'uni', 2026, '演習', 'user', NULL)`
+		);
+		t.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span) VALUES ('a', 'syl', 3, 1, 1), ('b', 'usr', 1, 1, 1)`);
+		const group = { title: '演習', teachers: [], credits: null, code: '10000001', slots: [{ weekday: 1, period: 1, span: 1, room: '' }] };
+		const [found] = await suggestions(t.db, { id: 't', year: 2026, universityId: 'uni' }, [group]);
+		expect(found.map((s) => [s.id, s.score])).toEqual([
+			['syl', 4],
+			['usr', 3]
+		]);
 	});
 });
