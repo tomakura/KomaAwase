@@ -39,10 +39,17 @@ const monthDay = (ms: number) => {
 };
 
 /** Where a shared course's values come from, and when they were last looked at or changed */
-export function sharedSource(c: { source: 'syllabus' | 'user'; version: number; createdAt: number; updatedAt: number }) {
+export function sharedSource(c: {
+	source: 'syllabus' | 'user';
+	createdAt: number;
+	updatedAt: number;
+	checkedAt?: number | null;
+}) {
 	if (c.source === 'syllabus') {
-		const base = `シラバスから（${monthDay(c.createdAt)} 確認）`;
-		return c.version > 1 ? `${base}・${monthDay(c.updatedAt)} 利用者が修正` : base;
+		// Read from the syllabus at `checked`; changed by someone after it (a room, say) when updated later
+		const checked = c.checkedAt ?? c.createdAt;
+		const base = `シラバスから（${monthDay(checked)} 確認）`;
+		return c.updatedAt > checked + 1000 ? `${base}・${monthDay(c.updatedAt)} 利用者が修正` : base;
 	}
 	return `利用者が入力（${monthDay(c.updatedAt)} 更新）`;
 }

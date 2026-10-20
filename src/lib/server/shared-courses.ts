@@ -31,7 +31,7 @@ export type SharedValues = {
 };
 
 // Fixed key order, so two sets of values compare equal as JSON
-function normalize(v: SharedValues): SharedValues {
+export function normalize(v: SharedValues): SharedValues {
 	return {
 		title: v.title,
 		teachers: v.teachers,
@@ -44,7 +44,7 @@ function normalize(v: SharedValues): SharedValues {
 }
 
 // Names typed two ways (full-width spaces, Ａ・１) are saved one way
-function cleanValues(v: SharedValues): SharedValues {
+export function cleanValues(v: SharedValues): SharedValues {
 	return {
 		...v,
 		title: cleanText(v.title),
@@ -64,6 +64,11 @@ export type SharedCourse = {
 	// When it was added and last changed (ms), for where the values come from (sharedSource)
 	createdAt: number;
 	updatedAt: number;
+	// When it was last read from the syllabus (ms); null for courses people added
+	checkedAt: number | null;
+	// From the syllabus: 授業概要・到達目標 and the plan of each class
+	outline: string | null;
+	schedule: string | null;
 	values: SharedValues;
 };
 
@@ -123,6 +128,9 @@ export function sharedCoursesFrom(
 				version: r.version,
 				createdAt: r.createdAt.getTime(),
 				updatedAt: r.updatedAt.getTime(),
+				checkedAt: r.syllabusCheckedAt?.getTime() ?? null,
+				outline: r.syllabusOutline,
+				schedule: r.syllabusSchedule,
 				values: normalize({
 					title: r.title,
 					teachers: teachers.filter((t) => t.sharedCourseId === r.id).map((t) => t.name),
@@ -185,7 +193,7 @@ export async function loadSharedCourse(db: Db, id: string) {
 	return (await loadSharedCourses(db, [id])).get(id) ?? null;
 }
 
-function insertDetails(db: Db, sharedCourseId: string, v: SharedValues): BatchItem<'sqlite'>[] {
+export function insertDetails(db: Db, sharedCourseId: string, v: SharedValues): BatchItem<'sqlite'>[] {
 	const statements: BatchItem<'sqlite'>[] = [];
 	if (v.slots.length) {
 		statements.push(
@@ -431,7 +439,20 @@ export async function loadEdits(db: Db, sharedCourseId: string, page = 1) {
  */
 export async function restoreShared(
 	db: Db,
-	{ userId, course, editId, version }: { userId: string; course: SharedCourse; editId: string; version: number }
+	{
+		userId,
+		course,
+		editId,
+		version,
+		roomsOnly = false
+	}: {
+		userId: string;
+		course: SharedCourse;
+		editId: string;
+		version: number;
+		// A syllabus course: only its rooms go back (its other values stay as the syllabus has them)
+		roomsOnly?: boolean;
+	}
 ) {
 	if (course.version !== version) return { message: 'ほかの人が先に直しました。読み込み直してから、もう一度やり直してください' };
 	const edit = await db
@@ -439,8 +460,17 @@ export async function restoreShared(
 		.from(sharedCourseEdits)
 		.where(and(eq(sharedCourseEdits.id, editId), eq(sharedCourseEdits.sharedCourseId, course.id)))
 		.get();
-	const values = edit?.diff.after as SharedValues | null | undefined;
-	if (!values) return { message: 'その版が見つかりません' };
+	const after = edit?.diff.after as SharedValues | null | undefined;
+	if (!after) return { message: 'その版が見つかりません' };
+	const values = roomsOnly
+		? {
+				...course.values,
+				slots: course.values.slots.map((s) => ({
+					...s,
+					room: after.slots.find((a) => a.weekday === s.weekday && a.period === s.period)?.room ?? null
+				}))
+			}
+		: after;
 	const written = writeShared(db, {
 		userId,
 		universityId: course.universityId,

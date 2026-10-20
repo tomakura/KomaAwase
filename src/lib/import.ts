@@ -10,6 +10,8 @@ export type ImportedCourse = {
 	span: number;
 	room: string;
 	teachers: string[];
+	// The university's course code, when the cell shows one: it finds the course in the syllabus
+	code?: string;
 	// Read from a row whose cells didn't match the weekday headings: the weekday is a guess
 	check?: true;
 	// The cells of a double class gave different rooms: one of them is likely misread
@@ -27,9 +29,10 @@ const CELL = {
 	properties: {
 		title: { type: 'string', description: '授業名。空いているマスは空文字' },
 		room: { type: 'string', description: '教室。なければ空文字' },
-		teacher: { type: 'string', description: '先生の名前。なければ空文字' }
+		teacher: { type: 'string', description: '先生の名前。なければ空文字' },
+		code: { type: 'string', description: '授業コードの数字。なければ空文字' }
 	},
-	required: ['title', 'room', 'teacher'],
+	required: ['title', 'room', 'teacher', 'code'],
 	additionalProperties: false
 } as const;
 
@@ -60,9 +63,9 @@ export const IMPORT_PROMPT = [
 	'これは大学の時間割アプリのスクリーンショットです。表を上の行から順に、そのまま書き写してJSONで返してください。',
 	'- days: いちばん上の曜日の見出しを、左から順に（例: ["月","火","水","木","金"]）',
 	'- rows: 時限の行ごとに1つ。period はその行の時限の番号（1限なら1）。番号がなく時刻だけなら、上から1、2、3…と数える',
-	'- cells: その行のマスを、左の列から順に days と同じ数だけ。授業が入っていないマスは title・room・teacher を空文字',
+	'- cells: その行のマスを、左の列から順に days と同じ数だけ。授業が入っていないマスは title・room・teacher・code を空文字',
 	'- title はマスの授業名。マスの中で改行されていても1つにつなげる',
-	'- room はマスにある教室、teacher は先生の名前。なければ空文字',
+	'- room はマスにある教室、teacher は先生の名前、code は8桁ほどの授業コードの数字。なければ空文字',
 	'- 同じ授業が上下のマスに続いていても、それぞれの行に書く',
 	'- 読めない文字を想像で埋めない'
 ].join('\n');
@@ -81,9 +84,10 @@ export const IMPORT_TILE_SCHEMA = {
 					cell: { type: 'string', description: 'そのマスの左にあるピンクの札の文字。例 B1' },
 					title: { type: 'string', description: '授業名。空のマスは空文字' },
 					teacher: { type: 'string', description: '先生の名前。なければ空文字' },
-					room: { type: 'string', description: '教室。なければ空文字' }
+					room: { type: 'string', description: '教室。なければ空文字' },
+					code: { type: 'string', description: '授業コードの数字。なければ空文字' }
 				},
-				required: ['cell', 'title', 'teacher', 'room'],
+				required: ['cell', 'title', 'teacher', 'room', 'code'],
 				additionalProperties: false
 			}
 		}
@@ -94,11 +98,12 @@ export const IMPORT_TILE_SCHEMA = {
 
 export const IMPORT_TILE_PROMPT = [
 	'これは大学の時間割のマスを縦に並べた画像です。各マスの左に、ピンクの札で B1 のような印があります。',
-	'すべてのマスについて、次の4つを書き出してください。',
+	'すべてのマスについて、次の5つを書き出してください。',
 	'- cell: そのマスの左にあるピンクの札の文字（例 B1）',
 	'- title: そのマスの太字の授業名の1行だけ（先生名・8桁の数字・N単位・複数回は含めない）。札が A0 のように0で終わるマスは曜日の見出しなので、title に曜日を書く',
 	'- teacher: 先生の名前（なければ空文字）',
 	'- room: 教室（なければ空文字）',
+	'- code: マスにある8桁ほどの授業コードの数字（なければ空文字）',
 	'読めない文字を想像で埋めない'
 ].join('\n');
 
@@ -135,7 +140,7 @@ function cellsOfGrid(days: unknown[], rows: unknown[]) {
 		const unsure = r.cells.length !== weekdays.length;
 		r.cells.forEach((cell, i) => {
 			if (typeof cell !== 'object' || cell === null) return;
-			const c = cell as { title?: unknown; room?: unknown; teacher?: unknown };
+			const c = cell as { title?: unknown; room?: unknown; teacher?: unknown; code?: unknown };
 			out.push({
 				title: c.title,
 				weekday: weekdays[i] ?? i + 1,
@@ -143,6 +148,7 @@ function cellsOfGrid(days: unknown[], rows: unknown[]) {
 				span: 1,
 				room: c.room,
 				teachers: typeof c.teacher === 'string' ? splitTeachers(c.teacher) : [],
+				code: c.code,
 				...(unsure ? { check: true } : {})
 			});
 		});
@@ -157,10 +163,10 @@ const TAG = /^([A-H])(\d{1,2})$/;
 /** Reads what the AI wrote beside each tag of a stack of cells (IMPORT_TILE_PROMPT) */
 function cellsOfTiles(tiles: unknown[]) {
 	const headings: unknown[] = [];
-	const found: { col: number; period: number; cell: { title?: unknown; room?: unknown; teacher?: unknown } }[] = [];
+	const found: { col: number; period: number; cell: { title?: unknown; room?: unknown; teacher?: unknown; code?: unknown } }[] = [];
 	for (const tile of tiles) {
 		if (typeof tile !== 'object' || tile === null) continue;
-		const t = tile as { cell?: unknown; title?: unknown; room?: unknown; teacher?: unknown };
+		const t = tile as { cell?: unknown; title?: unknown; room?: unknown; teacher?: unknown; code?: unknown };
 		const tag = typeof t.cell === 'string' ? TAG.exec(t.cell.normalize('NFKC').replace(/\s+/g, '').toUpperCase()) : null;
 		if (!tag) continue;
 		const col = tag[1].charCodeAt(0) - 65;
@@ -177,7 +183,8 @@ function cellsOfTiles(tiles: unknown[]) {
 		period,
 		span: 1,
 		room: cell.room,
-		teachers: typeof cell.teacher === 'string' ? splitTeachers(cell.teacher) : []
+		teachers: typeof cell.teacher === 'string' ? splitTeachers(cell.teacher) : [],
+		code: cell.code
 	}));
 }
 
@@ -197,6 +204,20 @@ const SPAN_MAX = 4;
 export const IMPORT_COURSES_MAX = 60;
 
 const clip = (s: string, max: number) => [...s.trim()].slice(0, max).join('');
+
+// A course code as the syllabus writes it: digits, maybe letters and dashes. Anything else the
+// AI put there (a room, a credit count) is dropped.
+const CODE = /^[0-9A-Z][0-9A-Z-]{3,19}$/;
+export function cleanCode(text: unknown) {
+	if (typeof text !== 'string') return '';
+	const code = text
+		.normalize('NFKC')
+		.replace(/\s+/g, '')
+		.replace(/[\u2010-\u2015\u2212\u30FC]/g, '-')
+		.toUpperCase();
+	// At least one digit, so a word in capitals isn't taken for one
+	return CODE.test(code) && /\d/.test(code) ? code : '';
+}
 
 // A Roman numeral symbol (Ⅱ, Ⅳ) becomes the letters it is drawn with (II, IV): the symbol can't
 // be typed on most keyboards, so a title with one would never match a search or a friend's.
@@ -274,6 +295,7 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 		const weekday = Number(c.weekday);
 		const period = Number(c.period);
 		const span = Number(c.span ?? 1);
+		const code = cleanCode(c.code);
 		if (!title || !Number.isInteger(weekday) || weekday < 1 || weekday > 7) continue;
 		if (!Number.isInteger(period) || period < 0 || period > 12) continue;
 		out.push({
@@ -287,6 +309,7 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 						.filter(Boolean)
 						.slice(0, TEACHERS_MAX)
 				: [],
+			...(code ? { code } : {}),
 			...(c.check === true ? { check: true as const } : {}),
 			...(typeof c.credits === 'number' && c.credits >= 0 && c.credits <= CREDITS_MAX && Number.isInteger(c.credits * 2)
 				? { credits: c.credits }
@@ -308,6 +331,7 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 			prev.span += c.span;
 			if (prev.room && c.room && prev.room !== c.room) prev.roomCheck = true;
 			prev.room ||= c.room;
+			if (c.code) prev.code ??= c.code;
 			prev.teachers = [...new Set([...prev.teachers, ...c.teachers])].slice(0, TEACHERS_MAX);
 			if (c.check) prev.check = true;
 			continue;
@@ -324,12 +348,13 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 // Courses that meet several times a week are one course with several slots.
 export function groupImported(courses: ImportedCourse[]) {
 	const key = normalizeTitle;
-	type Slot = Omit<ImportedCourse, 'title' | 'teachers' | 'credits'>;
-	const groups = new Map<string, { title: string; teachers: string[]; credits: number | null; slots: Slot[] }>();
+	type Slot = Omit<ImportedCourse, 'title' | 'teachers' | 'credits' | 'code'>;
+	const groups = new Map<string, { title: string; teachers: string[]; credits: number | null; code: string | null; slots: Slot[] }>();
 	for (const c of courses) {
-		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], credits: null, slots: [] };
+		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], credits: null, code: null, slots: [] };
 		group.teachers = [...new Set([...group.teachers, ...c.teachers])];
 		group.credits ??= c.credits ?? null;
+		group.code ??= c.code ?? null;
 		group.slots.push({
 			weekday: c.weekday,
 			period: c.period,

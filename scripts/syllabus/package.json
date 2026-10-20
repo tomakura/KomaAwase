@@ -1,0 +1,9 @@
+{
+	"name": "komaawase-syllabus",
+	"private": true,
+	"type": "module",
+	"description": "Reads the public syllabus into a file for 運営 → シラバスの取り込み (see fetch.mjs)",
+	"dependencies": {
+		"playwright": "1.63.0"
+	}
+}

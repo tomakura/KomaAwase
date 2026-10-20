@@ -4,6 +4,8 @@
 	import { verifyHref } from '$lib/verify-prompt';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import Sheet from '$lib/components/Sheet.svelte';
+	import type { Snippet } from 'svelte';
+	import { ONLINE_ROOM } from '$lib/text';
 	import { COURSE_COLORS, DAY_NAMES, WEEK_PATTERNS, absenceLimitOf, courseColor, creditsOf, periodLabel, type Delivery, type WeekPattern } from '$lib/courses';
 
 	type Slot = { weekday: number; period: number; span: number; week?: WeekPattern; room: string | null };
@@ -31,6 +33,8 @@
 		shared: { id: string; source: 'syllabus' | 'user'; version: number; values: SharedValues } | null;
 		// Whether this person's changes reach the shared course (see canEditShared)
 		canEdit: boolean;
+		// A syllabus course: while synced, its values stay as the syllabus has them (rooms aside)
+		fixed?: boolean;
 	};
 
 	let {
@@ -45,7 +49,8 @@
 		periods,
 		others = [],
 		universityId = null,
-		message
+		message,
+		notice
 	}: {
 		heading: string;
 		backHref: string;
@@ -62,6 +67,8 @@
 		others?: { weekday: number; period: number; span: number; week: WeekPattern; termIds: string[] }[];
 		universityId?: string | null;
 		message?: string;
+		// Above the fields, under the sync choice
+		notice?: Snippet;
 	} = $props();
 
 	// The form keeps its own copy; `initial` only seeds it.
@@ -127,6 +134,9 @@
 		v.credits = shared.credits ?? '';
 	}
 
+	// The syllabus's values, shown but not changed (only rooms are)
+	const fixed = $derived(!!sync.fixed && sync.shared?.source === 'syllabus' && v.syncMode === 'synced');
+
 	const syncHeading = $derived(
 		!sync.shared
 			? 'この授業を同じ大学のみんなと共有できます'
@@ -137,6 +147,8 @@
 	const syncNote = $derived(
 		v.syncMode === 'personal'
 			? '授業名や教室を自分用に変えられます。ほかの人の変更は反映されません。'
+			: fixed && sync.canEdit
+				? '「シラバス」の付いた項目はシラバスのままです。教室を入れると、同期しているみんなに反映されます。シラバスと違うときは「自分だけで使う」で直せます。'
 			: sync.shared && !sync.canEdit
 				? 'だれかが教室などを直すと、自動で反映されます。この授業を同期していて在籍確認済みの人が、みんなのデータを直せます。内容を変えて保存すると「自分だけで使う」に切り替わります。'
 				: sync.shared
@@ -204,6 +216,11 @@
 		picking = false;
 	}
 </script>
+
+<!-- The small 「シラバス」 tag beside a value that comes from the syllabus -->
+{#snippet fromSyllabus(what = '')}
+	{#if fixed}<span class="tag-syllabus" title={what ? `${what}はシラバスのまま` : 'シラバスのまま'}>シラバス</span>{/if}
+{/snippet}
 
 <form
 	method="POST"
@@ -286,28 +303,35 @@
 			<input type="hidden" name="shared_version" value={sync.shared.version} />
 		{/if}
 
+		{@render notice?.()}
+
 		{#if message}<p class="error" role="alert">{message}</p>{/if}
 
 		<label class="field">
-			授業名
-			<input name="title" bind:value={v.title} maxlength="60" required autocomplete="off" />
+			<span class="label-row">授業名{@render fromSyllabus()}</span>
+			<input name="title" bind:value={v.title} maxlength="60" required autocomplete="off" readonly={fixed} />
 		</label>
 
 		<div class="group">
-			<span class="label" id="teacher-label">先生（任意）</span>
+			<span class="label label-row" id="teacher-label">{fixed ? '先生' : '先生（任意）'}{@render fromSyllabus()}</span>
 			{#if v.teachers.length}
 				<div class="chips">
 					{#each v.teachers as name, i (name)}
 						<span class="chip">
 							{name}
-							<button type="button" aria-label="{name}を外す" onclick={() => v.teachers.splice(i, 1)}>
-								<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-							</button>
+							{#if !fixed}
+								<button type="button" aria-label="{name}を外す" onclick={() => v.teachers.splice(i, 1)}>
+									<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+								</button>
+							{/if}
 						</span>
 						<input type="hidden" name="teacher" value={name} />
 					{/each}
 				</div>
+			{:else if fixed}
+				<span class="note">シラバスに載っていません</span>
 			{/if}
+			{#if !fixed}
 			<div class="inline">
 				<input
 					bind:value={teacher}
@@ -324,6 +348,7 @@
 				/>
 				<button class="secondary" type="button" onclick={addTeacher}>追加</button>
 			</div>
+			{/if}
 		</div>
 
 		<div class="group">
@@ -339,8 +364,8 @@
 
 		<div class="numbers">
 			<label class="field">
-				単位数（任意）
-				<input name="credits" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder={creditsHint ? `${creditsHint}` : ""} bind:value={v.credits} />
+				<span class="label-row">{fixed ? '単位数' : '単位数（任意）'}{@render fromSyllabus()}</span>
+				<input name="credits" type="number" inputmode="decimal" min="0" max="20" step="0.5" placeholder={creditsHint ? `${creditsHint}` : ""} bind:value={v.credits} readonly={fixed} />
 			</label>
 			<label class="field">
 				欠席できる回数（任意）
@@ -362,27 +387,43 @@
 
 		{#if !v.unscheduled}
 			<div class="group">
-				<span class="label">曜日・時限と教室</span>
+				<span class="label label-row">曜日・時限と教室{@render fromSyllabus('曜日・時限')}</span>
 				{#each v.slots as slot, i (`${slot.weekday}-${slot.period}`)}
 					{@const label = `${DAY_NAMES[slot.weekday]} ${periodLabel(slot.period, slot.span, periodNumbers)}`}
 					<div class="slot-row">
 						<span class="slot-label">{label}</span>
-						<!-- Longer or shorter in place, without taking the slot out and adding it again -->
-						<select class="span" bind:value={slot.span} aria-label="{label}のコマ数">
-							{#each spanChoices(i) as n (n)}<option value={n}>{n}コマ</option>{/each}
-						</select>
-						<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
-							<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-						</button>
-						<!-- Classes on alternate weeks share a slot with another course -->
-						<select class="week" bind:value={slot.week} aria-label="{label}の週">
-							{#each WEEK_PATTERNS as w (w.id)}<option value={w.id}>{w.label}</option>{/each}
-						</select>
-						<input bind:value={slot.room} placeholder="教室" aria-label="{label}の教室" maxlength="20" autocomplete="off" />
+						{#if fixed}
+							<span class="fixed-value">{slot.span}コマ{WEEK_PATTERNS.find((w) => w.id === slot.week && w.id !== 'every') ? ` · ${WEEK_PATTERNS.find((w) => w.id === slot.week)?.label}` : ''}</span>
+						{:else}
+							<!-- Longer or shorter in place, without taking the slot out and adding it again -->
+							<select class="span" bind:value={slot.span} aria-label="{label}のコマ数">
+								{#each spanChoices(i) as n (n)}<option value={n}>{n}コマ</option>{/each}
+							</select>
+							<button type="button" class="remove" aria-label="{label}を外す" onclick={() => v.slots.splice(i, 1)}>
+								<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+							</button>
+							<!-- Classes on alternate weeks share a slot with another course -->
+							<select class="week" bind:value={slot.week} aria-label="{label}の週">
+								{#each WEEK_PATTERNS as w (w.id)}<option value={w.id}>{w.label}</option>{/each}
+							</select>
+						{/if}
+						<div class="room" class:wide={fixed}>
+							<input bind:value={slot.room} placeholder="教室" aria-label="{label}の教室" maxlength="20" autocomplete="off" />
+							<button
+								type="button"
+								class="online"
+								aria-pressed={slot.room === ONLINE_ROOM}
+								onclick={() => (slot.room = slot.room === ONLINE_ROOM ? '' : ONLINE_ROOM)}
+							>
+								{ONLINE_ROOM}
+							</button>
+						</div>
 						<input type="hidden" name="slot" value={JSON.stringify(slot)} />
 					</div>
 				{/each}
-				{#if picking}
+				{#if fixed}
+					<!-- The syllabus's slots: none to add -->
+				{:else if picking}
 					<div class="picker">
 						<select bind:value={pick.weekday} aria-label="曜日">
 							{#each [1, 2, 3, 4, 5, 6, 7] as d (d)}<option value={d}>{DAY_NAMES[d]}曜</option>{/each}
@@ -415,37 +456,48 @@
 						曜日・時限を追加
 					</button>
 				{/if}
-				<span class="note">
-					週に複数回ある授業は、ここにまとめて登録できます。
-				</span>
+				{#if !fixed}
+					<span class="note">
+						週に複数回ある授業は、ここにまとめて登録できます。
+					</span>
+				{/if}
 			</div>
 		{/if}
 
-		<label class="check">
-			<input type="checkbox" name="unscheduled" bind:checked={v.unscheduled} />
-			曜日・時限がない（オンデマンド・集中講義）
-		</label>
+		{#if fixed}
+			{#if v.unscheduled}<input type="hidden" name="unscheduled" value="on" />{/if}
+		{:else}
+			<label class="check">
+				<input type="checkbox" name="unscheduled" bind:checked={v.unscheduled} />
+				曜日・時限がない（オンデマンド・集中講義）
+			</label>
+		{/if}
 
 		{#if v.unscheduled}
 			<div class="group">
-				<div class="segmented" role="group" aria-label="授業の形">
-					<button type="button" aria-pressed={v.delivery === 'ondemand'} onclick={() => (v.delivery = 'ondemand')}>
-						オンデマンド
-					</button>
-					<button type="button" aria-pressed={v.delivery === 'intensive'} onclick={() => (v.delivery = 'intensive')}>
-						集中講義
-					</button>
-				</div>
+				{#if fixed}
+					<span class="label label-row">授業の形{@render fromSyllabus()}</span>
+					<span class="fixed-value">{v.delivery === 'intensive' ? '集中講義' : 'オンデマンド'}</span>
+				{:else}
+					<div class="segmented" role="group" aria-label="授業の形">
+						<button type="button" aria-pressed={v.delivery === 'ondemand'} onclick={() => (v.delivery = 'ondemand')}>
+							オンデマンド
+						</button>
+						<button type="button" aria-pressed={v.delivery === 'intensive'} onclick={() => (v.delivery = 'intensive')}>
+							集中講義
+						</button>
+					</div>
+				{/if}
 				<input type="hidden" name="delivery" value={v.delivery} />
 				{#if v.delivery === 'intensive'}
 					<div class="dates">
 						<label class="field">
 							はじまり（任意）
-							<input type="date" name="intensive_from" bind:value={v.intensiveFrom} />
+							<input type="date" name="intensive_from" bind:value={v.intensiveFrom} readonly={fixed} />
 						</label>
 						<label class="field">
 							おわり
-							<input type="date" name="intensive_to" bind:value={v.intensiveTo} />
+							<input type="date" name="intensive_to" bind:value={v.intensiveTo} readonly={fixed} />
 						</label>
 					</div>
 				{/if}
@@ -767,8 +819,64 @@
 		background: var(--bg);
 	}
 
-	.slot-row input {
+	.room {
 		grid-column: 2 / 4;
+		min-width: 0;
+		display: flex;
+		gap: 6px;
+	}
+
+	.room.wide {
+		grid-column: 1 / 4;
+	}
+
+	.room input {
+		flex: 1;
+	}
+
+	.online {
+		flex-shrink: 0;
+		height: 36px;
+		padding: 0 10px;
+		border: 1px solid var(--line);
+		border-radius: 9px;
+		background: var(--bg);
+		color: var(--ink-sub);
+		font-size: 13px;
+	}
+
+	.online[aria-pressed='true'] {
+		border-color: transparent;
+		background: var(--course-blue);
+		color: var(--ink);
+		font-weight: 700;
+	}
+
+	.label-row {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.tag-syllabus {
+		padding: 1px 6px;
+		border-radius: 5px;
+		background: var(--course-blue);
+		color: var(--ink);
+		font-size: 10px;
+		font-weight: 700;
+	}
+
+	.fixed-value {
+		font-size: 14px;
+		color: var(--ink-sub);
+	}
+
+	input[readonly] {
+		color: var(--ink-sub);
+	}
+
+	.slot-row input {
 		min-width: 0;
 		height: 36px;
 		padding: 0 10px;

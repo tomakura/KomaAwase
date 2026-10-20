@@ -5,12 +5,13 @@ import { ABSENCE_LIMIT_MAX, COURSE_COLORS, CREDITS_MAX, isCourseColor, readNumbe
 import { isDate } from '$lib/time';
 import { cleanRoom, cleanText } from '$lib/text';
 import type { Db } from './db';
-import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, sharedCourseEdits, timetables } from './db/schema';
+import { courseAbsences, courseSlots, courseTeachers, courseTerms, courses, sharedCourseEdits, timetables, users } from './db/schema';
 import { sharedChanges, sharedSource, type SharedChange } from '$lib/shared-changes';
 import { deleteCourseFiles } from './files';
 import { courseMovesQuery } from './calendar';
 import { loadNotes } from './notes';
 import { canEditShared, loadSharedCourse, sharedCourseQueries, sharedCoursesFrom, syncedValues, writeShared, type SharedCourse, type SharedValues } from './shared-courses';
+import { memoStatements, withRooms } from './syllabus';
 import { loadShape, shapeQueries } from './timetable';
 import { sharedAccess } from './verify';
 
@@ -172,6 +173,16 @@ export async function prepareCourse(
 	{ userId, timetable, terms, courseId, input, sharedAllowed }: SaveArgs
 ): Promise<PreparedCourse | { message: string }> {
 	const existing = input.sharedCourseId ? await loadSharedCourse(db, input.sharedCourseId) : null;
+	// Synced with a syllabus course, it keeps the syllabus's values and only the rooms are
+	// people's (the form shows the rest as fixed). The admin may still change anything.
+	let roomsOnly = false;
+	if (input.syncMode === 'synced' && existing?.source === 'syllabus') {
+		const user = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).get();
+		if (user?.role !== 'admin') {
+			input = { ...input, ...withRooms(existing.values, input.slots) };
+			roomsOnly = true;
+		}
+	}
 	if (
 		input.sharedCourseId &&
 		(existing?.universityId !== timetable.universityId || existing?.year !== timetable.year)
@@ -181,6 +192,8 @@ export async function prepareCourse(
 	// The shared data is for people with a current enrollment check. A course already linked
 	// stays so (its values are still read); new links and new shared courses need the check.
 	const allowed = async () => (sharedAllowed ??= (await sharedAccess(db, userId, timetable.universityId)) === 'ok');
+	// Whether this saves the link to `existing` for the first time
+	let newLink = false;
 	if (existing) {
 		const linked = courseId
 			? await db
@@ -189,7 +202,8 @@ export async function prepareCourse(
 					.where(and(eq(courses.id, courseId), eq(courses.timetableId, timetable.id)))
 					.get()
 			: null;
-		if (linked?.id !== existing.id && !(await allowed())) return { message: NEEDS_CHECK };
+		newLink = linked?.id !== existing.id;
+		if (newLink && !(await allowed())) return { message: NEEDS_CHECK };
 	}
 
 	let sharedCourseId = existing?.id ?? null;
@@ -210,7 +224,9 @@ export async function prepareCourse(
 		if (written.changed && existing && input.sharedVersion !== null && input.sharedVersion !== existing.version) {
 			return { message: CONFLICT };
 		}
-		if (written.changed && existing && !(await canEditShared(db, userId, existing))) {
+		// The syllabus has no rooms, so anyone at the university with an enrollment check fills
+		// them in, also as they add the course; other changes need canEditShared
+		if (written.changed && existing && !(roomsOnly ? await allowed() : await canEditShared(db, userId, existing))) {
 			// Not theirs to change for everyone: the change stays in their timetable, still linked
 			// (so overlays still group it), as 自分だけで使う. The form says so beforehand.
 			syncMode = 'personal';
@@ -265,6 +281,8 @@ export async function prepareCourse(
 				.values(input.teachers.map((name, sortOrder) => ({ courseId: id, name, sortOrder })))
 		);
 	}
+	// Added from the syllabus: its outline and the plan of each class come along as memos
+	if (newLink && existing?.source === 'syllabus' && sharedCourseId) rest.push(...memoStatements(db, [id], existing));
 	return {
 		id,
 		existing,

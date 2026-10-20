@@ -24,7 +24,8 @@
 		locked: data.sharedAccess === 'need-verify' || data.sharedAccess === 'unsupported' ? data.sharedAccess : null,
 		year: data.timetable.year,
 		shared: data.shared,
-		canEdit: data.canEditShared
+		canEdit: data.canEditShared,
+		fixed: data.fixedBySyllabus
 	}}
 	initial={data.course}
 	terms={data.terms}
@@ -34,7 +35,18 @@
 	message={form?.message}
 	{onsaved}
 	{onback}
-/>
+>
+	{#snippet notice()}
+		{#if data.found}
+			<div class="found">
+				<span class="found-title">シラバスにこの授業がありました</span>
+				<span class="found-detail">{data.found.title}{data.found.detail ? ` · ${data.found.detail}` : ''}</span>
+				<span class="found-note">つなぐと、授業名や先生がシラバスの内容になり、授業概要と回ごとの授業内容がメモに入ります。色・メモ・課題はそのままです。</span>
+				<button class="btn" type="submit" formaction={actionHref('link', data.termParam)} formnovalidate>シラバスとつなぐ</button>
+			</div>
+		{/if}
+	{/snippet}
+</CourseForm>
 
 <form
 	class="delete"
@@ -48,6 +60,32 @@
 </form>
 
 <style>
+	.found {
+		display: grid;
+		gap: 6px;
+		padding: 12px 14px;
+		border-radius: 14px;
+		background: var(--course-blue);
+	}
+
+	.found-title {
+		font-weight: 700;
+		font-size: 14px;
+	}
+
+	.found-detail {
+		font-size: 14px;
+	}
+
+	.found-note {
+		font-size: 12px;
+		color: var(--ink-sub);
+	}
+
+	.found .btn {
+		justify-self: start;
+	}
+
 	.delete {
 		max-width: 480px;
 		margin: 0 auto;

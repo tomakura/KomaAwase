@@ -1,11 +1,11 @@
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { STEPS_MAX, STEP_TEXT_MAX, SUBMIT_TO_MAX, weeklyDates, type TaskStep } from '$lib/tasks';
+import { MEMO_MAX } from '$lib/notes';
 import { isDate } from '$lib/time';
 import type { Db } from './db';
 import { courseNotes, courses } from './db/schema';
 
-const MEMO_MAX = 1000;
 const TASK_MAX = 100;
 const CANCEL_NOTE_MAX = 100;
 

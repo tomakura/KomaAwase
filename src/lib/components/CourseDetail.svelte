@@ -28,7 +28,7 @@
 		weekLabel
 	} from '$lib/courses';
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
-	import { moveId, orderMemos } from '$lib/notes';
+	import { MEMO_MAX, moveId, orderMemos } from '$lib/notes';
 	import { votesLabel } from '$lib/cancellations';
 	import { whenLabel } from '$lib/plans';
 	import { REPEAT_MAX, stepsDone, submitLink, type TaskStep } from '$lib/tasks';
@@ -162,6 +162,10 @@
 	let allTasks = $state(false);
 	let removing = $state<string | null>(null);
 
+	// Long memos (the syllabus's, say) show their first lines until opened
+	let openMemos = $state<string[]>([]);
+	const isLong = (body: string) => body.split('\n').length > 6 || body.length > 240;
+
 	// The note being changed (its form is where the note was)
 	let editing = $state<string | null>(null);
 	// Putting the memos in an order: the ids as they are lined up until 完了
@@ -216,7 +220,7 @@
 {#snippet noteFields(kind: 'memo' | 'task' | 'cancel', note?: { date: string | null; body: string; due: string | null; dueTime?: string | null; submitTo?: string | null; steps?: TaskStep[] | null })}
 	{#if kind === 'memo'}
 		<label class="field">日付<input type="date" name="date" value={note?.date ?? data.today} required /></label>
-		<label class="field">メモ<textarea name="body" rows="4" maxlength="1000" required>{note?.body ?? ''}</textarea></label>
+		<label class="field">メモ<textarea name="body" rows="4" maxlength={MEMO_MAX} required>{note?.body ?? ''}</textarea></label>
 	{:else if kind === 'task'}
 		<label class="field">課題<input name="body" value={note?.body ?? ''} maxlength="100" required autocomplete="off" /></label>
 		<div class="times">
@@ -358,7 +362,14 @@
 				<span class="teachers">{course.teachers.join('・')}</span>
 			{/if}
 			{#if course.syncMode === 'synced' && data.shared}
-				<span class="source">{data.shared.sourceText}</span>
+				<span class="source">
+					{#if data.shared.source === 'syllabus'}<span class="tag-syllabus">シラバス</span>{/if}
+					{data.shared.sourceText}
+					<!-- The syllabus has no rooms: people fill them in -->
+					{#if data.shared.source === 'syllabus' && course.slots.some((s) => !s.room)}
+						· <a href={courseHref(course.id, data.termParam, '/edit')}>教室を入力</a>
+					{/if}
+				</span>
 			{/if}
 			{#if course.syncMode === 'synced' && data.shared?.changes.length}
 				<div class="changed" role="status">
@@ -815,7 +826,12 @@
 							<div class="item memo">
 								<span class="text">
 									{#if memo.date}<span class="sub">{withDay(memo.date)}</span>{/if}
-									<span class="body">{memo.body}</span>
+									<span class="body" class:clamp={isLong(memo.body) && !openMemos.includes(memo.id)}>{memo.body}</span>
+									{#if isLong(memo.body)}
+										<button class="more-memo" type="button" onclick={() => (openMemos = openMemos.includes(memo.id) ? openMemos.filter((id) => id !== memo.id) : [...openMemos, memo.id])}>
+											{openMemos.includes(memo.id) ? 'たたむ' : '続きを読む'}
+										</button>
+									{/if}
 								</span>
 								{#if sorting}
 									{@const at = lined.indexOf(memo)}
@@ -1031,6 +1047,20 @@
 	.source {
 		font-size: 12px;
 		color: var(--ink-sub);
+	}
+
+	.source a {
+		color: var(--accent-text);
+	}
+
+	.tag-syllabus {
+		margin-right: 4px;
+		padding: 1px 6px;
+		border-radius: 5px;
+		background: var(--course-blue);
+		color: var(--ink);
+		font-size: 10px;
+		font-weight: 700;
 	}
 
 	.changed {
@@ -1459,6 +1489,23 @@
 		line-height: 1.6;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
+	}
+
+	.body.clamp {
+		display: -webkit-box;
+		-webkit-line-clamp: 6;
+		line-clamp: 6;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.more-memo {
+		align-self: flex-start;
+		padding: 4px 0;
+		border: none;
+		background: none;
+		color: var(--accent-text);
+		font-size: 13px;
 	}
 
 	.due {

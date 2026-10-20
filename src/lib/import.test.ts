@@ -77,6 +77,24 @@ describe('readImport', () => {
 		]);
 	});
 
+	it('keeps the course code a cell shows, and drops what is not one', () => {
+		const answer = {
+			courses: [
+				{ cell: 'A0', title: '月', teacher: '', room: '', code: '' },
+				{ cell: 'A1', title: '演習A', teacher: '', room: '', code: '１０００ ０００１' },
+				{ cell: 'A2', title: '演習A', teacher: '', room: '', code: '' },
+				{ cell: 'A3', title: '演習B', teacher: '', room: '', code: '2単位' },
+				{ cell: 'A4', title: '演習C', teacher: '', room: '', code: 'E10' }
+			]
+		};
+		expect(readImport(answer)!.map((c) => [c.title, c.span, c.code])).toEqual([
+			['演習A', 2, '10000001'],
+			['演習B', 1, undefined],
+			['演習C', 1, undefined]
+		]);
+		expect(groupImported(readImport(answer)!)[0].code).toBe('10000001');
+	});
+
 	it('takes the weekdays of tagged cells from the headings, wherever the table starts', () => {
 		const answer = {
 			courses: [
