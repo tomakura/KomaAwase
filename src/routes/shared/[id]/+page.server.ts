@@ -131,7 +131,8 @@ export const actions: Actions = {
 			userId: me.id,
 			course,
 			editId: String(form.get('edit') ?? ''),
-			version: Number(form.get('version'))
+			version: Number(form.get('version')),
+			roomsOnly: course.source === 'syllabus' && me.role !== 'admin'
 		});
 		if ('message' in result) return fail(409, { message: result.message });
 		notifySharedChanged(platform, locals.db, me.id, [course.id]);

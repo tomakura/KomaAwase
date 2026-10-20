@@ -225,6 +225,13 @@
       "when": 1792330135852,
       "tag": "0031_google_at",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1792486616236,
+      "tag": "0032_syllabus",
+      "breakpoints": true
     }
   ]
 }

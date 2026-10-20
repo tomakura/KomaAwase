@@ -525,13 +525,22 @@ export const sharedCourses = sqliteTable(
 		intensiveTo: text('intensive_to'),
 		credits: real('credits'),
 		source: text('source', { enum: ['syllabus', 'user'] }).notNull(),
+		// From the syllabus (source syllabus): 授業概要・到達目標 and the plan of each class, which a
+		// timetable that adds the course gets as two memos; when it was last read from the syllabus
+		syllabusOutline: text('syllabus_outline'),
+		syllabusSchedule: text('syllabus_schedule'),
+		syllabusCheckedAt: integer('syllabus_checked_at', { mode: 'timestamp_ms' }),
 		version: integer('version').notNull().default(1),
 		createdAt: createdAt(),
 		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
 			.notNull()
 			.default(sql`(unixepoch() * 1000)`)
 	},
-	(t) => [index('shared_courses_university_year_idx').on(t.universityId, t.year)]
+	(t) => [
+		index('shared_courses_university_year_idx').on(t.universityId, t.year),
+		// One shared course per syllabus course
+		uniqueIndex('shared_courses_code_idx').on(t.universityId, t.year, t.code)
+	]
 );
 
 export const sharedCourseSlots = sqliteTable(

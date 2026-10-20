@@ -1,3 +1,6 @@
+// How long a memo may be; the syllabus memos (授業内容 of every class) need room
+export const MEMO_MAX = 4000;
+
 // The order memos are shown in. Newest on top: the later day first, and of the same day the one
 // added later. Once someone has put them in an order by hand, that order is kept. `list` comes
 // in the order the memos were added.
