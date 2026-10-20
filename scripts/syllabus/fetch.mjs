@@ -115,13 +115,14 @@ for (;;) {
 		console.log(`  ${code} ${course.title}`);
 	}
 	save();
-	const next = page.locator('.ui-paginator-next:not(.ui-state-disabled)').first();
+	// The paginator is drawn above and below the table, and one of them can be hidden
+	const next = page.locator('.ui-paginator-next:not(.ui-state-disabled):visible').first();
 	if (!(await next.count())) break;
-	const first = rows[0]?.title;
+	const top = rows[0]?.title;
 	await next.click();
 	await page.waitForFunction(
 		([sel, t]) => document.querySelector(sel)?.innerText.includes(t) === false,
-		[`${ROWS} td:nth-child(2)`, first ?? ''],
+		[`${ROWS} td:nth-child(2)`, top ?? ''],
 		{ timeout: 20000 }
 	);
 	pageNo += 1;
