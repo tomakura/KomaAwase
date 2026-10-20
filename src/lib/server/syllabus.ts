@@ -160,9 +160,10 @@ export function memoStatements(db: Db, courseIds: string[], c: { outline: string
 	const bodies = syllabusMemos(c);
 	if (!bodies.length || !courseIds.length) return [];
 	const rows = courseIds.flatMap((courseId) => bodies.map((body) => ({ courseId, kind: 'memo' as const, body })));
-	// D1 takes at most 100 bound values per query (3 a row here)
+	// D1 takes at most 100 bound values per query: 5 a row here, with the id and done that drizzle fills in
+	const ROWS = 20;
 	const statements: BatchItem<'sqlite'>[] = [];
-	for (let i = 0; i < rows.length; i += 30) statements.push(db.insert(courseNotes).values(rows.slice(i, i + 30)));
+	for (let i = 0; i < rows.length; i += ROWS) statements.push(db.insert(courseNotes).values(rows.slice(i, i + ROWS)));
 	return statements;
 }
 

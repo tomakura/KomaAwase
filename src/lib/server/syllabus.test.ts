@@ -4,7 +4,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { testDatabase } from '../../test/db';
 import { prepareCourse, commitCourses, type CourseInput } from './courses';
 import { loadSharedCourses } from './shared-courses';
-import { findSyllabusMatch, importBatches, parseSyllabusFile, planImport, type SyllabusFile } from './syllabus';
+import { findSyllabusMatch, importBatches, memoStatements, parseSyllabusFile, planImport, type SyllabusFile } from './syllabus';
 
 const FAR = Date.UTC(2099, 0, 1);
 
@@ -190,5 +190,15 @@ describe('findSyllabusMatch', () => {
 		expect(found?.id).toBe('mine');
 		expect(await findSyllabusMatch(t.db, { universityId: 'uni', year: 2026, title: '演習A', slots: [{ weekday: 5, period: 1 }] })).toBeNull();
 		expect(await findSyllabusMatch(t.db, { universityId: 'uni', year: 2026, title: '別の授業', slots: [{ weekday: 2, period: 3 }] })).toBeNull();
+	});
+});
+
+describe('memoStatements', () => {
+	it('keeps each insert under 100 bound values', () => {
+		const t = testDatabase();
+		const ids = Array.from({ length: 15 }, (_, i) => `c${i}`);
+		const statements = memoStatements(t.db, ids, { outline: '授業概要\nx', schedule: '第1回 y' });
+		expect(statements).toHaveLength(2);
+		for (const s of statements) expect((s as unknown as { toSQL(): { params: unknown[] } }).toSQL().params.length).toBeLessThanOrEqual(100);
 	});
 });

@@ -84,4 +84,14 @@ describe('suggestions', () => {
 			['usr', 3]
 		]);
 	});
+
+	it('does not choose a course found only by its code when the name read is unlike it', async () => {
+		const t = testDatabase();
+		t.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
+		t.run(`INSERT INTO shared_courses (id, university_id, year, title, source, code) VALUES ('syl', 'uni', 2026, '演習A', 'syllabus', '10000001')`);
+		t.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span) VALUES ('a', 'syl', 3, 1, 1)`);
+		const group = { title: '英語', teachers: [], credits: null, code: '10000001', slots: [{ weekday: 1, period: 1, span: 1, room: '' }] };
+		const [found] = await suggestions(t.db, { id: 't', year: 2026, universityId: 'uni' }, [group]);
+		expect(found.map((s) => [s.id, s.score])).toEqual([['syl', 2.5]]);
+	});
 });

@@ -18,7 +18,10 @@
 		name = file?.name ?? '';
 	}
 
-	const checked = $derived(form && 'checked' in form ? form.checked : null);
+	// What 確かめる was pressed with: the plan shown is for that file and university only
+	let checkedWith = $state('');
+	const key = $derived(`${university}\n${text}`);
+	const checked = $derived(form && 'checked' in form && checkedWith === key ? form.checked : null);
 	const SHOWN = 100;
 </script>
 
@@ -54,8 +57,10 @@
 					return cancel();
 				}
 				busy = true;
+				const sent = key;
 				return async ({ update }) => {
 					await update({ reset: false });
+					checkedWith = sent;
 					busy = false;
 				};
 			}}

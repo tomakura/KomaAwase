@@ -64,7 +64,9 @@ export async function suggestions(db: Db, timetable: Timetable, groups: ReturnTy
 				const course = shared.get(id);
 				if (!course) return [];
 				const other = normalizeTitle(course.values.title);
-				const score = id === byCode ? 4 : other === title ? 3 : other.includes(title) || title.includes(other) ? 2 : 1;
+				const near = other === title ? 3 : other.includes(title) || title.includes(other) ? 2 : 1;
+				// A code read wrong finds another course: only with a name near it is it chosen as it is
+				const score = id === byCode ? (near >= 2 ? 4 : 2.5) : near;
 				return [{ id, version: course.version, terms: course.terms, score, ...course.values }];
 			})
 			.sort((a, b) => b.score - a.score)
