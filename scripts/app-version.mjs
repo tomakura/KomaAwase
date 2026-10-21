@@ -4,11 +4,12 @@ import { execFileSync } from 'node:child_process';
 // change to main it was on that day (merges and direct pushes, counted along main's first
 // parents). Builds of the same commit get the same versions.
 //
-// `current` is the commit being built. `byPr` gives the version each pull request went out in,
-// read from the merge's subject ("Merge pull request #64 …" or "… (#62)"), for 更新情報.
+// `current` is the commit being built. `history` is every version on main, newest first, with the
+// pull request it went out in, read from the merge's subject ("Merge pull request #64 …" or
+// "… (#62)"), for 更新情報.
 //
 // Workers Builds and GitHub Actions check out a shallow copy, so the rest of the history is
-// fetched first. Without it the counts are unknown: `current` is only the date, `byPr` empty.
+// fetched first. Without it the counts are unknown: `current` is only the date, `history` empty.
 export function appVersions() {
 	const git = (...args) =>
 		execFileSync('git', args, {
@@ -27,20 +28,20 @@ export function appVersions() {
 		const commits = git('log', '--first-parent', '--reverse', '--format=%cd %s', '--date=format-local:%Y.%m.%d', 'HEAD')
 			.split('\n')
 			.map((line) => ({ day: line.slice(0, 10), subject: line.slice(11) }));
-		if (git('rev-parse', '--is-shallow-repository') === 'true') return { current: commits.at(-1).day, byPr: {} };
-		const byPr = {};
+		if (git('rev-parse', '--is-shallow-repository') === 'true') return { current: commits.at(-1).day, history: [] };
+		const history = [];
 		let version = '';
 		let count = 0;
 		for (const [i, { day, subject }] of commits.entries()) {
 			count = i > 0 && commits[i - 1].day === day ? count + 1 : 1;
 			version = `${day}-${String(count).padStart(3, '0')}`;
 			const pr = subject.match(/^Merge pull request #(\d+)/)?.[1] ?? subject.match(/\(#(\d+)\)$/)?.[1];
-			if (pr) byPr[pr] = version;
+			history.unshift({ version, pr: pr ? Number(pr) : null });
 		}
-		return { current: version, byPr };
+		return { current: version, history };
 	} catch {
 		// No git here: the build's own date
 		const now = new Date(Date.now() + 9 * 3600_000);
-		return { current: now.toISOString().slice(0, 10).replaceAll('-', '.'), byPr: {} };
+		return { current: now.toISOString().slice(0, 10).replaceAll('-', '.'), history: [] };
 	}
 }
