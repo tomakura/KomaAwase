@@ -19,7 +19,7 @@
 		title: string;
 		slots: { weekday: number; period: number; span: number; room: string | null }[];
 	};
-	type Group = { title: string; teachers: string[]; credits?: number | null; slots: Slot[]; suggestions: Suggestion[] };
+	type Group = { title: string; teachers: string[]; credits?: number | null; truncated?: boolean; slots: Slot[]; suggestions: Suggestion[] };
 
 	let {
 		terms,
@@ -83,6 +83,8 @@
 				// For a course already there with differences: set it to what was read
 				update: false,
 				title: g.title,
+				// The name the screen cut short, as read: until it is changed it is only the start of a name
+				cutTitle: g.truncated ? g.title : null,
 				teachers: g.teachers.join('、'),
 				credits: g.credits ?? null,
 				slots: g.slots.map((s): Slot => ({ ...s })),
@@ -127,7 +129,8 @@
 	const unfit = $derived(included.some((r) => !r.sharedId && r.slots.some((s) => !fits(s))));
 
 	// Parts worth a second look, counted for the note at the top
-	const titleDoubtOf = (r: (typeof rows)[number]) => !r.sharedId && titleDoubt(r.title);
+	const cutOf = (r: (typeof rows)[number]) => !r.sharedId && r.cutTitle !== null && r.title === r.cutTitle;
+	const titleDoubtOf = (r: (typeof rows)[number]) => !r.sharedId && (cutOf(r) || titleDoubt(r.title));
 	const doubts = $derived(
 		rows.reduce(
 			(n, r) => n + (r.sharedId ? 0 : Number(titleDoubtOf(r)) + r.slots.filter((s) => s.check || s.roomCheck).length),
@@ -233,7 +236,9 @@
 					{cmp?.kind === 'new' ? '新しい' : cmp?.kind === 'same' ? '同じ' : cmp?.kind === 'changed' ? '違いあり' : '時間が重なる'}
 				</span>
 			</div>
-			{#if titleDoubtOf(row)}
+			{#if cutOf(row)}
+				<p class="taken">授業名が途中までしか表示されていません。授業名を入力するか、下の候補から選んでください</p>
+			{:else if titleDoubtOf(row)}
 				<p class="taken">授業名を正しく読み取れていない可能性があります</p>
 			{/if}
 

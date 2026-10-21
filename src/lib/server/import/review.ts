@@ -6,8 +6,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { COURSE_COLORS } from '$lib/courses';
 import { IMPORT_COURSES_MAX, type groupImported } from '$lib/import';
-import type { Existing } from '$lib/import-review';
-import { normalizeTitle } from '$lib/overlay';
+import { titleNearness, type Existing } from '$lib/import-review';
 import type { Db } from '../db';
 import { commitCourses, nextColor, parseCourseForm, prepareCourse, shapeOf } from '../courses';
 import { courseSlots, courseTeachers, courses, sharedCourseSlots, sharedCourses } from '../db/schema';
@@ -58,19 +57,19 @@ export async function suggestions(db: Db, timetable: Timetable, groups: ReturnTy
 			...(byCode ? [byCode] : []),
 			...rows.filter((r) => g.slots.some((s) => s.weekday === r.weekday && s.period === r.period)).map((r) => r.id)
 		]);
-		const title = normalizeTitle(g.title);
-		return [...here]
+		const list = [...here]
 			.flatMap((id) => {
 				const course = shared.get(id);
 				if (!course) return [];
-				const other = normalizeTitle(course.values.title);
-				const near = other === title ? 3 : other.includes(title) || title.includes(other) ? 2 : 1;
+				const near = titleNearness(g.title, course.values.title, g.truncated);
 				// A code read wrong finds another course: only with a name near it is it chosen as it is
 				const score = id === byCode ? (near >= 2 ? 4 : 2.5) : near;
 				return [{ id, version: course.version, terms: course.terms, score, ...course.values }];
 			})
-			.sort((a, b) => b.score - a.score)
-			.slice(0, 3);
+			.sort((a, b) => b.score - a.score);
+		// The start of a name at a slot with several courses that begin with it: they are offered, none chosen
+		if (g.truncated && list.filter((c) => c.score === 3).length > 1) for (const c of list) if (c.score === 3) c.score = 2.5;
+		return list.slice(0, 3);
 	});
 }
 

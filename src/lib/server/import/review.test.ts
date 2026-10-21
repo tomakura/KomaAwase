@@ -77,7 +77,7 @@ describe('suggestions', () => {
 			`INSERT INTO shared_courses (id, university_id, year, title, source, code) VALUES ('syl', 'uni', 2026, '演習A', 'syllabus', '10000001'), ('usr', 'uni', 2026, '演習', 'user', NULL)`
 		);
 		t.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span) VALUES ('a', 'syl', 3, 1, 1), ('b', 'usr', 1, 1, 1)`);
-		const group = { title: '演習', teachers: [], credits: null, code: '10000001', slots: [{ weekday: 1, period: 1, span: 1, room: '' }] };
+		const group = { title: '演習', teachers: [], credits: null, code: '10000001', truncated: false, slots: [{ weekday: 1, period: 1, span: 1, room: '' }] };
 		const [found] = await suggestions(t.db, { id: 't', year: 2026, universityId: 'uni' }, [group]);
 		expect(found.map((s) => [s.id, s.score])).toEqual([
 			['syl', 4],
@@ -90,8 +90,34 @@ describe('suggestions', () => {
 		t.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
 		t.run(`INSERT INTO shared_courses (id, university_id, year, title, source, code) VALUES ('syl', 'uni', 2026, '演習A', 'syllabus', '10000001')`);
 		t.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span) VALUES ('a', 'syl', 3, 1, 1)`);
-		const group = { title: '英語', teachers: [], credits: null, code: '10000001', slots: [{ weekday: 1, period: 1, span: 1, room: '' }] };
+		const group = { title: '英語', teachers: [], credits: null, code: '10000001', truncated: false, slots: [{ weekday: 1, period: 1, span: 1, room: '' }] };
 		const [found] = await suggestions(t.db, { id: 't', year: 2026, universityId: 'uni' }, [group]);
 		expect(found.map((s) => [s.id, s.score])).toEqual([['syl', 2.5]]);
+	});
+	it('chooses the course at the slot that begins with a name the screen cut short', async () => {
+		const t = testDatabase();
+		t.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
+		t.run(
+			`INSERT INTO shared_courses (id, university_id, year, title, source, code) VALUES ('a', 'uni', 2026, 'コンプライアンス基礎 I', 'syllabus', '10210001'), ('b', 'uni', 2026, '心理学', 'syllabus', '54140001')`
+		);
+		t.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span) VALUES ('sa', 'a', 1, 2, 1), ('sb', 'b', 1, 2, 1)`);
+		const group = { title: 'コンプ', teachers: [], credits: null, code: null, truncated: true, slots: [{ weekday: 1, period: 2, span: 1, room: '' }] };
+		const [found] = await suggestions(t.db, { id: 't', year: 2026, universityId: 'uni' }, [group]);
+		expect(found.map((s) => [s.id, s.score])).toEqual([
+			['a', 3],
+			['b', 1]
+		]);
+	});
+
+	it('only offers the courses when several begin with the start of a name', async () => {
+		const t = testDatabase();
+		t.run(`INSERT INTO universities (id, name) VALUES ('uni', 'テスト大学')`);
+		t.run(
+			`INSERT INTO shared_courses (id, university_id, year, title, source) VALUES ('a', 'uni', 2026, '映像制作演習基礎A', 'syllabus'), ('b', 'uni', 2026, '映像制作演習基礎C', 'syllabus')`
+		);
+		t.run(`INSERT INTO shared_course_slots (id, shared_course_id, weekday, period_number, span) VALUES ('sa', 'a', 2, 3, 1), ('sb', 'b', 2, 3, 1)`);
+		const group = { title: '映像制', teachers: [], credits: null, code: null, truncated: true, slots: [{ weekday: 2, period: 3, span: 1, room: '' }] };
+		const [found] = await suggestions(t.db, { id: 't', year: 2026, universityId: 'uni' }, [group]);
+		expect(found.map((s) => s.score)).toEqual([2.5, 2.5]);
 	});
 });

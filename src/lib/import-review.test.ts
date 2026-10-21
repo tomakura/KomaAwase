@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareCourse, titleDoubt, type Existing } from './import-review';
+import { compareCourse, titleDoubt, titleNearness, type Existing } from './import-review';
 
 describe('titleDoubt', () => {
 	it('marks unread letters and one-letter names', () => {
@@ -54,5 +54,24 @@ describe('compareCourse', () => {
 
 	it('names another course in the same slot', () => {
 		expect(compareCourse(read({ title: '英語' }), ['q1'], [course({})])).toEqual({ kind: 'clash', titles: ['線形代数'] });
+	});
+});
+
+describe('titleNearness', () => {
+	it('is 3 for the same title, however it is written', () => {
+		expect(titleNearness('線形代数 Ⅱ', '線形代数II')).toBe(3);
+	});
+
+	it('takes the start of a name the screen cut short for the name, and only then', () => {
+		expect(titleNearness('コンプ', 'コンプライアンス基礎 I', true)).toBe(3);
+		expect(titleNearness('コンプ', 'コンプライアンス基礎 I')).toBe(2);
+		expect(titleNearness('心', '心理学', true)).toBe(2);
+		expect(titleNearness('理学', '心理学', true)).toBe(2);
+	});
+
+	it('is 2 when one title holds the other or a letter was misread, and 1 for others', () => {
+		expect(titleNearness('英語', '英語コミュニケーション')).toBe(2);
+		expect(titleNearness('映像制作演習基籍C', '映像制作演習基礎C')).toBe(2);
+		expect(titleNearness('英語', '体育')).toBe(1);
 	});
 });

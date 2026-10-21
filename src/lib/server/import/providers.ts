@@ -6,6 +6,36 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 export const GROQ_MODEL = 'qwen/qwen3.8-27b';
 export const WORKERS_AI_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
 
+/**
+ * The answers to the sheets of one timetable as the one answer they make: each lists the
+ * cells it was given, and the cells are told apart by their tags, so the lists just join.
+ * A sheet whose answer isn't such a list fails them all, so the other AI reads the lot again.
+ */
+export function joinSheets(answers: unknown[]): unknown {
+	const courses: unknown[] = [];
+	for (let answer of answers) {
+		if (typeof answer === 'string') {
+			try {
+				answer = JSON.parse(answer);
+			} catch {
+				throw new Error('unexpected answer');
+			}
+		}
+		const list = (answer as { courses?: unknown } | null)?.courses;
+		if (!Array.isArray(list)) throw new Error('unexpected answer');
+		courses.push(...list);
+	}
+	return { courses };
+}
+
+/** Reads each picture in turn (one picture is read as it is) */
+export async function readSheets(read: (image: string) => Promise<unknown>, images: string[]): Promise<unknown> {
+	if (images.length === 1) return read(images[0]);
+	const answers: unknown[] = [];
+	for (const image of images) answers.push(await read(image));
+	return joinSheets(answers);
+}
+
 /** Busy for a moment: worth trying the same AI again after `seconds`. */
 export class Busy extends Error {
 	constructor(readonly seconds: number) {
@@ -39,7 +69,8 @@ export async function readWithGroq(apiKey: string, image: string, tiled: boolean
 			response_format: { type: 'json_schema', json_schema: { name: 'timetable', strict: true, schema: schemaOf(tiled) } },
 			reasoning_effort: 'none',
 			temperature: 0,
-			max_completion_tokens: 2048
+			// A table read whole, or a list, has every class in it; cut-out cells are a short answer
+			max_completion_tokens: tiled ? 2048 : 3072
 		}),
 		signal: AbortSignal.timeout(90_000)
 	});

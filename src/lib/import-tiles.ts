@@ -1,14 +1,17 @@
 // Drawing the cut-out cells of a timetable one under another, each with a pink tag on its left
 // (see import-grid.ts). Browser only: it needs canvases.
-import { tagOf, tiles, type Grid } from './import-grid';
+import { sheets, tagOf, tiles, type Grid, type Tile } from './import-grid';
 
 const TAG_COLOUR = '#ff00c8';
 const GAP = 8;
 
-/** The cells of `source` that findGrid found, stacked two across, at most `longest` pixels on the long side */
-export function drawTiles(source: HTMLCanvasElement, grid: Grid, longest: number): HTMLCanvasElement | null {
-	const list = tiles(grid);
-	if (!list.length) return null;
+/** The cells of `source` that findGrid found, stacked two across in sheets of a few cells each, at most `longest` pixels on the long side */
+export function drawTiles(source: HTMLCanvasElement, grid: Grid, longest: number): HTMLCanvasElement[] | null {
+	const drawn = sheets(tiles(grid)).map((list) => drawSheet(source, list, longest));
+	return drawn.length && drawn.every((c) => c) ? (drawn as HTMLCanvasElement[]) : null;
+}
+
+function drawSheet(source: HTMLCanvasElement, list: Tile[], longest: number): HTMLCanvasElement | null {
 	const tileW = Math.max(...list.map((t) => t.w));
 	const tagW = Math.round(tileW * 0.22);
 	const slotW = tagW + tileW + GAP;

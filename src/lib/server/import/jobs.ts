@@ -5,7 +5,8 @@ import { RETRY_AFTER_RESET, TOTAL_DAILY_LIMIT, lastQuotaReset, nextRetryTime } f
 import type { Db } from '../db';
 import { authChallenges, emailTokens, importJobs, sessions, verifyTokens } from '../db/schema';
 import { notify } from '../notify';
-import { Busy, OutOfQuota, readWithGroq, readWithWorkersAi } from './providers';
+import { imagesOf } from './images';
+import { Busy, OutOfQuota, readSheets, readWithGroq, readWithWorkersAi } from './providers';
 
 // The free tiers read about 110 screenshots a day between them: each person gets a few, and
 // everyone together TOTAL_DAILY_LIMIT (import-quota.ts).
@@ -16,7 +17,6 @@ const KEEP_DAYS = 3;
 const DAY = 24 * 60 * 60 * 1000;
 
 // A cropped JPEG, as the page sends it. D1 rows hold up to 2MB.
-const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/;
 export const IMAGE_MAX = 1_500_000;
 
 // Jobs that count toward today's free quota (quotaUsed)
@@ -74,7 +74,9 @@ export async function createImportJob(
 	termId: string | null = null,
 	consentVersion: string | null = null
 ) {
-	if (image.length > IMAGE_MAX || !IMAGE_PATTERN.test(image)) {
+	// One picture, or the sheets of a table cut into cells
+	const images = image.length > IMAGE_MAX ? null : imagesOf(image);
+	if (!images || (images.length > 1 && !tiled)) {
 		return { message: '画像を読み込めませんでした。別の画像でやり直してください' };
 	}
 	const since = new Date(Date.now() - DAY);
@@ -204,8 +206,13 @@ async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): P
 
 	const errors: string[] = [];
 	const providers: { name: 'groq' | 'workers-ai'; read: () => Promise<unknown> }[] = [];
-	if (env.GROQ_API_KEY) providers.push({ name: 'groq', read: () => readWithGroq(env.GROQ_API_KEY!, job.image!, job.tiled) });
-	if (env.AI) providers.push({ name: 'workers-ai', read: () => readWithWorkersAi(env.AI, job.image!, job.tiled) });
+	const images = imagesOf(job.image);
+	if (!images) {
+		await finish({ status: 'failed', image: null, error: 'unreadable image', finishedAt: new Date() });
+		return { status: 'failed' };
+	}
+	if (env.GROQ_API_KEY) providers.push({ name: 'groq', read: () => readSheets((image) => readWithGroq(env.GROQ_API_KEY!, image, job.tiled), images) });
+	if (env.AI) providers.push({ name: 'workers-ai', read: () => readSheets((image) => readWithWorkersAi(env.AI, image, job.tiled), images) });
 
 	for (const provider of providers) {
 		let courses;
@@ -221,8 +228,9 @@ async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): P
 			errors.push(`${provider.name}: ${e instanceof OutOfQuota ? 'out of quota' : e instanceof Error ? e.message : e}`);
 			continue;
 		}
-		// Outside the try, so a failed write isn't taken for the AI failing.
-		if (courses) {
+		// Outside the try, so a failed write isn't taken for the AI failing. An answer with no
+		// course in it is a miss too (an empty table, a layout it didn't follow): the other AI may do better.
+		if (courses?.length) {
 			await finish({ status: 'done', provider: provider.name, result: courses, image: null, error: null, finishedAt: new Date() });
 			return { status: 'done' };
 		}
