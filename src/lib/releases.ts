@@ -8,6 +8,14 @@ export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
 	{
+		pr: 76,
+		date: '2026-10-21',
+		items: [
+			'スクリーンショットの読み取りで、時間割の金・土曜日や5・6限が抜けることがあるのを修正',
+			'スクリーンショットの授業名が「…」で途切れているとき、同じコマのシラバスの授業から選べるように'
+		]
+	},
+	{
 		pr: 75,
 		date: '2026-10-21',
 		items: [
