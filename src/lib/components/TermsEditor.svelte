@@ -215,6 +215,17 @@
 		width: 100%;
 	}
 
+	/* iOS Safari widens native date inputs past their grid track; drop its styling so they fit */
+	.dates input {
+		-webkit-appearance: none;
+		appearance: none;
+		text-align: left;
+	}
+
+	.dates input::-webkit-date-and-time-value {
+		text-align: left;
+	}
+
 	.dates span {
 		color: var(--ink-sub);
 	}

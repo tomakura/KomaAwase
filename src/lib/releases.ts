@@ -7,6 +7,11 @@ export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
 	{
+		pr: 74,
+		date: '2026-10-21',
+		items: ['iPhone の「学期の区切り」で、日付の箱が右にはみ出るのを修正']
+	},
+	{
 		pr: 70,
 		date: '2026-10-21',
 		items: [
