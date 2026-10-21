@@ -18,7 +18,7 @@ const woff2Only: Plugin = {
 
 export default defineConfig({
 	// Shown on このアプリについて and 更新情報 (src/lib/version.ts)
-	define: { __APP_VERSION__: JSON.stringify(versions.current), __PR_VERSIONS__: JSON.stringify(versions.byPr) },
+	define: { __APP_VERSION__: JSON.stringify(versions.current), __APP_HISTORY__: JSON.stringify(versions.history) },
 	plugins: [
 		woff2Only,
 		sveltekit({
