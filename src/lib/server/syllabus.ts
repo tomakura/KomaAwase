@@ -50,7 +50,7 @@ const longText = (v: unknown) => str(v).replace(/\r\n?/g, '\n').trim().slice(0, 
 
 /** The file the admin uploads, checked; a message says what is wrong with it */
 export function parseSyllabusFile(raw: unknown): SyllabusFile | { message: string } {
-	if (!raw || typeof raw !== 'object') return { message: 'ファイルの形がちがいます' };
+	if (!raw || typeof raw !== 'object') return { message: 'ファイルの形式が異なります' };
 	const { year, courses: list } = raw as { year?: unknown; courses?: unknown };
 	if (typeof year !== 'number' || !Number.isInteger(year) || year < 2000 || year > 2100) return { message: '年度がありません' };
 	if (!Array.isArray(list) || !list.length) return { message: '授業がありません' };

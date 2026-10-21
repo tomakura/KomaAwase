@@ -7,7 +7,7 @@ import { hmacSha256Hex, newNonce, sha256Hex } from './hmac';
 export { FILE_MAX_BYTES };
 export const USER_QUOTA_BYTES = 100 * 1024 * 1024;
 const NAME_MAX = 100;
-const QUOTA_MESSAGE = `資料は全部で${USER_QUOTA_BYTES / 1024 / 1024}MBまでです。いらない資料を消してください`;
+const QUOTA_MESSAGE = `資料はすべてで${USER_QUOTA_BYTES / 1024 / 1024}MBまでです。いらない資料を消してください`;
 
 // What can be kept with a course. PDFs and images open in the browser; Office files download.
 const TYPES: Record<string, 'inline' | 'attachment'> = {

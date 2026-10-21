@@ -8,7 +8,7 @@ import type { Actions, PageServerLoad } from './$types';
 async function target(db: App.Locals['db'], code: string) {
 	const valid = readCode(code);
 	const person = valid ? await findByFriendCode(db, valid) : undefined;
-	if (!person) error(404, 'このリンクは使えません。作り直されたか、まちがっているかもしれません');
+	if (!person) error(404, 'このリンクは使えません。作り直されたか、間違っているかもしれません');
 	return person;
 }
 
@@ -55,11 +55,11 @@ export const actions: Actions = {
 		const result = await sendRequest(locals.db, me.id, person.id);
 		const message = MESSAGES[result];
 		if (message) return fail(400, { message });
-		const name = me.nickname ?? 'だれか';
+		const name = me.nickname ?? '誰か';
 		if (result === 'sent') {
 			notifyLater(platform, locals.db, [person.id], 'friendRequest', {
 				title: `${name}さんから友だち申請が届きました`,
-				body: '承認すると、おたがいの時間割が見られるようになります',
+				body: '承認すると、お互いの時間割が見られるようになります',
 				url: '/friends',
 				tag: `friend-${me.id}`,
 				badge: await pendingRequestCount(locals.db, person.id)
@@ -68,7 +68,7 @@ export const actions: Actions = {
 			// They had asked first, so this accepted their request
 			notifyLater(platform, locals.db, [person.id], 'friendAccepted', {
 				title: `${name}さんが友だち申請を承認しました`,
-				body: 'おたがいの時間割が見られるようになりました',
+				body: 'お互いの時間割が見られるようになりました',
 				url: `/friends/${me.id}`,
 				tag: `friend-${me.id}`
 			});

@@ -56,7 +56,7 @@
 		{:else if form?.sentTo && !other}
 			{#key form}
 				<MailSent email={form.sentTo} action="" next={data.from ?? '/more/verify'} onother={() => (other = true)}>
-					{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
+					{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールフォルダも確認してください。
 				</MailSent>
 			{/key}
 		{:else}

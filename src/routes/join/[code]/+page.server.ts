@@ -24,7 +24,7 @@ import type { Actions, PageServerLoad } from './$types';
 async function invited(db: App.Locals['db'], code: string) {
 	const valid = readCode(code);
 	const group = valid ? await findGroupByInvite(db, valid) : undefined;
-	if (!group) error(404, 'この招待リンクは使えません。作り直されたか、まちがっているかもしれません');
+	if (!group) error(404, 'この招待リンクは使えません。作り直されたか、間違っているかもしれません');
 	return group;
 }
 
@@ -50,7 +50,7 @@ export const actions: Actions = {
 	join: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const group = await invited(locals.db, params.code);
-		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'この招待からは参加できません。招待した人にご確認ください。' });
+		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'この招待からは参加できません。招待した人に確認してください。' });
 		const share = readShareChoice((await request.formData()).get('share')) ?? 'all';
 		// Asking again, or joining from a request made before, doesn't take another use of the invite
 		const asked = !!(await requestOf(locals.db, group.id, me.id));
@@ -61,7 +61,7 @@ export const actions: Actions = {
 			await requestToJoin(locals.db, group.id, me.id, share);
 			if (!asked) {
 				notifyLater(platform, locals.db, await managerIds(locals.db, group.id), 'groupRequest', {
-					title: `${me.nickname ?? 'だれか'}さんが「${group.name}」に参加を申請しました`,
+					title: `${me.nickname ?? '誰か'}さんが「${group.name}」に参加を申請しました`,
 					url: `/groups/${group.id}`,
 					tag: `group-request-${group.id}`
 				});
@@ -70,12 +70,12 @@ export const actions: Actions = {
 		}
 		const joined = await joinGroup(locals.db, group.id, me.id, share);
 		if (joined !== 'joined' && !asked) await returnInvite(locals.db, group.id, group.inviteCode);
-		if (joined === 'full') return fail(400, { message: 'このグループは人数がいっぱいです' });
+		if (joined === 'full') return fail(400, { message: 'このグループは定員に達しています' });
 		// A request left from when the group needed approval
 		await cancelRequest(locals.db, group.id, me.id);
 		if (joined === 'joined') {
 			notifyLater(platform, locals.db, await otherMembers(locals.db, group.id, me.id), 'groupJoin', {
-				title: `${me.nickname ?? 'だれか'}さんが「${group.name}」に参加しました`,
+				title: `${me.nickname ?? '誰か'}さんが「${group.name}」に参加しました`,
 				url: `/groups/${group.id}`,
 				tag: `group-${group.id}`
 			});

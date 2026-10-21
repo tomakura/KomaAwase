@@ -208,13 +208,13 @@
 			</div>
 		</div>
 		<p class="ui-note">
-			同期すると、同じ大学の人が「授業をさがす」で選べるようになります。「みんなの登録」に合わせた授業はいつも同期します。
+			同期すると、同じ大学の人が「授業を探す」で選べるようになります。「みんなの登録」に合わせた授業はいつも同期します。
 		</p>
 	{/if}
 
 	<h2 class="count">{rows.length}件の授業（{adding}件を追加{updating ? `・${updating}件を直す` : ''}）</h2>
 	{#if doubts}
-		<p class="doubts" role="status"><Icon name="flag" size={16} />確かめてほしい所が{doubts}か所あります。枠で囲んだ所を見てください。</p>
+		<p class="doubts" role="status"><Icon name="flag" size={16} />確認が必要な箇所が{doubts}件あります。枠で囲んだ箇所を確認してください。</p>
 	{/if}
 	{#each rows as row, i (i)}
 		{@const cmp = comparisons[i]}
@@ -234,7 +234,7 @@
 				</span>
 			</div>
 			{#if titleDoubtOf(row)}
-				<p class="taken">授業名がうまく読めていないかもしれません</p>
+				<p class="taken">授業名を正しく読み取れていない可能性があります</p>
 			{/if}
 
 			{#if cmp?.kind === 'same'}
@@ -309,10 +309,10 @@
 					</div>
 					{@const taken = takenBy(slot, termIds)}
 					{#if slot.check}
-						<p class="taken">曜日の見出しとマスの数が合わない行から読み取りました。曜日を確かめてください</p>
+						<p class="taken">曜日の見出しとマスの数が合わない行から読み取りました。曜日を確認してください</p>
 					{/if}
 					{#if slot.roomCheck}
-						<p class="taken">続きのコマで教室がちがって読めました。教室を確かめてください</p>
+						<p class="taken">続きのコマで教室が異なって読み取れました。教室を確認してください</p>
 					{/if}
 					{#if !fits(slot)}
 						<p class="taken">この時間割にない時限です。時限かコマ数を選び直してください</p>

@@ -56,7 +56,7 @@
 <Sheet bind:open {title}>
 	{#if shown?.kind === 'expiring' || shown?.kind === 'lapsed'}
 		<p>
-			在籍確認は、毎年5月1日に切れます。切れると、みんなの授業データとスクショの読み込みが使えなくなります。
+			在籍確認は、毎年5月1日に切れます。切れると、みんなの授業データとスクリーンショットの読み込みが使えなくなります。
 			大学のメールアドレスに届くリンクを開くと、確認し直せます。
 		</p>
 		<a class="btn btn-primary" href={verifyHref(page.url)} onclick={() => (open = false)}>確認し直す</a>

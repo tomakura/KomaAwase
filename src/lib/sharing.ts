@@ -3,7 +3,7 @@
 export type ShareChoice = 'all' | 'free' | 'none';
 
 export const SHARE_CHOICES: readonly { id: ShareChoice; label: string }[] = [
-	{ id: 'all', label: '全部' },
+	{ id: 'all', label: 'すべて' },
 	{ id: 'free', label: '空き時間だけ' },
 	{ id: 'none', label: '見せない' }
 ];

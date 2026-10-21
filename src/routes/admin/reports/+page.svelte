@@ -45,7 +45,7 @@
 				<p class="reason">{r.reason}{r.detail ? `：${r.detail}` : ''}</p>
 				{#if r.targetType === 'group' && r.target !== null}
 					<p class="sub">
-						オーナー：{#if r.owner}<a href="/admin/users/{r.owner.id}">{r.owner.nickname ?? '（名前なし）'}</a>{:else}なし{/if}
+						持ち主：{#if r.owner}<a href="/admin/users/{r.owner.id}">{r.owner.nickname ?? '（名前なし）'}</a>{:else}なし{/if}
 					</p>
 					{#if renaming === r.targetId}
 						<form

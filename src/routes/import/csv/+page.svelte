@@ -54,7 +54,7 @@
 	{#if read}
 		{#if read.skipped.length || read.cut}
 			<p class="ui-note pad">
-				{skippedNote(read.skipped)}{read.cut ? '授業が多いので、初めの分だけ読みました。' : ''}
+				{skippedNote(read.skipped)}{read.cut ? '授業が多いので、最初の分だけ読みました。' : ''}
 			</p>
 		{/if}
 		<ImportReview

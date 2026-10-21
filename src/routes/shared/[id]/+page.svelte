@@ -45,7 +45,7 @@
 	let reporting = $state(false);
 	// The delete's warning to the creator, on unless the admin unticks it
 	let warn = $state(true);
-	const warningDraft = $derived(`授業「${data.course.values.title}」を、不適切な内容であると判断して削除しました。くり返すと利用を止めることがあります。`);
+	const warningDraft = $derived(`授業「${data.course.values.title}」を、不適切な内容であると判断して削除しました。繰り返すと利用を止めることがあります。`);
 </script>
 
 <svelte:head>
@@ -84,9 +84,9 @@
 		<p class="ui-note">
 			この授業を同期していて在籍確認済みの人と運営が直せます。直した内容は同期しているみんなに反映され、履歴から元に戻せます。{data.canEdit
 				? ''
-				: 'まちがいを見つけたら、報告してください。'}
+				: '間違いを見つけたら、報告してください。'}
 		</p>
-		<button class="btn" type="button" onclick={() => (reporting = true)}><Icon name="flag" size={18} />まちがい・荒らしを報告する</button>
+		<button class="btn" type="button" onclick={() => (reporting = true)}><Icon name="flag" size={18} />間違い・荒らしを報告する</button>
 	</section>
 
 	{#if data.isAdmin}
@@ -146,12 +146,12 @@
 					</div>
 				{:else if data.merge.query === null}
 					<p class="ui-note">名前が少し違うだけで別の授業になっているときに、同じ大学・年度・学期の授業にまとめられます。</p>
-					<a class="btn" href={mergeHref('')}>まとめ先をさがす</a>
+					<a class="btn" href={mergeHref('')}>まとめ先を探す</a>
 				{:else}
 					<form method="GET" role="search" class="merge-search">
 						<input type="hidden" name="back" value={data.back} />
-						<input type="search" name="merge" value={data.merge.query} placeholder="まとめ先の授業名・先生・授業コード" maxlength="50" aria-label="まとめ先をさがす" />
-						<button class="btn" type="submit">さがす</button>
+						<input type="search" name="merge" value={data.merge.query} placeholder="まとめ先の授業名・先生・授業コード" maxlength="50" aria-label="まとめ先を探す" />
+						<button class="btn" type="submit">探す</button>
 					</form>
 					<div class="ui-list">
 						{#each data.merge.candidates as c (c.id)}
@@ -214,7 +214,7 @@
 				<div class="edit">
 					<div class="edit-head">
 						<span class="date">{when(edit.createdAt)}</span>
-						{#if data.page === 1 && i === 0}<span class="now">いまの内容</span>{/if}
+						{#if data.page === 1 && i === 0}<span class="now">今の内容</span>{/if}
 						{#if edit.by}
 							<span class="by">
 								{#if edit.by.id}<a href="/admin/users/{edit.by.id}">{edit.by.nickname ?? '（名前なし）'}</a>{:else}（退会した人）{/if}
@@ -246,7 +246,7 @@
 				{#if data.more}<a class="older" href={historyPage(data.page + 1)}>もっと前の変更</a>{/if}
 			</nav>
 		{/if}
-		<p class="ui-note">{data.isAdmin ? 'だれが直したかは、運営にだけ表示しています。' : 'だれが直したかは表示しません。'}</p>
+		<p class="ui-note">{data.isAdmin ? '誰が直したかは、運営にだけ表示しています。' : '誰が直したかは表示しません。'}</p>
 	</section>
 </div>
 

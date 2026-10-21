@@ -31,15 +31,15 @@ export const POST: RequestHandler = async ({ locals, request, platform, url }) =
 	if (typeof body?.image !== 'string') error(400, '画像を読み込めませんでした');
 
 	// The page asks to check "読み込む前に" (the image goes to the AI services) before the button works
-	if (body.agreed !== true) return json({ message: '「読み込む前に」を確かめて、チェックを入れてください' }, { status: 403 });
+	if (body.agreed !== true) return json({ message: '「読み込む前に」を確認して、チェックを入れてください' }, { status: 403 });
 	// A page opened before the wording changed showed something else: it is agreed to again
 	if (body.consent !== IMPORT_CONSENT_VERSION) {
-		return json({ message: '「読み込む前に」の内容が新しくなりました。ページを開き直して、確かめてください' }, { status: 409 });
+		return json({ message: '「読み込む前に」の内容が新しくなりました。ページを開き直して、確認してください' }, { status: 409 });
 	}
 	const term = typeof body.term === 'string' && body.term.length <= 64 ? body.term : null;
 	const timetable = await currentTimetable(locals.db, locals.user);
 	if ((await sharedAccess(locals.db, locals.user.id, timetable.universityId)) !== 'ok') {
-		return json({ message: 'スクショからの読み込みは、在籍確認をすると使えます' }, { status: 403 });
+		return json({ message: 'スクリーンショットからの読み込みは、在籍確認をすると使えます' }, { status: 403 });
 	}
 	const created = await createImportJob(locals.db, locals.user.id, timetable.id, body.image, body.tiled === true, term, IMPORT_CONSENT_VERSION);
 	if ('message' in created) return json({ message: created.message }, { status: 400 });

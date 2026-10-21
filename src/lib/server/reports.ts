@@ -5,7 +5,7 @@ import { reports } from './db/schema';
 export const REPORT_REASONS = {
 	user: ['なりすまし', '迷惑な申請', 'いやがらせ', 'その他'],
 	group: ['不適切な名前', '迷惑な招待', 'その他'],
-	shared_course: ['内容がまちがっている', '同じ授業が2つある', '不適切な内容', '荒らされている', 'その他']
+	shared_course: ['内容が間違っている', '同じ授業が2つある', '不適切な内容', '荒らされている', 'その他']
 } as const;
 
 export type ReportTarget = keyof typeof REPORT_REASONS;
@@ -17,7 +17,7 @@ export async function saveReport(db: Db, reporterId: string, targetType: ReportT
 	const reason = String(form.get('reason') ?? '');
 	if (!(REPORT_REASONS[targetType] as readonly string[]).includes(reason)) return '理由を選んでください';
 	const detail = String(form.get('detail') ?? '').trim();
-	if ([...detail].length > DETAIL_MAX) return `くわしい内容は${DETAIL_MAX}文字までです`;
+	if ([...detail].length > DETAIL_MAX) return `詳しい内容は${DETAIL_MAX}文字までです`;
 	// One open report per person and target: sending again doesn't pile up
 	const open = await db
 		.select({ id: reports.id })

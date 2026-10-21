@@ -64,7 +64,7 @@
 				spellcheck="false"
 				required
 			/>
-			<button class="btn" type="submit">さがす</button>
+			<button class="btn" type="submit">探す</button>
 		</form>
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		<p class="ui-note">あなたのコードは <b class="code">{data.code}</b> です。</p>

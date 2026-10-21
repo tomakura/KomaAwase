@@ -72,7 +72,7 @@ export const actions: Actions = {
 	adoptCancel: async (event) => {
 		const courseId = await ownCourse(event);
 		const date = String((await event.request.formData()).get('date') ?? '');
-		if (!isDate(date)) return fail(400, { message: '日付を確かめてください' });
+		if (!isDate(date)) return fail(400, { message: '日付を確認してください' });
 		const has = await event.locals.db
 			.select({ id: courseNotes.id })
 			.from(courseNotes)
@@ -83,7 +83,7 @@ export const actions: Actions = {
 	reportCancel: async (event) => {
 		const courseId = await ownCourse(event);
 		const date = String((await event.request.formData()).get('date') ?? '');
-		if (!isDate(date)) return fail(400, { message: '日付を確かめてください' });
+		if (!isDate(date)) return fail(400, { message: '日付を確認してください' });
 		const loaded = await loadCourse(event.locals.db, event.locals.user!.id, courseId);
 		if (loaded?.course.syncMode !== 'synced' || !loaded.shared) error(404, '授業が見つかりません');
 		await reportCancellation(event.locals.db, event.locals.user!.id, loaded.shared.id, date);

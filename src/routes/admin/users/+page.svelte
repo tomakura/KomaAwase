@@ -19,7 +19,7 @@
 
 	<form class="search" method="GET" role="search">
 		<input type="search" name="q" value={data.q} placeholder="ニックネームかメールアドレス" maxlength="50" autocomplete="off" />
-		<button class="btn" type="submit">さがす</button>
+		<button class="btn" type="submit">探す</button>
 	</form>
 
 	<section class="ui-section">

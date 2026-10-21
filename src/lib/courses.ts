@@ -2,15 +2,15 @@ import { addDays, daysBetween, isDate, monthDay, weekdayOf } from './time';
 
 // Ids match the --course-* variables in app.css.
 export const COURSE_COLORS = [
-	{ id: 'red', label: 'あか' },
+	{ id: 'red', label: '赤' },
 	{ id: 'orange', label: 'オレンジ' },
-	{ id: 'yellow', label: 'きいろ' },
-	{ id: 'lime', label: 'きみどり' },
-	{ id: 'green', label: 'みどり' },
+	{ id: 'yellow', label: '黄' },
+	{ id: 'lime', label: '黄緑' },
+	{ id: 'green', label: '緑' },
 	{ id: 'mint', label: 'ミント' },
-	{ id: 'blue', label: 'あお' },
-	{ id: 'indigo', label: 'あいいろ' },
-	{ id: 'purple', label: 'むらさき' },
+	{ id: 'blue', label: '青' },
+	{ id: 'indigo', label: '藍' },
+	{ id: 'purple', label: '紫' },
 	{ id: 'gray', label: 'グレー' }
 ] as const;
 

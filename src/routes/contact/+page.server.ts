@@ -34,10 +34,10 @@ export const actions: Actions = {
 
 		if (!name || [...name].length > NAME_MAX) return fail(400, { message: `名前は1〜${NAME_MAX}文字で入れてください`, ...values });
 		const email = normalizeEmail(emailInput);
-		if (!email) return fail(400, { message: 'メールアドレスを確かめてください', ...values });
+		if (!email) return fail(400, { message: 'メールアドレスを確認してください', ...values });
 		if (!body || [...body].length > BODY_MAX) return fail(400, { message: `内容は1〜${BODY_MAX}文字で書いてください`, ...values });
 		if (!(await passesTurnstile(platform?.env, form.get('cf-turnstile-response'), event.getClientAddress()))) {
-			return fail(400, { message: '確認がうまくいきませんでした。もう一度送ってください', ...values });
+			return fail(400, { message: '確認が失敗しました。もう一度送ってください', ...values });
 		}
 
 		// Counted and saved in one statement, so sends at the same moment can't pass the limits together

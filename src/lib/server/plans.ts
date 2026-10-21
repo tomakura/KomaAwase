@@ -43,10 +43,10 @@ export function parseEvent(form: FormData): { event: EventInput } | { message: s
 	const scope = (exam && String(form.get('scope') ?? '').trim()) || null;
 	const bring = (exam && String(form.get('bring') ?? '').trim()) || null;
 	if (!title || length(title) > TITLE_MAX) return { message: `名前は1〜${TITLE_MAX}文字で入れてください` };
-	if (!isDate(date)) return { message: '日付を確かめてください' };
-	if ((startTime && !isTime(startTime)) || (endTime && !isTime(endTime))) return { message: '時刻を確かめてください' };
-	if (endTime && !startTime) return { message: '終わりの時刻を入れるときは、はじまりの時刻も入れてください' };
-	if (startTime && endTime && endTime < startTime) return { message: '終わりの時刻は、はじまりより後にしてください' };
+	if (!isDate(date)) return { message: '日付を確認してください' };
+	if ((startTime && !isTime(startTime)) || (endTime && !isTime(endTime))) return { message: '時刻を確認してください' };
+	if (endTime && !startTime) return { message: '終わりの時刻を入れるときは、始まりの時刻も入れてください' };
+	if (startTime && endTime && endTime < startTime) return { message: '終わりの時刻は、始まりより後にしてください' };
 	if (place && length(place) > PLACE_MAX) return { message: `場所は${PLACE_MAX}文字までです` };
 	if (memo && length(memo) > MEMO_MAX) return { message: `メモは${MEMO_MAX}文字までです` };
 	if (scope && length(scope) > EXAM_TEXT_MAX) return { message: `範囲は${EXAM_TEXT_MAX}文字までです` };

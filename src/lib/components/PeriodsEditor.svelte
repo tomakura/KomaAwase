@@ -104,7 +104,7 @@
 				<span class="title">{summary.title}</span>
 				<span class="detail">{summary.detail}</span>
 			</span>
-			<span class="toggle">{open ? 'とじる' : '変える'}<Icon name="chevron" size={16} /></span>
+			<span class="toggle">{open ? '閉じる' : '変える'}<Icon name="chevron" size={16} /></span>
 		</button>
 	{/if}
 

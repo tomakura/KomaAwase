@@ -36,7 +36,7 @@
 			groups={data.groups}
 			action="?/save"
 			message={form?.message}
-			lead="AIが読み取った内容です。授業名・曜日・時限・教室がまちがっていないか、保存する前に見直してください。"
+			lead="AIが読み取った内容です。授業名・曜日・時限・教室が間違っていないか、保存する前に見直してください。"
 		/>
 		<form class="dismiss" method="POST" action="?/dismiss" use:enhance>
 			<button class="link" type="submit">追加しないで閉じる</button>

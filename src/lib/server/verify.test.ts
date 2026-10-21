@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import type { RequestEvent } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { finishVerification, mailboxOf, peekVerification, sendVerificationMail, startVerification, verificationOf, verifyByGoogle } from './verify';
+import { finishVerification, mailboxOf, peekVerification, sendVerificationMail, startVerification, verificationOf, verifyBySignIn } from './verify';
 import { testDatabase } from '../../test/db';
 
 function world() {
@@ -26,6 +26,9 @@ async function link(t: World, userId: string, address: string) {
 async function confirm(t: World, userId: string, address: string) {
 	return finishVerification(t.db, await link(t, userId, address), userId);
 }
+
+// An account made long before the sign-in, so only a Google sign-in can speak for its address
+const old = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
 const checks = (t: World) => t.rows(`SELECT user_id, email, mailbox FROM univ_verifications ORDER BY user_id`);
 
@@ -129,26 +132,37 @@ describe('enrollment checks by mailbox', () => {
 	it('holds the mailbox for a check from Google sign-in too', async () => {
 		const t = world();
 		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
-		expect(await verifyByGoogle(t.db, { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a', googleAt: new Date() }, uni)).toBe(true);
+		expect(await verifyBySignIn(t.db, { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a', googleAt: new Date(), createdAt: old }, uni)).toBe(true);
 		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
 		// The mail can't add a second account on that mailbox, nor can another Google sign-in
 		const token = await link(t, 'b', 'taro+x@u.ac.jp');
 		expect(await finishVerification(t.db, token, 'b')).toBe('taken');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
-		expect(await verifyByGoogle(t.db, { id: 'c', email: 'taro+y@u.ac.jp', googleSub: 'g-c', googleAt: new Date() }, uni)).toBe(false);
+		expect(await verifyBySignIn(t.db, { id: 'c', email: 'taro+y@u.ac.jp', googleSub: 'g-c', googleAt: new Date(), createdAt: old }, uni)).toBe(false);
 		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
 	});
 
 	it('confirms by Google only right after a Google sign-in', async () => {
 		const t = world();
 		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
-		const user = { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a' };
+		const user = { id: 'a', email: 'taro@u.ac.jp', googleSub: 'g-a', createdAt: old };
 		// A sign-in from long ago (the school may have deleted the account since), or none
-		expect(await verifyByGoogle(t.db, { ...user, googleAt: new Date(Date.now() - 2 * 60 * 60 * 1000) }, uni)).toBe(false);
-		expect(await verifyByGoogle(t.db, { ...user, googleAt: null }, uni)).toBe(false);
+		expect(await verifyBySignIn(t.db, { ...user, googleAt: new Date(Date.now() - 2 * 60 * 60 * 1000) }, uni)).toBe(false);
+		expect(await verifyBySignIn(t.db, { ...user, googleAt: null }, uni)).toBe(false);
 		expect(checks(t)).toEqual([]);
 		// Within the hour that the nickname, passkey and はじめの設定 take
-		expect(await verifyByGoogle(t.db, { ...user, googleAt: new Date(Date.now() - 30 * 60 * 1000) }, uni)).toBe(true);
+		expect(await verifyBySignIn(t.db, { ...user, googleAt: new Date(Date.now() - 30 * 60 * 1000) }, uni)).toBe(true);
+		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
+	});
+
+	it('confirms an account made by the sign-in mail within the hour, on its university address only', async () => {
+		const t = world();
+		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
+		const user = { id: 'a', email: 'taro@u.ac.jp', googleSub: null, googleAt: null };
+		expect(await verifyBySignIn(t.db, { ...user, createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) }, uni)).toBe(false);
+		expect(await verifyBySignIn(t.db, { ...user, email: 'taro@example.test', createdAt: new Date() }, uni)).toBe(false);
+		expect(checks(t)).toEqual([]);
+		expect(await verifyBySignIn(t.db, { ...user, createdAt: new Date(Date.now() - 30 * 60 * 1000) }, uni)).toBe(true);
 		expect(checks(t)).toEqual([{ user_id: 'a', email: 'taro@u.ac.jp', mailbox: 'taro@u.ac.jp' }]);
 	});
 
@@ -187,7 +201,7 @@ describe('enrollment checks by mailbox', () => {
 		expect(await peekVerification(t.db, token)).toMatchObject({ taken: true });
 		expect(await finishVerification(t.db, token, 'c')).toBe('taken');
 		const uni = { id: 'uni', emailDomains: ['u.ac.jp'] };
-		expect(await verifyByGoogle(t.db, { id: 'c', email: 'taro@u.ac.jp', googleSub: 'g-c', googleAt: new Date() }, uni)).toBe(false);
+		expect(await verifyBySignIn(t.db, { id: 'c', email: 'taro@u.ac.jp', googleSub: 'g-c', googleAt: new Date(), createdAt: old }, uni)).toBe(false);
 		// b itself confirms again, and then holds the mailbox
 		t.run(`UPDATE verify_tokens SET expires_at = expires_at - 120000`);
 		expect(await confirm(t, 'b', 'taro+x@u.ac.jp')).toEqual({ university: 'テスト大学' });

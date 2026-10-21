@@ -42,7 +42,7 @@ export const actions: Actions = {
 			const message =
 				created.error === 'cooldown'
 					? MAIL_COOLDOWN_MESSAGE
-					: 'このアドレスには、続けてメールを送りました。届いたメールを確かめるか、15分ほどたってから、もう一度送ってください。';
+					: 'このアドレスには、続けてメールを送りました。届いたメールを確認するか、15分ほどたってから、もう一度送ってください。';
 			return fail(429, { message, email });
 		}
 		// All users together, so the rental server keeps sending

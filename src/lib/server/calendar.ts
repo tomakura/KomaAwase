@@ -110,10 +110,10 @@ export function parseMove(form: FormData, periods: number[]): { move: MoveInput 
 	const period = Number(form.get('period'));
 	const span = Number(form.get('span') ?? 1);
 	const room = String(form.get('room') ?? '').trim() || null;
-	if (!isDate(fromDate)) return { message: 'もとの日を確かめてください' };
-	if (!isDate(toDate)) return { message: '振替の日を確かめてください' };
+	if (!isDate(fromDate)) return { message: 'もとの日を確認してください' };
+	if (!isDate(toDate)) return { message: '振替の日を確認してください' };
 	if (!periods.includes(period)) return { message: '時限を選んでください' };
-	if (!Number.isInteger(span) || span < 1 || !periods.includes(period + span - 1)) return { message: 'コマ数を確かめてください' };
+	if (!Number.isInteger(span) || span < 1 || !periods.includes(period + span - 1)) return { message: 'コマ数を確認してください' };
 	if (room && [...room].length > ROOM_MAX) return { message: `教室は${ROOM_MAX}文字までです` };
 	return { move: { fromDate, toDate, period, span, room } };
 }

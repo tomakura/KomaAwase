@@ -34,7 +34,7 @@
 		{/if}
 
 		<p class="ui-note">
-			「授業をさがす」には、同じ大学の人が登録した授業が出ます。大学を変えても、みんなと同期している授業はそのまま残ります。
+			「授業を探す」には、同じ大学の人が登録した授業が出ます。大学を変えても、みんなと同期している授業はそのまま残ります。
 		</p>
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 		<button class="btn btn-primary" type="submit">保存する</button>

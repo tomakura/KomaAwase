@@ -33,7 +33,7 @@
 		<form class="ui-list" method="POST" action="?/friends" bind:this={friendsForm} use:enhance={keep}>
 			<div class="choice">
 				<Segmented options={SHARE_CHOICES} bind:value={friends} label="友だちへの見せ方" name="share" onchange={() => submit(friendsForm)} />
-				<a class="preview" href="/friends/sharing/preview?as=friends">見え方を確かめる<Icon name="chevron" size={16} /></a>
+				<a class="preview" href="/friends/sharing/preview?as=friends">見え方を確認する<Icon name="chevron" size={16} /></a>
 			</div>
 		</form>
 		<p class="ui-note">{SHARE_NOTES[friends]}友だち全員に同じように見えます。</p>
@@ -54,7 +54,7 @@
 							name="share"
 							onchange={() => submit(groupForms[g.id])}
 						/>
-						<a class="preview" href="/friends/sharing/preview?as={g.id}">見え方を確かめる<Icon name="chevron" size={16} /></a>
+						<a class="preview" href="/friends/sharing/preview?as={g.id}">見え方を確認する<Icon name="chevron" size={16} /></a>
 					</form>
 				{/each}
 			</div>

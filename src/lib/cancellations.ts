@@ -4,6 +4,6 @@
 // How many others it takes before a timetable cell says 休講かも; one person's word only shows in the detail
 export const MAYBE_MIN = 2;
 
-export const votesLabel = (n: number) => `${n}人が休講と入れています`;
+export const votesLabel = (n: number) => `${n}人が休講として登録しています`;
 
-export const CANCEL_REPORT_REASON = 'まちがい・いたずら';
+export const CANCEL_REPORT_REASON = '間違い・いたずら';

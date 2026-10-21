@@ -89,7 +89,7 @@
 			<section class="device">
 				<h2>この端末</h2>
 				{#if device === 'checking'}
-					<p class="ui-note">確かめています…</p>
+					<p class="ui-note">確認しています…</p>
 				{:else if device === 'install'}
 					<p>iPhone・iPad では、ホーム画面に追加したコマあわせから通知を受け取れます。</p>
 					<a class="btn" href="/install">ホーム画面に追加する方法</a>
@@ -108,7 +108,7 @@
 					</div>
 					{#if form?.tested}<p class="ui-note" role="status">送信しました。</p>{/if}
 				{:else}
-					<p>友だち申請やスクショの読み取り完了などをお知らせします。</p>
+					<p>友だち申請やスクリーンショットの読み取り完了などをお知らせします。</p>
 					<button class="btn btn-primary" type="button" onclick={turnOn} disabled={busy}>この端末で通知を受け取る</button>
 				{/if}
 				{#if message || form?.message}<p class="error" role="alert">{message ?? form?.message}</p>{/if}
@@ -138,7 +138,7 @@
 						</div>
 					{/each}
 				</form>
-				<p class="ui-note">締め切りの3時間前・1時間前は、締め切りの時刻を入れた課題だけです。設定はすべての端末で共通です。</p>
+				<p class="ui-note">締切の3時間前・1時間前は、締切の時刻を入れた課題だけです。設定はすべての端末で共通です。</p>
 			</section>
 
 			<section>

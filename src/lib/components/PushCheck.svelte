@@ -62,7 +62,7 @@
 				detail: registered
 					? '通知の届け先として登録されています。'
 					: sub && !state
-						? '確かめられませんでした。通信できるところで、もう一度試してください。'
+						? '確認できませんでした。通信できるところで、もう一度試してください。'
 						: '「この端末ではやめる」を押してから、もう一度「この端末で通知を受け取る」を押してください。'
 			});
 			if (!registered || !state) return;
@@ -73,9 +73,9 @@
 				label: '最後に送った結果',
 				ok: lastOkAt === null && lastFailedAt === null ? null : !failedLast,
 				detail: failedLast
-					? `${when(lastFailedAt)} に送れませんでした。テストの通知を送って、届くか確かめてください。`
+					? `${when(lastFailedAt)} に送れませんでした。テストの通知を送って、届くか確認してください。`
 					: lastOkAt !== null
-						? `${when(lastOkAt)} に届けました。届いていなければ、端末の「おやすみモード」や通知の設定を確かめてください。`
+						? `${when(lastOkAt)} に届けました。届いていなければ、端末の「おやすみモード」や通知の設定を確認してください。`
 						: 'まだ送っていません。テストの通知を送ってみてください。'
 			});
 		} finally {
@@ -87,7 +87,7 @@
 
 <section>
 	<h2>届かないときは</h2>
-	<button class="btn" type="button" onclick={run} disabled={running}>{running ? '確かめています…' : checks ? 'もう一度確かめる' : '確かめる'}</button>
+	<button class="btn" type="button" onclick={run} disabled={running}>{running ? '確認しています…' : checks ? 'もう一度確認する' : '確認する'}</button>
 	{#if checks}
 		<ol class="ui-list">
 			{#each checks as c (c.label)}

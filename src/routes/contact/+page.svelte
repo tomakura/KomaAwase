@@ -54,7 +54,7 @@
 		<div class="body">
 			<!-- Comes up from below -->
 			<p class="thanks" role="status" in:fly|global={{ y: 28, ...motion(420) }}>送信しました。返信は、入力したメールアドレスにお送りします。</p>
-			<a class="btn" href={data.signedIn ? '/more' : '/login'} in:fly|global={{ y: 28, delay: 70, ...motion(420) }}>もどる</a>
+			<a class="btn" href={data.signedIn ? '/more' : '/login'} in:fly|global={{ y: 28, delay: 70, ...motion(420) }}>戻る</a>
 		</div>
 	{:else}
 		<form

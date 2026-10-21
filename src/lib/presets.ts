@@ -97,7 +97,7 @@ export function periodsProblem(periods: PeriodInput[]): string | null {
 	if (first !== 0 && first !== 1) return '時限は0限か1限から始めてください';
 	for (const [i, p] of periods.entries()) {
 		if (p.number !== first + i) return '時限の番号が飛んでいます';
-		if (!TIME.test(p.start) || !TIME.test(p.end)) return `${p.number}限の時刻を確かめてください`;
+		if (!TIME.test(p.start) || !TIME.test(p.end)) return `${p.number}限の時刻を確認してください`;
 		if (toMinutes(p.start) >= toMinutes(p.end)) return `${p.number}限は始まりを終わりより前にしてください`;
 		const prev = periods[i - 1];
 		if (prev && toMinutes(prev.end) > toMinutes(p.start)) {

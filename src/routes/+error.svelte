@@ -3,14 +3,14 @@
 
 	const notFound = $derived(page.status === 404);
 	const title = $derived(
-		notFound ? 'ページが見つかりません' : page.status === 429 ? '少し待ってください' : 'うまくいきませんでした'
+		notFound ? 'ページが見つかりません' : page.status === 429 ? '少し待ってください' : '失敗しました'
 	);
 	// Our own messages are written for people; anything else gets a plain explanation.
 	const message = $derived(
 		page.error?.message && /[ぁ-んァ-ン一-龥]/.test(page.error.message)
 			? page.error.message
 			: notFound
-				? 'リンクがまちがっているか、消されたページかもしれません。'
+				? 'リンクが間違っているか、消されたページかもしれません。'
 				: '時間をおいて、もう一度やり直してください。'
 	);
 </script>

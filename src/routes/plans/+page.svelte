@@ -147,7 +147,7 @@
 						{@render row(p)}
 					{/each}
 				</div>
-				{#if s.id === 'open'}<p class="ui-note">日付を入れると、締め切りの近い順に並びます。</p>{/if}
+				{#if s.id === 'open'}<p class="ui-note">日付を入れると、締切の近い順に並びます。</p>{/if}
 			</section>
 		{/each}
 
@@ -201,7 +201,7 @@
 				</label>
 				<label class="field">課題<input name="body" maxlength="100" required autocomplete="off" /></label>
 				<div class="times">
-					<label class="field">締め切り（日付）<input type="date" name="due" /></label>
+					<label class="field">締切（日付）<input type="date" name="due" /></label>
 					<label class="field">時刻（任意）<input type="time" name="dueTime" /></label>
 				</div>
 				<label class="field">
@@ -217,7 +217,7 @@
 				</div>
 				{#if !allDay}
 					<div class="times">
-						<label class="field">はじまり<input type="time" name="start" value={editing?.start ?? ''} /></label>
+						<label class="field">始まり<input type="time" name="start" value={editing?.start ?? ''} /></label>
 						<label class="field">終わり<input type="time" name="end" value={editing?.end ?? ''} /></label>
 					</div>
 				{/if}

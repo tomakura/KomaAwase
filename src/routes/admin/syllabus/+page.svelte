@@ -49,7 +49,7 @@
 	<PageHeader title="シラバスの取り込み" back="/admin" />
 
 	<section class="ui-section">
-		<p class="ui-note">scripts/syllabus で書き出したファイルを選んで、まず中身を確かめてから取り込みます。授業コードで同じ授業を見分けるので、同じファイルをもう一度取り込んでも増えません。ファイルの教室は、教室が空のコマにだけ入ります。入っている教室は消えません。</p>
+		<p class="ui-note">scripts/syllabus で書き出したファイルを選んで、まず中身を確認してから取り込みます。授業コードで同じ授業を見分けるので、同じファイルをもう一度取り込んでも増えません。ファイルの教室は、教室が空のコマにだけ入ります。入っている教室は消えません。</p>
 		<form
 			method="POST"
 			use:enhance={async ({ action, cancel }) => {
@@ -83,7 +83,7 @@
 				</p>
 			{/if}
 			<div class="buttons">
-				<button class="btn" type="submit" formaction="?/check" disabled={!text || busy}>確かめる</button>
+				<button class="btn" type="submit" formaction="?/check" disabled={!text || busy}>確認する</button>
 				<button class="btn btn-primary" type="submit" formaction="?/apply" disabled={!checked || !text || busy}>取り込む</button>
 			</div>
 			{#if name}<p class="ui-note">{name}</p>{/if}
@@ -113,7 +113,7 @@
 		</section>
 		{#if checked.roomsKept.length}
 			<section class="ui-section">
-				<h2 class="ui-section-title">教室がファイルとちがう授業 {checked.roomsKept.length}件</h2>
+				<h2 class="ui-section-title">教室がファイルと異なる授業 {checked.roomsKept.length}件</h2>
 				<p class="ui-note">利用者が入れた教室のままにします。直すときは、みんなの授業データから直してください。</p>
 				{@render list(checked.roomsKept)}
 			</section>

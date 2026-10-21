@@ -87,10 +87,10 @@
 		{#if passkeyResult === 'failed'}
 			<p class="error" role="alert">パスキーでログインできませんでした。もう一度試すか、メールでログインしてください。</p>
 		{:else if passkeyResult === 'none'}
-			<p class="hint" role="status">パスキーでログインを完了できませんでした。もう一度試すか、他の方法でログインしてください。</p>
+			<p class="hint" role="status">パスキーでログインを完了できませんでした。もう一度試すか、ほかの方法でログインしてください。</p>
 		{/if}
 
-		<div class="divider"><span>{data.reauth ? 'パスキーがないとき' : 'はじめての人・パスキーがない人'}</span></div>
+		<div class="divider"><span>{data.reauth ? 'パスキーがないとき' : '初めての人・パスキーがない人'}</span></div>
 
 		{#if data.google}
 			<!-- Google's branding rules: the colored G on a white (or, in dark mode, #131314) button -->
@@ -106,14 +106,14 @@
 			{#if data.suspended}<p class="error" role="alert">{SUSPENDED_MESSAGE}</p>{/if}
 			{#if data.googleFailed}<p class="error" role="alert">Googleでログインできませんでした。もう一度やり直してください</p>{/if}
 			{#if data.googleUseMail}
-				<p class="error" role="alert">このGoogleアカウントでは続けられません。同じメールアドレスに届くリンクでログインしてください。</p>
+				<p class="error" role="alert">このGoogleアカウントでは続行できません。メールアドレスを入力して、届いたリンクからログインしてください。</p>
 			{/if}
 		{/if}
 
 		{#if form?.sentTo && !other}
 			{#key form}
 				<MailSent email={form.sentTo} action="?/email" onother={() => (other = true)}>
-					{form.sentTo} にリンクを送りました。15分以内に開いてください。届かない場合は迷惑メールをご確認ください。
+					{form.sentTo} にリンクを送りました。15分以内に開いてください。届かない場合は迷惑メールフォルダも確認してください。
 				</MailSent>
 			{/key}
 		{:else}

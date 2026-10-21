@@ -106,7 +106,7 @@
 <Sheet bind:open title={done ? '設定しました' : kind === 'install' ? '通知を使うには、ホーム画面に追加してください' : kind === 'reminder' ? '授業の前にも通知できます' : '通知をオンにしませんか'} onclose={remember}>
 	{#if done}
 		<p>授業が始まる10分前に、授業名・教室・開始時刻をお知らせします。時間は「その他」→「通知」で変えられます。</p>
-		<button class="btn btn-primary" type="button" onclick={dismiss}>とじる</button>
+		<button class="btn btn-primary" type="button" onclick={dismiss}>閉じる</button>
 	{:else if kind === 'install'}
 		<p>iPhone・iPad は、ホーム画面に追加したアプリから通知を受け取れます。</p>
 		<ol>
@@ -114,7 +114,7 @@
 			<li>「ホーム画面に追加」を選ぶ</li>
 			<li>追加したアイコンから開いて、ログインする</li>
 		</ol>
-		<a class="btn btn-primary" href="/install" onclick={dismiss}>くわしい手順を見る</a>
+		<a class="btn btn-primary" href="/install" onclick={dismiss}>詳しい手順を見る</a>
 		<button class="btn" type="button" onclick={dismiss}>あとで</button>
 	{:else}
 		<p>

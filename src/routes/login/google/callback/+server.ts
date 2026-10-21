@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ platform, url, cookies, locals, requ
 	if (user === 'use-mail') redirect(303, '/login?error=google-mail');
 	if (!user) redirect(303, '/login?error=google');
 	if (user.suspendedAt) redirect(303, '/login?error=suspended');
-	// For the enrollment check by Google (verifyByGoogle), which goes by how recent this is. Only
+	// For the enrollment check by the sign-in (verifyBySignIn), which goes by how recent this is. Only
 	// for the Google account linked to it: one found by its address may be linked to another
 	await locals.db
 		.update(users)

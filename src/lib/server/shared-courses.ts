@@ -479,7 +479,7 @@ export async function restoreShared(
 		existing: course,
 		values
 	});
-	if (!written.changed) return { message: 'いまの内容と同じです' };
+	if (!written.changed) return { message: '今の内容と同じです' };
 	try {
 		await db.batch(written.statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 	} catch {

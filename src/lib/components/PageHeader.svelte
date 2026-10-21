@@ -8,7 +8,7 @@
 <header>
 	<a class="back" href={back} data-back>
 		<Icon name="back" size={22} />
-		<span class="visually-hidden">もどる：</span>
+		<span class="visually-hidden">戻る：</span>
 		<h1>{title}</h1>
 	</a>
 	{#if trailing}<div class="trailing">{@render trailing()}</div>{/if}

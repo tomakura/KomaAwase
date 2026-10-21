@@ -54,7 +54,7 @@ export const actions: Actions = {
 			insert into ${feedback} (id, user_id, kind, body, env)
 			select ${crypto.randomUUID()}, ${me.id}, ${kind}, ${body}, ${env && JSON.stringify(env)}
 			where (select count(*) from ${feedback} where ${feedback.userId} = ${me.id} and ${feedback.createdAt} >= ${since}) < ${DAILY_MAX}`);
-		if (!saved.meta.changes) return fail(429, { message: '今日はたくさん送っていただきました。また明日お願いします' });
+		if (!saved.meta.changes) return fail(429, { message: '本日の送信上限に達しました。明日もう一度送ってください' });
 		return { sent: true };
 	}
 };

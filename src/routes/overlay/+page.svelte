@@ -282,7 +282,7 @@
 	{:else}
 		<p class="ui-note">みんな空いています。</p>
 	{/if}
-	<button class="btn" type="button" onclick={() => (open = null)}>とじる</button>
+	<button class="btn" type="button" onclick={() => (open = null)}>閉じる</button>
 </Sheet>
 
 <style>
