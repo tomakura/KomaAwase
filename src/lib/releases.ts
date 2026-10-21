@@ -2,7 +2,8 @@
 // went out in (worked out at build time from its number, src/lib/version.ts). Each pull request
 // that changes what people see adds its entry here, in short release-note style
 // (〜を追加 / 〜を修正 / 〜できるように). `date` is the day it is put out (Japan time), shown
-// when the version can't be worked out. Tests, docs and the admin's screens are left out.
+// when the version can't be worked out. Tests, docs and the admin's screens are left out; a version
+// with no entry shows as 軽微な修正.
 export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
