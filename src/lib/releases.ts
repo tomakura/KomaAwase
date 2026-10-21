@@ -7,12 +7,12 @@
 export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
-	{ pr: 73, date: '2026-10-21', items: ['デジタルハリウッド大学のシラバスに対応', '更新情報に、細かな変更のバージョンも「軽微な修正」として表示するように'] },
 	{
 		pr: 74,
 		date: '2026-10-21',
 		items: ['iPhone の「学期の区切り」で、日付の箱が右にはみ出るのを修正']
 	},
+	{ pr: 73, date: '2026-10-21', items: ['デジタルハリウッド大学のシラバスに対応', '更新情報に、細かな変更のバージョンも「軽微な修正」として表示するように'] },
 	{
 		pr: 70,
 		date: '2026-10-21',
