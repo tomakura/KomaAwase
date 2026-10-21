@@ -128,6 +128,17 @@ describe('findGrid', () => {
 		expect(heading.y + heading.h).toBe(grid.rows[0][0]);
 	});
 
+	it('leaves a title that sits right above the headings out of the heading band', () => {
+		const img = cards([[1, 1]]);
+		// The page title at 72-80, the weekday headings at 88-96: the band above the first row is 70-100
+		rect(img, 60, 72, 200, 8, [40, 40, 40]);
+		for (let c = 0; c < 5; c++) rect(img, 60 + c * 110 + 30, 88, 40, 8, [40, 40, 40]);
+		const heading = tiles(findGrid(img)!)[0];
+		expect(heading.y).toBeGreaterThan(80);
+		expect(heading.y).toBeLessThanOrEqual(88);
+		expect(heading.y + heading.h).toBe(100);
+	});
+
 	it('gives up on what is not a table', () => {
 		expect(findGrid(canvas(400, 400, [255, 255, 255]))).toBeNull();
 		expect(findGrid(canvas(50, 50, [0, 0, 0]))).toBeNull();

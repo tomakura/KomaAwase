@@ -225,6 +225,41 @@ function look(img: Pixels, col: Span, row: Span): { colour: Colour; written: boo
 	return { colour, written: offsets.length > 0 && ink / offsets.length >= INK };
 }
 
+/**
+ * The part of the band above the table that the weekday headings fill. A page's own title or a
+ * button can sit right above them, and the AI would read that as part of a heading. Rows with
+ * something written in them are looked for from the bottom up: the last block of them is the
+ * headings, and a blank stretch above it ends the band.
+ */
+function headingBand(img: Pixels, cols: Span[], band: Span): Span {
+	const { data, width } = img;
+	const inked = (y: number) =>
+		cols.some((c) => {
+			let lo = 255;
+			let hi = 0;
+			for (let x = c[0] + 2; x < c[1] - 2; x += Math.max(1, Math.floor((c[1] - c[0]) / 80))) {
+				const i = (y * width + x) * 4;
+				const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+				lo = Math.min(lo, l);
+				hi = Math.max(hi, l);
+			}
+			return hi - lo > 40;
+		});
+	const BLANK = 5;
+	let top = band[1];
+	let seen = false;
+	let blank = 0;
+	for (let y = band[1] - 1; y >= band[0]; y--) {
+		if (inked(y)) {
+			seen = true;
+			blank = 0;
+			top = y;
+		} else if (seen && ++blank >= BLANK) break;
+	}
+	// A little room around the writing, so the heading isn't cut at the edge
+	return seen ? [Math.max(band[0], top - BLANK), band[1]] : band;
+}
+
 /** The table in the screenshot, or null when it doesn't look like one (then it is sent whole) */
 export function findGrid(img: Pixels): Grid | null {
 	const { data, width, height } = img;
@@ -275,7 +310,8 @@ export function findGrid(img: Pixels): Grid | null {
 	// band about half a row tall
 	const firstRow = best.rows[0];
 	const band = Math.min(firstRow[0], Math.round((firstRow[1] - firstRow[0]) * 0.5));
-	return { cols, rows, filled, header: best.header ?? (band >= 12 ? [firstRow[0] - band, firstRow[0]] : null) };
+	const header = best.header ?? (band >= 12 ? headingBand(img, cols, [firstRow[0] - band, firstRow[0]]) : null);
+	return { cols, rows, filled, header };
 }
 
 function mostCommon(colours: Colour[]): Colour {
