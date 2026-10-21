@@ -25,7 +25,12 @@ function world() {
 	return t;
 }
 
-const course = (over: Partial<SyllabusFile['courses'][number]> = {}) => ({
+// A course as the file has it: a slot's room may be left out
+type FileCourse = Omit<SyllabusFile['courses'][number], 'slots'> & {
+	slots: (Omit<SyllabusFile['courses'][number]['slots'][number], 'room'> & { room?: string | null })[];
+};
+
+const course = (over: Partial<FileCourse> = {}): FileCourse => ({
 	code: '1001',
 	title: '演習A',
 	terms: ['Q3'],
@@ -42,7 +47,7 @@ const course = (over: Partial<SyllabusFile['courses'][number]> = {}) => ({
 	...over
 });
 
-async function importFile(t: ReturnType<typeof world>, courses: ReturnType<typeof course>[]) {
+async function importFile(t: ReturnType<typeof world>, courses: FileCourse[]) {
 	const file = parseSyllabusFile({ year: 2026, courses });
 	if ('message' in file) throw new Error(file.message);
 	const rows = t.rows(`SELECT id FROM shared_courses WHERE university_id = 'uni'`).map((r) => String(r.id));
@@ -111,6 +116,27 @@ describe('importing the syllabus', () => {
 		const plan = await importFile(t, [course()]);
 		expect(plan.missing.map((m) => m.code)).toEqual(['3003']);
 		expect(t.rows(`SELECT count(*) AS n FROM shared_courses WHERE code = '3003'`)).toEqual([{ n: 1 }]);
+	});
+
+	it("puts the file's rooms into empty slots only, and lists the ones that differ", async () => {
+		const t = world();
+		await importFile(t, [course({ code: '2002', title: '講義B', slots: [{ weekday: 1, period: 1, span: 1, week: 'every' }] })]);
+		const rooms = [
+			// People entered E15 here: it stays
+			course({ link: 'mine', slots: [{ weekday: 2, period: 3, span: 2, week: 'every', room: 'E16' }] }),
+			// Empty: it takes the file's, written as people's are
+			course({ code: '2002', title: '講義B', slots: [{ weekday: 1, period: 1, span: 1, week: 'every', room: 'E05/E06' }] })
+		];
+		const plan = await importFile(t, rooms);
+		expect(plan.roomsKept.map((k) => [k.course.code, k.room, k.slot.room])).toEqual([['1001', 'E15', 'E16']]);
+		expect(plan.update[0].changes).toEqual([{ label: '教室', before: 'なし', after: 'E05 / E06' }]);
+		expect(t.rows(`SELECT room FROM shared_course_slots WHERE shared_course_id = 'mine'`)).toEqual([{ room: 'E15' }]);
+		expect(t.rows(`SELECT room FROM shared_course_slots s JOIN shared_courses c ON c.id = s.shared_course_id WHERE c.code = '2002'`)).toEqual([
+			{ room: 'E05 / E06' }
+		]);
+		// The same file again changes nothing
+		const again = await importFile(t, rooms.map((c) => ({ ...c, link: null })));
+		expect([again.update.length, again.same.length]).toEqual([0, 2]);
 	});
 });
 
