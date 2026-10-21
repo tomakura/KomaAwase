@@ -136,6 +136,42 @@ describe('readImport', () => {
 		]);
 	});
 
+	it('reads a list under weekday and period headings, which has no columns to count', () => {
+		const answer = {
+			days: [],
+			rows: [],
+			courses: [
+				{ weekday: '月', period: 2, title: 'コンプライアンス基礎 I', room: '', teacher: '高瀬 亜富', code: '10210001' },
+				{ weekday: '火曜日', period: 3, title: '映像制作演習基礎C', room: '', teacher: '大島 ダヴィッド', code: '33130002' },
+				{ weekday: '火曜日', period: 4, title: '映像制作演習基礎C', room: '', teacher: '大島 ダヴィッド', code: '33130002' }
+			]
+		};
+		expect(readImport(answer)).toEqual([
+			{ title: 'コンプライアンス基礎 I', weekday: 1, period: 2, span: 1, room: '', teachers: ['高瀬 亜富'], code: '10210001' },
+			{ title: '映像制作演習基礎C', weekday: 2, period: 3, span: 2, room: '', teachers: ['大島 ダヴィッド'], code: '33130002' }
+		]);
+	});
+
+	it('reads a table from an answer that also has an empty list', () => {
+		const cell = (title: string) => ({ title, room: '', teacher: '', code: '' });
+		const answer = { days: ['月', '火'], rows: [{ period: 1, cells: [cell('英語'), cell('')] }], courses: [] };
+		expect(readImport(answer)).toEqual([{ title: '英語', weekday: 1, period: 1, span: 1, room: '', teachers: [] }]);
+	});
+
+	it('answers with no course in it is empty, not wrong in shape', () => {
+		expect(readImport({ days: [], rows: [], courses: [] })).toEqual([]);
+	});
+
+	it('keeps the start of a name the screen cut short, and says so', () => {
+		const tile = (cell: string, title: string) => ({ cell, title, teacher: '', room: '', code: '' });
+		const read = readImport({ courses: [tile('A0', '月'), tile('A2', 'コンプ…'), tile('A3', '中国語 ...'), tile('A4', '宗教学A')] })!;
+		expect(read.map((c) => [c.title, c.truncated ?? false])).toEqual([
+			['コンプ', true],
+			['中国語', true],
+			['宗教学A', false]
+		]);
+	});
+
 	it('takes JSON text or an object', () => {
 		const answer = { courses: [{ title: '統計学入門', weekday: 3, period: 1, span: 1, room: 'A-305', teachers: [] }] };
 		expect(readImport(JSON.stringify(answer))).toEqual(answer.courses);

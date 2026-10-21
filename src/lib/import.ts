@@ -16,6 +16,8 @@ export type ImportedCourse = {
 	check?: true;
 	// The cells of a double class gave different rooms: one of them is likely misread
 	roomCheck?: true;
+	// The screenshot cut the name short with …: what is here is the start of it
+	truncated?: true;
 	// Only from a CSV; a screenshot doesn't show them
 	credits?: number;
 };
@@ -36,12 +38,30 @@ const CELL = {
 	additionalProperties: false
 } as const;
 
+// A table is copied out as days and rows. A list under weekday and period headings (a phone
+// view that shows each day's classes one under another) has no columns to count, so each class
+// carries its own weekday and period; whichever of the two the screenshot is, the other stays empty.
+const LISTED = {
+	type: 'object',
+	properties: {
+		weekday: { type: 'string', description: '見出しの曜日。月〜日の1文字' },
+		period: { type: 'integer', description: '見出しの時限の番号。2時限なら2' },
+		title: { type: 'string', description: '授業名' },
+		room: { type: 'string', description: '教室。なければ空文字' },
+		teacher: { type: 'string', description: '先生の名前。なければ空文字' },
+		code: { type: 'string', description: '授業コードの数字。なければ空文字' }
+	},
+	required: ['weekday', 'period', 'title', 'room', 'teacher', 'code'],
+	additionalProperties: false
+} as const;
+
 export const IMPORT_SCHEMA = {
 	type: 'object',
 	properties: {
-		days: { type: 'array', items: { type: 'string' }, description: '曜日の見出し。左から順に' },
+		days: { type: 'array', items: { type: 'string' }, description: '表のとき、曜日の見出し。左から順に。表でなければ空の配列' },
 		rows: {
 			type: 'array',
+			description: '表のとき、時限の行。表でなければ空の配列',
 			items: {
 				type: 'object',
 				properties: {
@@ -51,21 +71,27 @@ export const IMPORT_SCHEMA = {
 				required: ['period', 'cells'],
 				additionalProperties: false
 			}
-		}
+		},
+		courses: { type: 'array', items: LISTED, description: '曜日と時限の見出しごとの一覧のとき、授業を1つずつ。一覧でなければ空の配列' }
 	},
-	required: ['days', 'rows'],
+	required: ['days', 'rows', 'courses'],
 	additionalProperties: false
 } as const;
 
 // Tried on real screenshots: one more rule (leave out notes and ads) made Llama 4 Scout
-// garble kanji, so the prompt stays this short.
+// garble kanji, so the prompt only says what each field is. What a cell looks like differs from
+// app to app (a title that wraps onto two lines, the room in a small label, a title cut short
+// with …), so no one app's layout is written into it.
 export const IMPORT_PROMPT = [
-	'これは大学の時間割アプリのスクリーンショットです。表を上の行から順に、そのまま書き写してJSONで返してください。',
+	'これは大学の時間割アプリのスクリーンショットです。授業を書き写してJSONで返してください。',
+	'表（曜日が列、時限が行）のとき: days と rows に書き、courses は空の配列にする',
 	'- days: いちばん上の曜日の見出しを、左から順に（例: ["月","火","水","木","金"]）',
-	'- rows: 時限の行ごとに1つ。period はその行の時限の番号（1限なら1）。番号がなく時刻だけなら、上から1、2、3…と数える',
+	'- rows: 時限の行ごとに1つ。period はその行の時限の番号（1限なら1）。番号がなく時刻だけなら、上から1、2、3…と数える。昼休みなど授業の行でないものは書かない',
 	'- cells: その行のマスを、左の列から順に days と同じ数だけ。授業が入っていないマスは title・room・teacher・code を空文字',
-	'- title はマスの授業名。マスの中で改行されていても1つにつなげる',
-	'- room はマスにある教室、teacher は先生の名前、code は8桁ほどの授業コードの数字。なければ空文字',
+	'曜日と時限の見出しごとに授業が並ぶ一覧のとき: courses に授業を1つずつ書き、days と rows は空の配列にする。weekday は見出しの曜日、period は見出しの時限の番号',
+	'どちらも:',
+	'- title は授業名。マスの中で折り返されていても1つにつなげる。先生・授業コード・単位などは含めない。「…」で途切れているときは、見えている分と「…」をそのまま書く',
+	'- room は教室（「E15」「遠隔」のような短いラベルのこともある）、teacher は先生の名前、code は授業コード。なければ空文字',
 	'- 同じ授業が上下のマスに続いていても、それぞれの行に書く',
 	'- 読めない文字を想像で埋めない'
 ].join('\n');
@@ -100,10 +126,10 @@ export const IMPORT_TILE_PROMPT = [
 	'これは大学の時間割のマスを縦に並べた画像です。各マスの左に、ピンクの札で B1 のような印があります。',
 	'すべてのマスについて、次の5つを書き出してください。',
 	'- cell: そのマスの左にあるピンクの札の文字（例 B1）',
-	'- title: そのマスの太字の授業名の1行だけ（先生名・8桁の数字・N単位・複数回は含めない）。札が A0 のように0で終わるマスは曜日の見出しなので、title に曜日を書く',
+	'- title: 授業名。2行以上に折り返されていても1つにつなげる。先生・授業コード・単位・「複数回」などは含めない。「…」で途切れているときは、見えている分と「…」をそのまま書く。札が A0 のように0で終わるマスは曜日の見出しなので、title に曜日だけを書く',
 	'- teacher: 先生の名前（なければ空文字）',
-	'- room: 教室（なければ空文字）',
-	'- code: マスにある8桁ほどの授業コードの数字（なければ空文字）',
+	'- room: 教室（「E15」「遠隔」のような短いラベルのこともある。なければ空文字）',
+	'- code: 授業コード（なければ空文字）',
 	'読めない文字を想像で埋めない'
 ].join('\n');
 
@@ -188,6 +214,17 @@ function cellsOfTiles(tiles: unknown[]) {
 	}));
 }
 
+// A class from a list under weekday and period headings: the weekday is the heading's, 「月」
+function listed(item: unknown) {
+	if (typeof item !== 'object' || item === null) return item;
+	const c = item as Record<string, unknown>;
+	return {
+		...c,
+		weekday: typeof c.weekday === 'string' ? (weekdayOf(c.weekday) ?? c.weekday) : c.weekday,
+		...(typeof c.teacher === 'string' && !Array.isArray(c.teachers) ? { teachers: splitTeachers(c.teacher) } : {})
+	};
+}
+
 /** Names separated by 、 , ／ or a new line. A space stays inside a name (「山田 太郎」). */
 export function splitTeachers(text: string) {
 	return text
@@ -202,6 +239,9 @@ const TEACHER_MAX = 30;
 const TEACHERS_MAX = 10;
 const SPAN_MAX = 4;
 export const IMPORT_COURSES_MAX = 60;
+
+// A name the screen cut short: 「コンプ…」 or 「映像制...」
+const CUT_SHORT = /\s*(?:…|‥|\.{2,})+\s*$/;
 
 const clip = (s: string, max: number) => [...s.trim()].slice(0, max).join('');
 
@@ -279,11 +319,14 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 	}
 	const answer = raw as { courses?: unknown; days?: unknown; rows?: unknown } | null;
 	const tiled = Array.isArray(answer?.courses) && answer.courses.some((c) => typeof (c as { cell?: unknown } | null)?.cell === 'string');
-	const list =
-		Array.isArray(answer?.days) && Array.isArray(answer?.rows)
-			? cellsOfGrid(answer.days, answer.rows)
-			: tiled
-				? cellsOfTiles(answer!.courses as unknown[])
+	// An answer to the table-or-list schema leaves the half it didn't use empty
+	const grid = Array.isArray(answer?.days) && Array.isArray(answer?.rows) && answer.rows.length > 0;
+	const list = grid
+		? cellsOfGrid(answer!.days as unknown[], answer!.rows as unknown[])
+		: tiled
+			? cellsOfTiles(answer!.courses as unknown[])
+			: Array.isArray(answer?.courses)
+				? answer.courses.map(listed)
 				: answer?.courses;
 	if (!Array.isArray(list)) return null;
 
@@ -291,7 +334,10 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 	for (const item of list.slice(0, IMPORT_COURSES_MAX * 4)) {
 		if (typeof item !== 'object' || item === null) continue;
 		const c = item as Record<string, unknown>;
-		const title = typeof c.title === 'string' ? clip(cleanTitle(c.title), TITLE_MAX) : '';
+		// A screenshot that cuts a long name short with … (a phone's table does): the start of the name is kept
+		const rawTitle = typeof c.title === 'string' ? c.title : '';
+		const cutShort = CUT_SHORT.test(rawTitle);
+		const title = clip(cleanTitle(rawTitle.replace(CUT_SHORT, '')), TITLE_MAX);
 		const weekday = Number(c.weekday);
 		const period = Number(c.period);
 		const span = Number(c.span ?? 1);
@@ -310,6 +356,7 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 						.slice(0, TEACHERS_MAX)
 				: [],
 			...(code ? { code } : {}),
+			...(cutShort ? { truncated: true as const } : {}),
 			...(c.check === true ? { check: true as const } : {}),
 			...(typeof c.credits === 'number' && c.credits >= 0 && c.credits <= CREDITS_MAX && Number.isInteger(c.credits * 2)
 				? { credits: c.credits }
@@ -334,6 +381,7 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 			if (c.code) prev.code ??= c.code;
 			prev.teachers = [...new Set([...prev.teachers, ...c.teachers])].slice(0, TEACHERS_MAX);
 			if (c.check) prev.check = true;
+			if (c.truncated) prev.truncated = true;
 			continue;
 		}
 		// The same slot twice is a misread of a screenshot; the first stays. A CSV may well have two
@@ -348,13 +396,14 @@ export function readImport(raw: unknown, { sameSlot = false } = {}): ImportedCou
 // Courses that meet several times a week are one course with several slots.
 export function groupImported(courses: ImportedCourse[]) {
 	const key = normalizeTitle;
-	type Slot = Omit<ImportedCourse, 'title' | 'teachers' | 'credits' | 'code'>;
-	const groups = new Map<string, { title: string; teachers: string[]; credits: number | null; code: string | null; slots: Slot[] }>();
+	type Slot = Omit<ImportedCourse, 'title' | 'teachers' | 'credits' | 'code' | 'truncated'>;
+	const groups = new Map<string, { title: string; teachers: string[]; credits: number | null; code: string | null; truncated: boolean; slots: Slot[] }>();
 	for (const c of courses) {
-		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], credits: null, code: null, slots: [] };
+		const group = groups.get(key(c.title)) ?? { title: c.title, teachers: [], credits: null, code: null, truncated: false, slots: [] };
 		group.teachers = [...new Set([...group.teachers, ...c.teachers])];
 		group.credits ??= c.credits ?? null;
 		group.code ??= c.code ?? null;
+		group.truncated ||= !!c.truncated;
 		group.slots.push({
 			weekday: c.weekday,
 			period: c.period,

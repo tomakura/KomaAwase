@@ -39,7 +39,8 @@ export async function readWithGroq(apiKey: string, image: string, tiled: boolean
 			response_format: { type: 'json_schema', json_schema: { name: 'timetable', strict: true, schema: schemaOf(tiled) } },
 			reasoning_effort: 'none',
 			temperature: 0,
-			max_completion_tokens: 2048
+			// A table read whole, or a list, has every class in it; cut-out cells are a short answer
+			max_completion_tokens: tiled ? 2048 : 3072
 		}),
 		signal: AbortSignal.timeout(90_000)
 	});

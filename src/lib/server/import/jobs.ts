@@ -221,8 +221,9 @@ async function readJob(env: Env, db: Db, job: typeof importJobs.$inferSelect): P
 			errors.push(`${provider.name}: ${e instanceof OutOfQuota ? 'out of quota' : e instanceof Error ? e.message : e}`);
 			continue;
 		}
-		// Outside the try, so a failed write isn't taken for the AI failing.
-		if (courses) {
+		// Outside the try, so a failed write isn't taken for the AI failing. An answer with no
+		// course in it is a miss too (an empty table, a layout it didn't follow): the other AI may do better.
+		if (courses?.length) {
 			await finish({ status: 'done', provider: provider.name, result: courses, image: null, error: null, finishedAt: new Date() });
 			return { status: 'done' };
 		}

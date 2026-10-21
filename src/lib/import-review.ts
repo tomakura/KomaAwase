@@ -64,3 +64,33 @@ export function compareCourse(
 	const titles = [...new Set(here.filter((c) => c.slots.some((a) => row.slots.some((b) => overlaps(a, b)))).map((c) => c.title))];
 	return titles.length ? { kind: 'clash', titles } : { kind: 'new' };
 }
+
+// Two titles' shared pairs of characters, out of all their pairs: 0 for nothing alike, 1 the same
+function bigramShare(a: string, b: string) {
+	const pairs = (t: string) => {
+		const out = new Map<string, number>();
+		for (let i = 0; i + 1 < t.length; i++) out.set(t.slice(i, i + 2), (out.get(t.slice(i, i + 2)) ?? 0) + 1);
+		return out;
+	};
+	const x = pairs(a);
+	const y = pairs(b);
+	let shared = 0;
+	for (const [pair, n] of x) shared += Math.min(n, y.get(pair) ?? 0);
+	const total = Math.max(0, a.length - 1) + Math.max(0, b.length - 1);
+	return total ? (2 * shared) / total : 0;
+}
+
+/**
+ * How near a title read from an image is to a shared course's: 3 the same, or, for a name the
+ * screen cut short, its start; 2 one holds the other or they are nearly the same (a letter
+ * misread); 1 otherwise. The caller decides what 3 is worth: at one slot, the start of a name
+ * can fit several courses.
+ */
+export function titleNearness(read: string, other: string, truncated = false) {
+	const a = normalizeTitle(read);
+	const b = normalizeTitle(other);
+	if (a === b) return 3;
+	if (truncated && [...a].length >= 2 && b.startsWith(a)) return 3;
+	if (a.includes(b) || b.includes(a)) return 2;
+	return bigramShare(a, b) >= 0.65 ? 2 : 1;
+}
