@@ -341,5 +341,18 @@ export function tiles(grid: Grid): Tile[] {
 	return out;
 }
 
+// A model asked for the tag of every cell of a big table copies some of them wrong (a 6 for
+// an 8, the column of the next cell): 11 courses with their 6 headings were read with 2 courses
+// misplaced, and the same cells sent as two pictures of 10 and 8 were all read right. So the
+// cells go in sheets of at most this many (the headings come first, so they fill the first sheet).
+export const TILES_PER_SHEET = 10;
+
+/** The tiles in sheets of at most `size`, in the order they are read */
+export function sheets<T>(list: T[], size = TILES_PER_SHEET): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+	return out;
+}
+
 /** The tag written beside a tile: the column as a letter, then the row (0 for a heading) */
 export const tagOf = (tile: Pick<Tile, 'col' | 'row'>) => `${'ABCDEFGH'[tile.col]}${tile.row}`;

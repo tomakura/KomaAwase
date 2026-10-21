@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findGrid, tagOf, tiles, type Pixels } from './import-grid';
+import { findGrid, sheets, tagOf, tiles, TILES_PER_SHEET, type Pixels } from './import-grid';
 
 type Colour = [number, number, number];
 
@@ -151,5 +151,21 @@ describe('findGrid', () => {
 		// Wipe the third vertical line, so two columns look like one wide cell
 		rect(img, 240, 20, 2, 240, DARK);
 		expect(findGrid(img)).toBeNull();
+	});
+});
+
+describe('sheets', () => {
+	it('cuts the tiles into sheets in reading order, the headings first', () => {
+		const grid = findGrid(scaled())!;
+		const list = tiles(grid);
+		expect(list.map(tagOf)).toEqual(['A0', 'B0', 'C0', 'D0', 'E0', 'F0', 'A1', 'E6']);
+		expect(sheets(list).map((s) => s.length)).toEqual([8]);
+		expect(sheets(list, 5).map((s) => s.map(tagOf))).toEqual([['A0', 'B0', 'C0', 'D0', 'E0'], ['F0', 'A1', 'E6']]);
+	});
+
+	it('sends 18 cells in two pictures, 10 and 8', () => {
+		expect(TILES_PER_SHEET).toBe(10);
+		expect(sheets(Array.from({ length: 18 }, (_, i) => i)).map((s) => s.length)).toEqual([10, 8]);
+		expect(sheets([])).toEqual([]);
 	});
 });

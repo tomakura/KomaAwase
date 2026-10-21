@@ -78,11 +78,11 @@
 		return canvas;
 	}
 
-	// Smaller until it fits comfortably in a database row
-	function jpeg(canvas: HTMLCanvasElement) {
+	// Smaller until all of them fit comfortably in a database row
+	function jpegs(canvases: HTMLCanvasElement[]) {
 		for (const quality of [0.85, 0.75, 0.6, 0.45]) {
-			const url = canvas.toDataURL('image/jpeg', quality);
-			if (url.length < 1_400_000) return url;
+			const urls = canvases.map((c) => c.toDataURL('image/jpeg', quality));
+			if (urls.reduce((sum, u) => sum + u.length, 0) < 1_400_000) return urls;
 		}
 		return null;
 	}
@@ -90,7 +90,8 @@
 	/**
 	 * The chosen part as a JPEG data URL, at most `longest` pixels on its long side. When the
 	 * table can be found in it, `tiled` is true and the image is its filled cells stacked with
-	 * tags (import-grid.ts); otherwise the part is sent as it is.
+	 * tags (import-grid.ts), a few to a picture: with more than one picture the image is a JSON
+	 * list of data URLs. Otherwise the part is sent as it is.
 	 */
 	export async function crop(longest = 1600): Promise<{ image: string; tiled: boolean } | null> {
 		const table = draw(TABLE_LONGEST);
@@ -98,14 +99,14 @@
 			try {
 				const grid = findGrid(table.getContext('2d')!.getImageData(0, 0, table.width, table.height));
 				const stacked = grid && drawTiles(table, grid, longest);
-				const url = stacked && jpeg(stacked);
-				if (url) return { image: url, tiled: true };
+				const urls = stacked && jpegs(stacked);
+				if (urls) return { image: urls.length === 1 ? urls[0] : JSON.stringify(urls), tiled: true };
 			} catch {
 				// Whatever went wrong, the whole part can still be sent
 			}
 		}
 		const whole = draw(longest);
-		const url = whole && jpeg(whole);
+		const url = whole && jpegs([whole])?.[0];
 		return url ? { image: url, tiled: false } : null;
 	}
 </script>
