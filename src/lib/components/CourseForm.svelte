@@ -150,10 +150,10 @@
 			: fixed && sync.canEdit
 				? '「シラバス」の付いた項目はシラバスのままです。教室を入れると、同期しているみんなに反映されます。シラバスと違うときは「自分だけで使う」で直せます。'
 			: sync.shared && !sync.canEdit
-				? 'だれかが教室などを直すと、自動で反映されます。この授業を同期していて在籍確認済みの人が、みんなのデータを直せます。内容を変えて保存すると「自分だけで使う」に切り替わります。'
+				? '誰かが教室などを直すと、自動で反映されます。この授業を同期していて在籍確認済みの人が、みんなのデータを直せます。内容を変えて保存すると「自分だけで使う」に切り替わります。'
 				: sync.shared
-				? 'だれかが教室などを直すと、自動で反映されます。ここでの変更は、同じ授業に同期している人の時間割にも反映されます。'
-				: '同じ大学の人が「授業をさがす」で見つけられるようになります。'
+				? '誰かが教室などを直すと、自動で反映されます。ここでの変更は、同じ授業に同期している人の時間割にも反映されます。'
+				: '同じ大学の人が「授業を探す」で見つけられるようになります。'
 	);
 
 	let teacher = $state('');
@@ -253,7 +253,7 @@
 			}}
 		>
 			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-			<span class="visually-hidden">もどる：</span>
+			<span class="visually-hidden">戻る：</span>
 			<h1>{heading}</h1>
 		</a>
 		<button class="save" type="submit" disabled={saving}>{saving ? '保存中…' : '保存'}</button>
@@ -492,7 +492,7 @@
 				{#if v.delivery === 'intensive'}
 					<div class="dates">
 						<label class="field">
-							はじまり（任意）
+							始まり（任意）
 							<input type="date" name="intensive_from" bind:value={v.intensiveFrom} readonly={fixed} />
 						</label>
 						<label class="field">

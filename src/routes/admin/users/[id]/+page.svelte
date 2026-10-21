@@ -38,7 +38,7 @@
 			<div class="ui-row"><span>登録日</span><span class="ui-row-value">{day(u.createdAt)}</span></div>
 			<div class="ui-row"><span>最後に使った日</span><span class="ui-row-value">{day(u.lastSeenAt)}</span></div>
 			<div class="ui-row"><span>受けた通報</span><span class="ui-row-value">{u.reported}件</span></div>
-			<div class="ui-row"><span>状態</span><span class="ui-row-value">{u.suspendedAt ? `利用停止（${day(u.suspendedAt)}から）` : 'ふつう'}</span></div>
+			<div class="ui-row"><span>状態</span><span class="ui-row-value">{u.suspendedAt ? `利用停止（${day(u.suspendedAt)}から）` : '通常'}</span></div>
 		</div>
 		<p class="ui-note">時間割の中身は、ここからは見えません。</p>
 	</section>

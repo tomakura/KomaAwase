@@ -164,8 +164,8 @@
 		{#if data.imported}
 			<a class="notice" class:failed={data.imported.status !== 'done'} href="/import/{data.imported.id}">
 				<span>
-					<b>{data.imported.status === 'done' ? 'スクショの読み取りが終わりました' : 'スクショを読み取れませんでした'}</b>
-					{data.imported.status === 'done' ? '内容を見直して、時間割に追加します' : 'くわしくはこちら'}
+					<b>{data.imported.status === 'done' ? 'スクリーンショットの読み取りが終わりました' : 'スクリーンショットを読み取れませんでした'}</b>
+					{data.imported.status === 'done' ? '内容を見直して、時間割に追加します' : '詳しくはこちら'}
 				</span>
 				<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 			</a>
@@ -191,11 +191,11 @@
 					<h2>授業を登録する</h2>
 					<a class="way primary" href="/import?back=/{termId ? `&term=${encodeURIComponent(termId)}` : ''}">
 						<Icon name="image" size={22} />
-						<span><b>スクショから読み込む</b>ほかのアプリの時間割をまとめて登録</span>
+						<span><b>スクリーンショットから読み込む</b>ほかのアプリの時間割をまとめて登録</span>
 					</a>
 					<a class="way" href="/courses/search{termId ? `?term=${encodeURIComponent(termId)}` : ''}">
 						<Icon name="search" size={22} />
-						<span><b>授業をさがす</b>同じ大学の人が登録した授業から選ぶ</span>
+						<span><b>授業を探す</b>同じ大学の人が登録した授業から選ぶ</span>
 					</a>
 				{:else}
 					<h2>授業を登録する</h2>
@@ -203,8 +203,8 @@
 						<div class="lock">
 							<b>在籍確認をすると使えます</b>
 							<ul>
-								<li>授業をさがす（同じ大学の人の授業から選ぶ）</li>
-								<li>スクショから読み込む</li>
+								<li>授業を探す（同じ大学の人の授業から選ぶ）</li>
+								<li>スクリーンショットから読み込む</li>
 							</ul>
 							<a class="btn btn-primary" href={verifyHref(page.url)}>在籍確認する</a>
 						</div>

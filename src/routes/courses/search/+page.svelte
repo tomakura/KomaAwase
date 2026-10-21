@@ -58,14 +58,14 @@
 </script>
 
 <svelte:head>
-	<title>授業をさがす · コマあわせ</title>
+	<title>授業を探す · コマあわせ</title>
 </svelte:head>
 
 <div class="page">
 	<header>
 		<a class="back" href={timetableHref(data.termParam)} data-back>
 			<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-			<span class="visually-hidden">もどる：</span>
+			<span class="visually-hidden">戻る：</span>
 			<h1>授業を追加</h1>
 		</a>
 		{#if data.slot}
@@ -93,8 +93,8 @@
 					type="search"
 					bind:value={query}
 					oninput={() => search(300)}
-					aria-label="授業をさがす"
-					placeholder="授業名・先生・授業コードでさがす"
+					aria-label="授業を探す"
+					placeholder="授業名・先生・授業コードで探す"
 					maxlength="50"
 					autocomplete="off"
 				/>
@@ -150,12 +150,12 @@
 						</div>
 					{/each}
 				</div>
-				<p class="note">「シラバス」は大学の公開シラバス、「みんなの登録」は同じ大学の人が入れた授業です。まちがいや不適切な授業は、旗のボタンから報告できます。</p>
+				<p class="note">「シラバス」は大学の公開シラバス、「みんなの登録」は同じ大学の人が入れた授業です。間違いや不適切な授業は、旗のボタンから報告できます。</p>
 			{:else}
 				<p class="empty">
 					{data.q
 						? '見つかりませんでした。'
-						: 'まだだれも登録していません。自分で入力すると、同じ大学の人がここから選べるようになります。'}
+						: 'まだ誰も登録していません。自分で入力すると、同じ大学の人がここから選べるようになります。'}
 				</p>
 			{/if}
 		</section>
@@ -185,7 +185,7 @@
 						<circle cx="9" cy="10" r="1.8" />
 						<path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" />
 					</svg>
-					<span>スクショからまとめて読み込む</span>
+					<span>スクリーンショットからまとめて読み込む</span>
 					<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 				</a>
 			{/if}

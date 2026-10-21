@@ -32,13 +32,13 @@
 </script>
 
 <svelte:head>
-	<title>はじめの設定 · コマあわせ</title>
+	<title>初期設定 · コマあわせ</title>
 </svelte:head>
 
 <main>
 	<header>
-		<h1>はじめの設定</h1>
-		<p>はじめに時間割の形を決めます。あとから「その他」で変更できます。</p>
+		<h1>初期設定</h1>
+		<p>最初に時間割の形を決めます。あとから「その他」で変更できます。</p>
 	</header>
 
 	<form
@@ -95,7 +95,7 @@
 		</div>
 
 		{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-		<button class="btn btn-primary start" type="submit" disabled={saving}>{saving ? '保存中…' : 'はじめる'}</button>
+		<button class="btn btn-primary start" type="submit" disabled={saving}>{saving ? '保存中…' : '始める'}</button>
 	</form>
 </main>
 

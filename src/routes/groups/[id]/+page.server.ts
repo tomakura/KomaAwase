@@ -148,7 +148,7 @@ export const actions: Actions = {
 		const { me, group } = await manager(event);
 		const userId = String((await event.request.formData()).get('id') ?? '');
 		const result = await approveRequest(event.locals.db, group.id, userId);
-		if (result === 'full') return fail(400, { message: 'このグループは人数がいっぱいです' });
+		if (result === 'full') return fail(400, { message: 'このグループは定員に達しています' });
 		if (result === 'joined') {
 			const { db } = event.locals;
 			notifyLater(event.platform, db, [userId], 'groupApproved', {
@@ -160,7 +160,7 @@ export const actions: Actions = {
 			const joined = await db.select({ nickname: users.nickname }).from(users).where(eq(users.id, userId)).get();
 			const others = (await otherMembers(db, group.id, userId)).filter((id) => id !== me.id);
 			notifyLater(event.platform, db, others, 'groupJoin', {
-				title: `${joined?.nickname ?? 'だれか'}さんが「${group.name}」に参加しました`,
+				title: `${joined?.nickname ?? '誰か'}さんが「${group.name}」に参加しました`,
 				url: `/groups/${group.id}`,
 				tag: `group-${group.id}`
 			});

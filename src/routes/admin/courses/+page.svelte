@@ -77,8 +77,8 @@
 					</label>
 				</div>
 				<div class="pick">
-					<input type="search" name="q" value={data.q} placeholder="授業名・先生・授業コード" maxlength="50" aria-label="授業をさがす" />
-					<button class="btn btn-primary" type="submit">さがす</button>
+					<input type="search" name="q" value={data.q} placeholder="授業名・先生・授業コード" maxlength="50" aria-label="授業を探す" />
+					<button class="btn btn-primary" type="submit">探す</button>
 				</div>
 			</form>
 

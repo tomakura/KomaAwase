@@ -63,7 +63,7 @@
 				</ul>
 			</details>
 		{/if}
-		<p class="ui-note">大学の発表と違うことがあります。正しい日程は大学の案内で確かめてください。</p>
+		<p class="ui-note">大学の発表と違うことがあります。正しい日程は大学の案内で確認してください。</p>
 	</section>
 
 	<section class="ui-section">
@@ -85,7 +85,7 @@
 				<input name="label" maxlength={CALENDAR_LABEL_MAX} autocomplete="off" placeholder={kind === 'off' ? '冬休み' : '期末試験'} />
 			</label>
 			<div class="dates">
-				<label class="field">はじまり<input type="date" name="start" required bind:value={start} /></label>
+				<label class="field">始まり<input type="date" name="start" required bind:value={start} /></label>
 				<label class="field">終わり（任意）<input type="date" name="end" min={start} /></label>
 			</div>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}

@@ -36,7 +36,7 @@
 
 <div class="ui-page">
 	<header>
-		<a class="back" href="/friends" aria-label="もどる" data-back><Icon name="back" size={22} /></a>
+		<a class="back" href="/friends" aria-label="戻る" data-back><Icon name="back" size={22} /></a>
 		<UserIcon user={data.person} size={36} />
 		<span class="who">
 			<h1>{name}</h1>
@@ -69,7 +69,7 @@
 				method="POST"
 				action="?/unfriend"
 				use:enhance={async ({ cancel }) => {
-					if (!(await ask({ message: `${name}さんと友だちをやめます。おたがいの時間割は見えなくなります`, ok: 'やめる', danger: true }))) return cancel();
+					if (!(await ask({ message: `${name}さんと友だちをやめます。お互いの時間割は見えなくなります`, ok: 'やめる', danger: true }))) return cancel();
 				}}
 			>
 				<button class="ui-row" type="submit"><span>友だちをやめる</span></button>

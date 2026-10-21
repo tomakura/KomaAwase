@@ -35,14 +35,14 @@ export const actions: Actions = {
 		}
 
 		const email = normalizeEmail(input);
-		if (!email) return fail(400, { message: 'メールアドレスを確かめてください', email: input });
+		if (!email) return fail(400, { message: 'メールアドレスを確認してください', email: input });
 
 		const created = await createEmailToken(locals.db, email);
 		if ('error' in created) {
 			const message =
 				created.error === 'cooldown'
 					? MAIL_COOLDOWN_MESSAGE
-					: 'このアドレスには、続けてメールを送りました。届いたメールを確かめるか、15分ほどたってから、もう一度送ってください。';
+					: 'このアドレスには、続けてメールを送りました。届いたメールを確認するか、15分ほどたってから、もう一度送ってください。';
 			return fail(429, { message, email });
 		}
 		// All users together, so the rental server keeps sending

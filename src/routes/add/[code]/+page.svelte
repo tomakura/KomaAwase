@@ -27,7 +27,7 @@
 			<p class="text">{name}さんとはもう友だちです。</p>
 			<a class="btn btn-primary" href="/friends/{data.person.id}">時間割を見る</a>
 		{:else if data.state === 'pending'}
-			<p class="text">申請しました。{name}さんが承認すると、おたがいの時間割が見られるようになります。</p>
+			<p class="text">申請しました。{name}さんが承認すると、お互いの時間割が見られるようになります。</p>
 			<a class="btn" href="/friends">友だちの画面へ</a>
 		{:else if data.state === 'unavailable'}
 			<p class="text">{name}さんには申請できません。</p>
@@ -35,8 +35,8 @@
 		{:else}
 			<p class="text">
 				{data.state === 'asked'
-					? `${name}さんから申請が届いています。承認すると、おたがいの時間割が見られるようになります。`
-					: `申請して${name}さんが承認すると、おたがいの時間割が見られるようになります。`}
+					? `${name}さんから申請が届いています。承認すると、お互いの時間割が見られるようになります。`
+					: `申請して${name}さんが承認すると、お互いの時間割が見られるようになります。`}
 			</p>
 			<form method="POST" use:enhance>
 				<button class="btn btn-primary" type="submit">{data.state === 'asked' ? '承認する' : '友だち申請する'}</button>

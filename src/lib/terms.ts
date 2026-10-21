@@ -16,7 +16,7 @@ export function termsProblem(terms: TermInput[]): string | null {
 		}
 		if (!!t.start !== !!t.end) return `${t.name}の始まりと終わりの両方を入れてください`;
 		if (t.start && t.end) {
-			if (!isDate(t.start) || !isDate(t.end)) return `${t.name}の日付を確かめてください`;
+			if (!isDate(t.start) || !isDate(t.end)) return `${t.name}の日付を確認してください`;
 			if (t.start > t.end) return `${t.name}は始まりを終わりより前にしてください`;
 		}
 	}

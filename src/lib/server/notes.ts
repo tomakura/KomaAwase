@@ -35,15 +35,15 @@ export function parseNote(form: FormData): { note: NoteInput } | { message: stri
 	const date = String(form.get('date') ?? '');
 	if (kind === 'memo') {
 		if (!body || length(body) > MEMO_MAX) return { message: `メモは1〜${MEMO_MAX}文字で入れてください` };
-		if (!isDate(date)) return { message: '日付を確かめてください' };
+		if (!isDate(date)) return { message: '日付を確認してください' };
 		return { note: { kind, date, body } };
 	}
 	if (kind === 'task') {
 		if (!body || length(body) > TASK_MAX) return { message: `課題の名前は1〜${TASK_MAX}文字で入れてください` };
 		const due = String(form.get('due') ?? '') || null;
-		if (due && !isDate(due)) return { message: '締切の日付を確かめてください' };
+		if (due && !isDate(due)) return { message: '締切の日付を確認してください' };
 		const dueTime = String(form.get('dueTime') ?? '') || null;
-		if (dueTime && !isTime(dueTime)) return { message: '締切の時刻を確かめてください' };
+		if (dueTime && !isTime(dueTime)) return { message: '締切の時刻を確認してください' };
 		if (dueTime && !due) return { message: '締切の時刻を入れるときは、日付も入れてください' };
 		const submitTo = String(form.get('submitTo') ?? '').trim() || null;
 		if (submitTo && length(submitTo) > SUBMIT_TO_MAX) return { message: `提出先は${SUBMIT_TO_MAX}文字までです` };
@@ -66,8 +66,8 @@ export function parseNote(form: FormData): { note: NoteInput } | { message: stri
 export function parseRepeat(form: FormData, note: NoteInput): { until: string | null } | { message: string } {
 	if (form.get('repeat') !== 'on' || note.kind !== 'task') return { until: null };
 	const until = String(form.get('until') ?? '');
-	if (!note.due) return { message: 'くり返すときは、締切の日付を入れてください' };
-	if (!isDate(until) || until < note.due) return { message: 'くり返す最後の日を確かめてください' };
+	if (!note.due) return { message: '繰り返すときは、締切の日付を入れてください' };
+	if (!isDate(until) || until < note.due) return { message: '繰り返す最後の日を確認してください' };
 	return { until };
 }
 

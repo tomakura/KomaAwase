@@ -65,7 +65,7 @@ describe('sendPlanEve', () => {
 		const slot = eveSlot('u1');
 		expect((await fire(w, at(20, slot === 0 ? 1 : 0))).count).toBe(0);
 		const { sent } = await fire(w, at(20, slot));
-		expect(sent).toEqual([{ title: '明日：レポート（締め切り）', body: 'サンプル演習', url: '/plans', tag: 'plan-eve-2026-09-30' }]);
+		expect(sent).toEqual([{ title: '明日：レポート（締切）', body: 'サンプル演習', url: '/plans', tag: 'plan-eve-2026-09-30' }]);
 	});
 
 	it('sends nothing outside 20:00 to 20:09, or for finished homework, or when turned off', async () => {

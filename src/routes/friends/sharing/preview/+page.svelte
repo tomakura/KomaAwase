@@ -33,7 +33,7 @@
 
 	<div class="top">
 		<label class="field">
-			だれから
+			誰から
 			<select value={data.as} onchange={(e) => goto(`?as=${e.currentTarget.value}`, { replaceState: true })}>
 				{#each data.audiences as a (a.id)}
 					<option value={a.id}>{a.id === 'friends' ? a.name : `グループ「${a.name}」`}</option>

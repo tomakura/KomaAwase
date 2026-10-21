@@ -109,7 +109,7 @@
 		</form>
 		<p class="ui-note">
 			{SHARE_NOTES[share]}{share === 'none' ? 'あなたはほかのメンバーの時間割を見られます。' : ''}
-			<a href="/friends/sharing/preview?as={data.group.id}">見え方を確かめる</a>
+			<a href="/friends/sharing/preview?as={data.group.id}">見え方を確認する</a>
 		</p>
 	</section>
 
@@ -188,7 +188,7 @@
 		<p class="ui-note">
 			{data.group.approval
 				? 'このリンクを開いた人は、参加を申請できます。グループの管理者が承認すると参加できます。'
-				: 'このリンクを開いた人は、だれでもグループに参加できます。知らない人に広まったら作り直してください。'}
+				: 'このリンクを開いた人は、誰でもグループに参加できます。知らない人に広まったら作り直してください。'}
 			{#if limits}このリンクは{limits}使えます。{/if}
 		</p>
 	{/if}

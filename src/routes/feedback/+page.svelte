@@ -49,7 +49,7 @@
 	{#if form?.sent}
 		<div class="body">
 			<p class="thanks" role="status">送信しました。ありがとうございます。</p>
-			<a class="btn" href={data.from || '/more'}>もどる</a>
+			<a class="btn" href={data.from || '/more'}>戻る</a>
 		</div>
 	{:else}
 		<form class="body" method="POST" use:enhance use:draft={'feedback'}>
@@ -58,7 +58,7 @@
 				{kind === 'bug' ? '何をしたら、どうなりましたか' : kind === 'request' ? 'ほしい機能や、変えてほしいところ' : '内容'}
 				<textarea name="body" rows="7" maxlength="2000" required></textarea>
 			</label>
-			<p class="ui-note">返信や、くわしいお話を聞くために、運営から連絡することがあります。そのため、登録しているメールアドレスも運営に送られます。個人情報は書かないでください。</p>
+			<p class="ui-note">返信や、詳しいお話を聞くために、運営から連絡することがあります。そのため、登録しているメールアドレスも運営に送られます。個人情報は書かないでください。</p>
 
 			<div class="ui-list">
 				<div class="ui-row">

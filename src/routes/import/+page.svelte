@@ -91,11 +91,11 @@
 </script>
 
 <svelte:head>
-	<title>スクショから読み込む · コマあわせ</title>
+	<title>スクリーンショットから読み込む · コマあわせ</title>
 </svelte:head>
 
 <div class="ui-page">
-	<PageHeader title="スクショから読み込む" back={data.back} />
+	<PageHeader title="スクリーンショットから読み込む" back={data.back} />
 
 	<div class="body">
 		{#if data.job}
@@ -147,13 +147,13 @@
 				</p>
 			{/if}
 			{#if job.status === 'done' || job.status === 'failed'}
-				<a class="btn btn-primary" href="/import/{job.id}">{job.status === 'done' ? '読み取った授業を見る' : 'くわしく見る'}</a>
+				<a class="btn btn-primary" href="/import/{job.id}">{job.status === 'done' ? '読み取った授業を見る' : '詳しく見る'}</a>
 			{/if}
 		{/if}
 
 		{#if data.access !== 'ok' && !data.job}
 			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
-			<SharedLock access={data.access} what="スクショからの読み込み" from="/import" />
+			<SharedLock access={data.access} what="スクリーンショットからの読み込み" from="/import" />
 			<p class="ui-note">授業は <a href="/courses/new">自分で入力</a> することもできます。</p>
 		{:else if !data.job || data.job.status === 'failed'}
 			<p class="lead">ほかのアプリの時間割を、スクリーンショットから読み込めます。</p>
@@ -190,7 +190,7 @@
 					<span class="num">2</span>
 					<span>
 						画像は米国の Groq と Cloudflare に送られ、AIが読み取ります。米国には日本のような全国共通の個人情報保護法がありません。両社は画像を学習に使いません。コマあわせに届いた画像は、読み取ったらすぐに消します（読み取れなかったときも、4日以内に消します）。<a
-							href="/privacy#foreign">くわしく見る</a
+							href="/privacy#foreign">詳しく見る</a
 						>
 					</span>
 				</div>

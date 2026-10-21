@@ -41,7 +41,7 @@ export const actions: Actions = {
 		const to = String(form.get('to') ?? '');
 		const time = /^([01]\d|2[0-3]):[0-5]\d$/;
 		if (form.get('on') === 'on' && (!time.test(from) || !time.test(to) || from === to)) {
-			return fail(400, { quietMessage: '時刻を確かめてください' });
+			return fail(400, { quietMessage: '時刻を確認してください' });
 		}
 		const quiet = form.get('on') === 'on' ? { from, to } : undefined;
 		await locals.db

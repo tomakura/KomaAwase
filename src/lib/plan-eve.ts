@@ -20,7 +20,7 @@ export function eveMessage(items: EveItem[], date: string) {
 		const detail =
 			i.kind === 'task' ? i.course : [i.start ? `${i.start.replace(/^0/, '')}から` : '終日', i.place].filter(Boolean).join(' · ');
 		return {
-			title: i.kind === 'task' ? `明日：${i.title}（締め切り）` : `明日：${i.title}`,
+			title: i.kind === 'task' ? `明日：${i.title}（締切）` : `明日：${i.title}`,
 			body: detail ?? undefined,
 			url: '/plans',
 			tag

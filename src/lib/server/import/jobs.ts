@@ -175,13 +175,13 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 			'importDone',
 			outcome.status === 'done'
 				? {
-						title: 'スクショの読み取りが終わりました',
+						title: 'スクリーンショットの読み取りが終わりました',
 						body: '読み取った授業を見直して、時間割に保存してください',
 						url: `/import/${job.id}`,
 						tag: `import-${job.id}`
 					}
 				: {
-						title: 'スクショを読み取れませんでした',
+						title: 'スクリーンショットを読み取れませんでした',
 						body: '画像を切り抜き直すか、授業を自分で入力してください',
 						url: '/import',
 						tag: `import-${job.id}`

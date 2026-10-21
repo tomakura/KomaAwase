@@ -27,8 +27,8 @@ export const actions: Actions = {
 		const requester = await other(request);
 		if (await acceptRequest(locals.db, locals.user.id, requester)) {
 			notifyLater(platform, locals.db, [requester], 'friendAccepted', {
-				title: `${locals.user.nickname ?? 'だれか'}さんが友だち申請を承認しました`,
-				body: 'おたがいの時間割が見られるようになりました',
+				title: `${locals.user.nickname ?? '誰か'}さんが友だち申請を承認しました`,
+				body: 'お互いの時間割が見られるようになりました',
 				url: `/friends/${locals.user.id}`,
 				tag: `friend-${locals.user.id}`
 			});

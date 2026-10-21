@@ -237,7 +237,7 @@
 		<StepsField steps={note?.steps} />
 		{#if !note}
 			<div class="all-day">
-				<span id="repeat-label">毎週くり返す</span>
+				<span id="repeat-label">毎週繰り返す</span>
 				<Switch bind:checked={repeat} name="repeat" labelledby="repeat-label" />
 			</div>
 			{#if repeat}
@@ -310,7 +310,7 @@
 	<a
 		class="scrim"
 		href={timetableHref(data.termParam)}
-		aria-label="閉じて時間割にもどる"
+		aria-label="閉じて時間割に戻る"
 		data-back={close ? undefined : ''}
 		onclick={(e) => {
 			if (!close) return;
@@ -521,7 +521,7 @@
 							/>
 						</div>
 						<div class="times">
-							<label class="field">はじまり<input type="time" name="start" bind:value={evStart} /></label>
+							<label class="field">始まり<input type="time" name="start" bind:value={evStart} /></label>
 							<label class="field">終わり<input type="time" name="end" bind:value={evEnd} /></label>
 						</div>
 					{/if}
@@ -561,7 +561,7 @@
 						{/if}
 					</span>
 					<form method="POST" action={actionHref('absent', data.termParam)} use:enhance>
-						<button class="absent" type="submit" disabled={absentToday}>{absentToday ? '今日は記録ずみ' : '欠席した'}</button>
+						<button class="absent" type="submit" disabled={absentToday}>{absentToday ? '今日は記録済み' : '欠席した'}</button>
 					</form>
 				</div>
 				{#each data.absences as a (a.id)}
@@ -642,10 +642,10 @@
 									}}
 							>
 								<input type="hidden" name="id" value={task.id} />
-								<span>くり返しの課題です。どれを消しますか？</span>
+								<span>繰り返しの課題です。どれを消しますか？</span>
 								<div class="series-actions">
 									<button class="btn" type="submit">この回だけ</button>
-									<button class="btn" type="submit" name="later" value="on">これ以降ぜんぶ</button>
+									<button class="btn" type="submit" name="later" value="on">これ以降すべて</button>
 									<button class="btn" type="button" onclick={() => (removing = null)}>やめる</button>
 								</div>
 							</form>
@@ -713,11 +713,11 @@
 								method="POST"
 								action={actionHref('reportCancel', data.termParam)}
 								use:enhance={async ({ cancel }) => {
-									if (!(await ask({ message: `${withDay(c.date)}の休講は、まちがいかいたずらだと運営に伝えます`, ok: '伝える' }))) return cancel();
+									if (!(await ask({ message: `${withDay(c.date)}の休講は、間違いかいたずらだと運営に伝えます`, ok: '伝える' }))) return cancel();
 								}}
 							>
 								<input type="hidden" name="date" value={c.date} />
-								<button class="absent quiet" type="submit" disabled={c.reported}>{c.reported ? '報告ずみ' : 'まちがい'}</button>
+								<button class="absent quiet" type="submit" disabled={c.reported}>{c.reported ? '報告済み' : '間違い'}</button>
 							</form>
 						</div>
 					{/each}
@@ -789,7 +789,7 @@
 							</div>
 						{/each}
 					</div>
-					<span class="usage">資料の容量 {formatBytes(data.usedBytes)} / {formatBytes(data.quotaBytes)}（全部の授業で）</span>
+					<span class="usage">資料の容量 {formatBytes(data.usedBytes)} / {formatBytes(data.quotaBytes)}（すべての授業で）</span>
 				</section>
 			{/if}
 

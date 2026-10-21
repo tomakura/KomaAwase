@@ -16,7 +16,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 	});
 	if (!res.ok) {
 		const data = (await res.json().catch(() => null)) as { message?: string } | null;
-		throw new Error(data?.message ?? 'うまくいきませんでした。もう一度やり直してください');
+		throw new Error(data?.message ?? '失敗しました。もう一度やり直してください');
 	}
 	return (await res.json()) as T;
 }
@@ -29,7 +29,7 @@ function toMessage(e: unknown): string | null {
 	if (e instanceof WebAuthnError && e.code === 'ERROR_CEREMONY_ABORTED') return null;
 	if (e instanceof WebAuthnError && e.code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED') return 'この端末のパスキーは、すでに存在します。';
 	if (e instanceof Error && (e.name === 'NotAllowedError' || e.name === 'AbortError')) return null;
-	return e instanceof Error ? e.message : 'うまくいきませんでした';
+	return e instanceof Error ? e.message : '失敗しました';
 }
 
 /**

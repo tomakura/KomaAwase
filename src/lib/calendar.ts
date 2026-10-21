@@ -26,7 +26,7 @@ export function parseCalendarEntry(form: FormData): { entry: CalendarDay } | { m
 	const start = String(form.get('start') ?? '');
 	const end = String(form.get('end') ?? '') || start;
 	if ([...label].length > CALENDAR_LABEL_MAX) return { message: `名前は${CALENDAR_LABEL_MAX}文字までです` };
-	if (!isDate(start) || !isDate(end)) return { message: '日付を確かめてください' };
-	if (end < start) return { message: '終わりの日は、はじまりの日より後にしてください' };
+	if (!isDate(start) || !isDate(end)) return { message: '日付を確認してください' };
+	if (end < start) return { message: '終わりの日は、始まりの日より後にしてください' };
 	return { entry: { kind, label, start, end } };
 }

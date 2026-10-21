@@ -93,7 +93,7 @@ export const actions: Actions = {
 			} catch (e) {
 				console.error('syllabus import stopped', e);
 				return fail(409, {
-					message: `途中で止まりました（${done}/${batches.length}）。だれかが同じ授業を直したのかもしれません。もう一度「確かめる」から進めると、残りを取り込めます`
+					message: `途中で止まりました（${done}/${batches.length}）。誰かが同じ授業を直したのかもしれません。もう一度「確認する」から進めると、残りを取り込めます`
 				});
 			}
 			done += 1;

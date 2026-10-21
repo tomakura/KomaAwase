@@ -36,7 +36,7 @@ export function mailboxOf(email: string) {
 /** The address to check, or the message to show. */
 export async function startVerification(db: Db, user: { id: string; universityId: string | null }, input: string) {
 	const email = normalizeEmail(input);
-	if (!email) return { message: 'メールアドレスを確かめてください' };
+	if (!email) return { message: 'メールアドレスを確認してください' };
 	if (!user.universityId) return { message: '先に「大学」を選んでください' };
 	const university = await db.select().from(universities).where(eq(universities.id, user.universityId)).get();
 	if (!university?.emailDomains.length) return { message: 'この大学はまだ在籍確認に対応していません' };
@@ -55,7 +55,7 @@ export async function startVerification(db: Db, user: { id: string; universityId
 		db.select({ at: max(verifyTokens.expiresAt) }).from(verifyTokens).where(eq(verifyTokens.email, email))
 	]);
 	if (latest?.at && latest.at.getTime() > now.getTime() + TOKEN_LIFETIME - MAIL_COOLDOWN_MS) return { message: MAIL_COOLDOWN_MESSAGE };
-	if ((live?.n ?? 0) >= LIVE_TOKENS_MAX) return { message: '確認のメールを送ったばかりです。届いたメールを確かめてください' };
+	if ((live?.n ?? 0) >= LIVE_TOKENS_MAX) return { message: '確認のメールを送ったばかりです。届いたメールを確認してください' };
 
 	const token = generateToken();
 	await db.insert(verifyTokens).values({

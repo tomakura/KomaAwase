@@ -14,7 +14,7 @@
 
 {#if sent}
 	<p class="sent" role="status">送信しました。ありがとうございます。</p>
-	<button class="btn" type="button" onclick={done}>とじる</button>
+	<button class="btn" type="button" onclick={done}>閉じる</button>
 {:else}
 	<form
 		method="POST"
@@ -36,7 +36,7 @@
 			{/each}
 		</fieldset>
 		<label class="field">
-			くわしい内容（任意）
+			詳しい内容（任意）
 			<textarea name="detail" rows="3" maxlength="500"></textarea>
 		</label>
 		<p class="note">確認のため、運営から連絡することがあります。そのため、登録しているメールアドレスも運営に送られます。</p>

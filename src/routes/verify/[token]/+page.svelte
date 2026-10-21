@@ -28,7 +28,7 @@
 	{:else if view === 'taken'}
 		<p role="alert">このアドレスは、ほかのアカウントの在籍確認に使われています。</p>
 		<p class="note">そのアカウントを使うか、退会してから確認してください。心当たりがないときは、<a href="/contact">運営に連絡</a>してください。</p>
-		<a class="btn" href="/more/verify">もどる</a>
+		<a class="btn" href="/more/verify">戻る</a>
 	{:else if data.state === 'ready'}
 		<p><b>{data.nickname}</b> さんのアカウントで、{data.university}の在籍確認をします。</p>
 		<p class="address">確認するアドレス：{data.email}</p>

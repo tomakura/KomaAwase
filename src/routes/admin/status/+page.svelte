@@ -30,7 +30,7 @@
 				<option value="trouble">{NOTE_LABELS.trouble}</option>
 				<option value="info">{NOTE_LABELS.info}</option>
 			</select>
-			<textarea name="body" rows="3" maxlength="300" required placeholder="スクショの読み取りが遅れています。順に読み取っています。"></textarea>
+			<textarea name="body" rows="3" maxlength="300" required placeholder="スクリーンショットの読み取りが遅れています。順に読み取っています。"></textarea>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 			<button class="btn btn-primary" type="submit">出す</button>
 		</form>
@@ -62,7 +62,7 @@
 	</section>
 
 	<section class="ui-section">
-		<h2 class="ui-section-title">いまの様子（稼働状況ページは1分ごとに確認）</h2>
+		<h2 class="ui-section-title">今の様子（稼働状況ページは1分ごとに確認）</h2>
 		<div class="ui-list">
 			{#each data.signals as s (s.id)}
 				<div class="ui-row"><span>{s.label}</span><span class="ui-row-value">{LEVEL_LABELS[s.level]} · {s.text}</span></div>
@@ -95,7 +95,7 @@
 				</tbody>
 			</table>
 		</div>
-		<p class="ui-note">件数と時間だけを数えています。だれのものか、どのページかは記録していません。30日で消えます。</p>
+		<p class="ui-note">件数と時間だけを数えています。誰のものか、どのページかは記録していません。30日で消えます。</p>
 	</section>
 </div>
 

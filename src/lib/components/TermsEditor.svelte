@@ -45,7 +45,7 @@
 			<span class="text">
 				{#each terms as t, i (i)}<span class="term"><b>{t.name}</b> {range(t)}</span>{/each}
 			</span>
-			<span class="toggle">{open ? 'とじる' : '日付を変える'}<Icon name="chevron" size={16} /></span>
+			<span class="toggle">{open ? '閉じる' : '日付を変える'}<Icon name="chevron" size={16} /></span>
 		</button>
 	{/if}
 

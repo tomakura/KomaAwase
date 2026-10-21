@@ -65,7 +65,7 @@
 						</div>
 					{/each}
 				</div>
-				<p class="ui-note">承認すると、おたがいの時間割が見られるようになります。</p>
+				<p class="ui-note">承認すると、お互いの時間割が見られるようになります。</p>
 			</section>
 		{/if}
 

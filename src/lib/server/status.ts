@@ -40,7 +40,7 @@ export async function signals(db: Db, now = Date.now()): Promise<Signal[]> {
 	const waitMin = waiting?.n && waiting.oldest ? Math.floor((now - waiting.oldest.getTime()) / 60000) : 0;
 	const importSignal: Signal = {
 		id: 'import',
-		label: 'スクショの読み取り',
+		label: 'スクリーンショットの読み取り',
 		level: waitMin >= 60 ? 'down' : waitMin >= 15 ? 'slow' : 'ok',
 		text: waiting?.n ? `${waiting.n}件待ち・最も長い待ち ${waitMin}分` : '待ちはありません'
 	};

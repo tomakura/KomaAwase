@@ -21,18 +21,18 @@
 
 	{#if data.banned}
 		<div class="actions">
-			<p class="notice" role="status">この招待からは参加できません。招待した人に聞いてみてください。</p>
-			<a class="btn" href="/">もどる</a>
+			<p class="notice" role="status">この招待からは参加できません。招待した人に確認してください。</p>
+			<a class="btn" href="/">戻る</a>
 		</div>
 	{:else if data.closed && !data.requested}
 		<div class="actions">
 			<p class="notice" role="status">{INVITE_CLOSED[data.closed]}</p>
-			<a class="btn" href="/">もどる</a>
+			<a class="btn" href="/">戻る</a>
 		</div>
 	{:else if (data.requested || form?.requested) && !form?.cancelled}
 		<form class="actions" method="POST" action="?/cancel" use:enhance>
 			<p class="notice" role="status">申請しました。グループの管理者が承認すると参加できます。</p>
-			<a class="btn btn-primary" href="/">時間割にもどる</a>
+			<a class="btn btn-primary" href="/">時間割に戻る</a>
 			<button class="later" type="submit">申請を取り消す</button>
 		</form>
 	{:else}

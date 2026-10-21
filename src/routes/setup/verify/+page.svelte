@@ -46,16 +46,16 @@
 
 	{#if data.done}
 		<form method="POST" action="?/skip" use:enhance>
-			<button class="btn btn-primary" type="submit">はじめる</button>
+			<button class="btn btn-primary" type="submit">始める</button>
 		</form>
 	{:else if form?.sentTo && !other}
 		{#key form}
 			<MailSent email={form.sentTo} action="?/send" onother={() => (other = true)}>
-				{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールのフォルダも見てください。
+				{form.sentTo} に確認のメールを送信しました。1日以内にリンクを開いてください。届かないときは、迷惑メールフォルダも確認してください。
 			</MailSent>
 		{/key}
 		<form method="POST" action="?/skip" use:enhance>
-			<button class="btn btn-primary" type="submit">はじめる</button>
+			<button class="btn btn-primary" type="submit">始める</button>
 		</form>
 	{:else}
 		<form

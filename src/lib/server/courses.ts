@@ -82,7 +82,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		const from = delivery === 'intensive' ? String(form.get('intensive_from') ?? '') || null : null;
 		const to = delivery === 'intensive' ? String(form.get('intensive_to') ?? '') || null : null;
 		if ((from && !isDate(from)) || (to && !isDate(to)) || (from && to && to < from)) {
-			return { message: '集中講義の期間を確かめてください' };
+			return { message: '集中講義の期間を確認してください' };
 		}
 		return {
 			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to, credits, absenceLimit, ...sync }
@@ -101,7 +101,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 
 // Slots arrive as JSON, one per field. They must fit in the timetable and not overlap.
 function parseSlots(values: FormDataEntryValue[], periods: number[]): SlotInput[] | string {
-	const invalid = '曜日・時限を確かめてください';
+	const invalid = '曜日・時限を確認してください';
 	if (values.length > SLOTS_MAX) return `曜日・時限は${SLOTS_MAX}個までです`;
 	const slots: (SlotInput & { start: number })[] = [];
 	for (const value of values) {

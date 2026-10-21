@@ -12,7 +12,7 @@
 		{
 			icon: 'edit',
 			title: '時間割を記録する',
-			text: '同じ大学の人が登録した授業から選べるので、授業名や先生を打たずに済みます。ほかのアプリの時間割のスクショから、まとめて読み込むこともできます。'
+			text: '同じ大学の人が登録した授業から選べるので、授業名や先生を打たずに済みます。ほかのアプリの時間割のスクリーンショットから、まとめて読み込むこともできます。'
 		},
 		{
 			icon: 'overlap',
@@ -58,13 +58,13 @@
 			時間割を友だちや仲間と重ねて、みんなが空いているコマをすぐ見つけられるアプリです。「今度いつ集まれる？」を話し合わずに決められます。
 		</p>
 		<div class="notes">
-			<span>無料</span><span>スマホ・パソコンで使える</span>
+			<span>無料</span><span>スマホ・PCで使える</span>
 		</div>
 	</section>
 
 	<section class="demo" aria-label="時間割を重ねたイメージ">
 		<OverlayDemo />
-		<p class="caption">3人の時間割を重ねたところ。だれも授業のないコマが、「みんな空いてるコマ」に出ます。</p>
+		<p class="caption">3人の時間割を重ねたところ。誰も授業のないコマが、「みんな空いてるコマ」に出ます。</p>
 	</section>
 
 	<section class="block">
@@ -93,7 +93,7 @@
 	</section>
 
 	<section class="block">
-		<h2>はじめ方</h2>
+		<h2>始め方</h2>
 		<ol class="steps">
 			{#each steps as s (s)}<li>{s}</li>{/each}
 		</ol>
@@ -104,7 +104,7 @@
 		{#if signedIn}
 			<a class="btn btn-primary" href="/">時間割を開く</a>
 		{:else}
-			<a class="btn btn-primary" href="/login">はじめる</a>
+			<a class="btn btn-primary" href="/login">始める</a>
 		{/if}
 		<p class="small">個人で開発しています。</p>
 		<p class="small links"><a href="/terms">利用規約</a><a href="/privacy">プライバシーポリシー</a><a href="/about">このアプリについて</a></p>

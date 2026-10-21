@@ -9,7 +9,7 @@
 	const cards = $derived([
 		{ label: '利用者', value: data.users, sub: `今週の新規 ${data.newWeek}人` },
 		{ label: '24時間に開いた人', value: data.activeDay, sub: `7日 ${data.activeWeek}人 · 30日 ${data.activeMonth}人` },
-		{ label: '在籍確認ずみ', value: data.verified, sub: `${percent(data.verified, data.users) ?? 0}%` },
+		{ label: '在籍確認済み', value: data.verified, sub: `${percent(data.verified, data.users) ?? 0}%` },
 		{ label: '通知をもらえる人', value: data.pushPeople, sub: `授業の前の通知 ${data.reminderPeople}人` }
 	]);
 

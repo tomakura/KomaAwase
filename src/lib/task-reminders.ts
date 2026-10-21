@@ -28,7 +28,7 @@ export function morningMessage(items: TaskItem[], date: string) {
 	}
 	const names = items.slice(0, 3).map((i) => i.title);
 	return {
-		title: `今日締め切りの課題が${items.length}件あります`,
+		title: `今日締切の課題が${items.length}件あります`,
 		body: `${names.join('、')}${items.length > 3 ? ' ほか' : ''}`,
 		url: '/plans',
 		tag
