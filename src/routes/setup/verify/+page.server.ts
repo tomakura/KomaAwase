@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	const verification = await verificationOf(locals.db, locals.user.id);
 	if (!university?.emailDomains.length) redirect(303, takeNext(cookies) ?? '/');
 	const current = verification?.universityId === university.id && verification.expiresAt.getTime() > Date.now();
-	// Just confirmed by the Google sign-in (see /setup): said once, then on to `next`
+	// Just confirmed by the sign-in (see /setup): said once, then on to `next`
 	if (current && url.searchParams.has('done')) {
 		return { university: { name: university.name, domains: university.emailDomains }, done: verification.email };
 	}

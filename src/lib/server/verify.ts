@@ -174,25 +174,27 @@ export async function finishVerification(db: Db, token: string, userId: string) 
 	return { university: university?.name ?? '' };
 }
 
-// How long a Google sign-in counts for verifyByGoogle: enough for the nickname, the passkey and
+// How long a sign-in counts for verifyBySignIn: enough for the nickname, the passkey and
 // はじめの設定 that come after a first sign-in
-const GOOGLE_FRESH_MS = 60 * 60 * 1000;
+const SIGN_IN_FRESH_MS = 60 * 60 * 1000;
 
 /**
- * Confirms enrollment without a mail, for someone who signed in with Google using an address
- * of their university: Google has just vouched that they hold it (only Workspace and Gmail
- * accounts sign in, see google.ts). False when it doesn't apply, or the address already
+ * Confirms enrollment without a mail, for someone whose account address is one of their
+ * university's and was proven just now: the account was made within the hour (by the sign-in
+ * mail, or by Google, which only makes one for an address it vouches for, see google.ts), or
+ * they have just signed in with Google. False when it doesn't apply, or the address already
  * confirms another account; then the mail is offered as usual.
  */
-export async function verifyByGoogle(
+export async function verifyBySignIn(
 	db: Db,
-	user: { id: string; email: string; googleSub: string | null; googleAt: Date | null },
+	user: { id: string; email: string; googleSub: string | null; googleAt: Date | null; createdAt: Date },
 	university: { id: string; emailDomains: string[] }
 ) {
-	if (!user.googleSub || !emailMatchesDomains(user.email, university.emailDomains)) return false;
-	// Only a recent Google sign-in speaks for the address now: one from long ago (say, before
-	// the school deleted the account) would renew the check every time はじめの設定 is sent
-	if (!user.googleAt || Date.now() - user.googleAt.getTime() > GOOGLE_FRESH_MS) return false;
+	if (!emailMatchesDomains(user.email, university.emailDomains)) return false;
+	// Only a recent proof speaks for the address now: one from long ago (say, before the school
+	// deleted the account) would renew the check every time はじめの設定 is sent
+	const fresh = (at: Date | null) => !!at && Date.now() - at.getTime() <= SIGN_IN_FRESH_MS;
+	if (!fresh(user.createdAt) && !(user.googleSub && fresh(user.googleAt))) return false;
 	if (await heldByOther(db, user.email, user.id)) return false;
 	const values = {
 		userId: user.id,
@@ -209,7 +211,7 @@ export async function verifyByGoogle(
 		]);
 	} catch (e) {
 		// The address and its mailbox are unique: another account holds one of them
-		console.error('enrollment check from Google sign-in failed', e);
+		console.error('enrollment check from the sign-in failed', e);
 		return false;
 	}
 	return true;

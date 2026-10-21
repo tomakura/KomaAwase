@@ -21,17 +21,28 @@
 <main>
 	{#if data.done}
 		<header>
-			<h1>在籍を確認しました</h1>
-			<p>{data.done} でログインしたので、{data.university.name}の在籍を確認しました。次のことができます。</p>
+			<h1>在籍確認が完了しました</h1>
+			<p>大学メールアドレスで登録したため、{data.university.name}の在籍確認が完了しました。次のことができます。</p>
 		</header>
+		<VerifyBenefits />
 	{:else}
 		<header>
-			<h1>在籍確認をしませんか</h1>
-			<p>{data.university.name}のメールアドレスに届くリンクを開くと確認できます。確認すると、次のことができます。</p>
+			<h1>在籍確認をしてから始めるのがおすすめです</h1>
+			<p>在籍確認をすると、シラバスに載っている授業を検索して、そのまま時間割に追加できます。{data.university.name}のメールアドレスに届くリンクを開けば完了します。</p>
 		</header>
+		<section>
+			<h2>在籍確認をした場合</h2>
+			<VerifyBenefits />
+		</section>
+		<section>
+			<h2>あとで在籍確認をする場合</h2>
+			<ul>
+				<li>授業名・曜日・時限・教室などを、1つずつ手で入力することになります</li>
+				<li>手で入力した授業はシラバスとつながりません。在籍確認のあと、授業の編集画面からつなげられます</li>
+				<li>スクリーンショットからの登録は使えません</li>
+			</ul>
+		</section>
 	{/if}
-
-	<VerifyBenefits />
 
 	{#if data.done}
 		<form method="POST" action="?/skip" use:enhance>
@@ -68,11 +79,11 @@
 				<input name="email" type="email" autocomplete="off" placeholder={`…@${data.university.domains[0]}`} value={form?.email ?? ''} required />
 			</label>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
-			<SendButton {phase} class="btn btn-primary">確認のメールを送る</SendButton>
-			<p class="note">このアドレスはほかの人には見えません。あとから「その他」→「在籍確認」でもできます。</p>
+			<SendButton {phase} class="btn btn-primary">確認メールを送る</SendButton>
+			<p class="note">入力したメールアドレスがほかの人に表示されることはありません。あとから「その他」→「在籍確認」でも在籍確認できます。</p>
 		</form>
 		<form method="POST" action="?/skip" use:enhance>
-			<button class="later" type="submit">あとで</button>
+			<button class="later" type="submit">あとで確認する</button>
 		</form>
 	{/if}
 </main>
@@ -107,6 +118,26 @@
 		font-size: 14px;
 		line-height: 1.7;
 		color: var(--ink-soft);
+	}
+
+	section {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 15px;
+		font-weight: 700;
+	}
+
+	/* Same as the list in VerifyBenefits */
+	section ul {
+		margin: 0;
+		padding-left: 1.4em;
+		font-size: 14px;
+		line-height: 1.8;
 	}
 
 	form {
