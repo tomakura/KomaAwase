@@ -65,7 +65,12 @@ function summary(plan: ImportPlan) {
 		update: plan.update.map((u) => ({ ...line(u.course), changes: u.changes })),
 		link: plan.link.map((l) => ({ ...line(l.course), from: l.existing.values.title, changes: l.changes })),
 		same: plan.same.length,
-		missing: plan.missing.map((m) => ({ code: m.code ?? '', title: m.values.title, detail: m.terms.join('・') }))
+		missing: plan.missing.map((m) => ({ code: m.code ?? '', title: m.values.title, detail: m.terms.join('・') })),
+		roomsKept: plan.roomsKept.map((k) => ({
+			code: `${k.course.code} ${slotText({ ...k.slot, room: null })}`,
+			title: k.course.title,
+			detail: `今の教室：${k.room} · ファイル：${k.slot.room}`
+		}))
 	};
 }
 

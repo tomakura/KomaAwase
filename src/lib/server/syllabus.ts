@@ -3,23 +3,24 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { sharedChanges, type SharedChange } from '$lib/shared-changes';
 import { isDate } from '$lib/time';
-import { ONLINE_ROOM, cleanText } from '$lib/text';
+import { ONLINE_ROOM, cleanRoom, cleanText } from '$lib/text';
 import { MEMO_MAX } from '$lib/notes';
 import type { Db } from './db';
 import { courseNotes, courses, sharedCourseEdits, sharedCourseSlots, sharedCourseTeachers, sharedCourses } from './db/schema';
 import { cleanValues, insertDetails, loadSharedCourses, normalize, type SharedCourse, type SharedValues } from './shared-courses';
 
 /**
- * One course of the syllabus, as scripts/syllabus writes it. Rooms aren't in the syllabus:
- * people fill them in, and an online class gets オンライン. `link` is the id of a shared course
- * people added that is this course, which then becomes the syllabus course (decided by hand).
+ * One course of the syllabus, as scripts/syllabus writes it. Rooms aren't in the syllabus: a
+ * slot's room is one the admin found (from the university's room bookings) or null, and people
+ * fill in the rest; an online class gets オンライン. `link` is the id of a shared course people
+ * added that is this course, which then becomes the syllabus course (decided by hand).
  */
 export type SyllabusCourse = {
 	code: string;
 	title: string;
 	terms: string[];
 	teachers: string[];
-	slots: { weekday: number; period: number; span: number; week: WeekPattern }[];
+	slots: { weekday: number; period: number; span: number; week: WeekPattern; room: string | null }[];
 	delivery: Delivery | null;
 	intensiveFrom: string | null;
 	intensiveTo: string | null;
@@ -38,6 +39,8 @@ const TEACHER_MAX = 30;
 const TEACHERS_MAX = 10;
 const TERM_MAX = 10;
 const SLOTS_MAX = 14;
+// As a room people type (courses.ts)
+const ROOM_MAX = 20;
 // What one import may hold; a university's year is well under it
 const COURSES_MAX = 5000;
 
@@ -78,7 +81,8 @@ export function parseSyllabusFile(raw: unknown): SyllabusFile | { message: strin
 			(s.period as number) <= 12 &&
 			(s.span as number) >= 1 &&
 			(s.span as number) <= 4 &&
-			(s.week === undefined || isWeekPattern(s.week));
+			(s.week === undefined || isWeekPattern(s.week)) &&
+			(s.room === undefined || s.room === null || (typeof s.room === 'string' && length(cleanRoom(s.room)) <= ROOM_MAX));
 		if (slots.length > SLOTS_MAX || !slots.every(okSlot)) return { message: `${at}（${code}）：曜日・時限を確かめてください` };
 		const delivery = c.delivery === 'ondemand' || c.delivery === 'intensive' ? c.delivery : null;
 		const from = str(c.intensiveFrom) || null;
@@ -95,7 +99,8 @@ export function parseSyllabusFile(raw: unknown): SyllabusFile | { message: strin
 					weekday: s.weekday as number,
 					period: s.period as number,
 					span: s.span as number,
-					week: (s.week ?? 'every') as WeekPattern
+					week: (s.week ?? 'every') as WeekPattern,
+					room: typeof s.room === 'string' ? cleanRoom(s.room) || null : null
 				}))
 				.sort((a, b) => a.weekday - b.weekday || a.period - b.period),
 			// A course without slots is on demand unless it is intensive
@@ -114,7 +119,8 @@ export function parseSyllabusFile(raw: unknown): SyllabusFile | { message: strin
 
 /**
  * The shared values of a syllabus course. Rooms come from `before` (what people entered) for
- * the slots that are still there; an online class without one gets オンライン.
+ * the slots that are still there; a slot without one takes the file's room, and an online class
+ * オンライン. A room someone entered is never replaced.
  */
 export function syllabusValues(c: SyllabusCourse, before: SharedValues['slots'] = []): SharedValues {
 	return cleanValues(
@@ -123,7 +129,7 @@ export function syllabusValues(c: SyllabusCourse, before: SharedValues['slots'] 
 			teachers: c.teachers,
 			slots: c.slots.map((s) => ({
 				...s,
-				room: before.find((b) => b.weekday === s.weekday && b.period === s.period)?.room ?? (c.online ? ONLINE_ROOM : null)
+				room: before.find((b) => b.weekday === s.weekday && b.period === s.period)?.room ?? s.room ?? (c.online ? ONLINE_ROOM : null)
 			})),
 			delivery: c.delivery,
 			intensiveFrom: c.intensiveFrom,
@@ -181,13 +187,15 @@ export type ImportPlan = {
 	same: { course: SyllabusCourse; existing: SharedCourse }[];
 	// Syllabus courses of the year that the file doesn't have any more: kept, only listed
 	missing: SharedCourse[];
+	// Slots whose room people entered differs from the file's: the entered one stays, only listed
+	roomsKept: { course: SyllabusCourse; slot: SyllabusCourse['slots'][number]; room: string }[];
 };
 
 /** What importing the file does to the university's shared courses of its year (`existing`) */
 export function planImport(file: SyllabusFile, existing: SharedCourse[]): ImportPlan | { message: string } {
 	const byCode = new Map(existing.filter((e) => e.code).map((e) => [e.code!, e]));
 	const byId = new Map(existing.map((e) => [e.id, e]));
-	const plan: ImportPlan = { year: file.year, add: [], update: [], link: [], same: [], missing: [] };
+	const plan: ImportPlan = { year: file.year, add: [], update: [], link: [], same: [], missing: [], roomsKept: [] };
 	const linked = new Set<string>();
 	for (const course of file.courses) {
 		const found = byCode.get(course.code);
@@ -210,6 +218,12 @@ export function planImport(file: SyllabusFile, existing: SharedCourse[]): Import
 			}
 		} else {
 			plan.add.push(course);
+		}
+	}
+	for (const { course, existing } of [...plan.update, ...plan.link, ...plan.same]) {
+		for (const slot of course.slots) {
+			const room = existing.values.slots.find((b) => b.weekday === slot.weekday && b.period === slot.period)?.room;
+			if (room && slot.room && room !== slot.room) plan.roomsKept.push({ course, slot, room });
 		}
 	}
 	const codes = new Set(file.courses.map((c) => c.code));

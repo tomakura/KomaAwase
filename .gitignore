@@ -35,4 +35,6 @@ relay/koma-files-secret.php
 .claude
 # What scripts/syllabus reads (real course data, kept out of the repository)
 /scripts/syllabus/*.json
+/scripts/syllabus/*.csv
+/scripts/syllabus/rooms-*
 !/scripts/syllabus/package.json
