@@ -390,7 +390,7 @@
 							method="POST"
 							action={actionHref('keepBefore', data.termParam)}
 							use:enhance={async ({ cancel }) => {
-								if (!(await ask({ message: '直される前の内容で、自分だけで使う授業にします。この授業の同期は止まります', ok: '切り替える' }))) return cancel();
+								if (!(await ask({ message: 'ほかの人が直す前の内容のまま、自分だけで使う授業にします。この授業の同期は止まります', ok: '切り替える' }))) return cancel();
 								return async ({ update }) => settle(update, { timetable: true });
 							}}
 						>

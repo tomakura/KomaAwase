@@ -35,7 +35,7 @@ export const actions: Actions = {
 		}
 
 		const email = normalizeEmail(input);
-		if (!email) return fail(400, { message: 'メールアドレスを確認してください', email: input });
+		if (!email) return fail(400, { message: 'メールアドレスを確かめてください', email: input });
 
 		const created = await createEmailToken(locals.db, email);
 		if ('error' in created) {

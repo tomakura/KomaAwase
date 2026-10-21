@@ -142,7 +142,7 @@ export async function nextColor(db: Db, timetableId: string) {
 const CONFLICT =
 	'ほかの人が先にこの授業を直しました。画面を読み込み直すと最新の内容になるので、もう一度直して保存してください';
 
-const NEEDS_CHECK = 'みんなの授業データは、在籍確認をすると使えます。「その他」→「在籍確認」からできます';
+const NEEDS_CHECK = 'みんなの授業データは、在籍確認をすると使えます。「その他」→「アカウント」→「在籍確認」からできます';
 
 type SaveArgs = {
 	userId: string;

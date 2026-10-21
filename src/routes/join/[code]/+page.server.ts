@@ -50,7 +50,7 @@ export const actions: Actions = {
 	join: async ({ locals, params, url, request, platform }) => {
 		const me = requireUser(locals, url);
 		const group = await invited(locals.db, params.code);
-		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'この招待からは参加できません。招待した人にご確認ください。' });
+		if (await isBanned(locals.db, group.id, me.id)) return fail(403, { message: 'この招待からは参加できません。招待した人に聞いてみてください。' });
 		const share = readShareChoice((await request.formData()).get('share')) ?? 'all';
 		// Asking again, or joining from a request made before, doesn't take another use of the invite
 		const asked = !!(await requestOf(locals.db, group.id, me.id));

@@ -80,7 +80,7 @@
 			</label>
 			{#if form?.message}<p class="error" role="alert">{form.message}</p>{/if}
 			<SendButton {phase} class="btn btn-primary">確認メールを送る</SendButton>
-			<p class="note">入力したメールアドレスがほかの人に表示されることはありません。あとから「その他」→「在籍確認」でも在籍確認できます。</p>
+			<p class="note">入力したメールアドレスがほかの人に表示されることはありません。あとから「その他」→「アカウント」→「在籍確認」でも在籍確認できます。</p>
 		</form>
 		<form method="POST" action="?/skip" use:enhance>
 			<button class="later" type="submit">あとで確認する</button>

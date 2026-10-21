@@ -87,7 +87,7 @@
 		{#if passkeyResult === 'failed'}
 			<p class="error" role="alert">パスキーでログインできませんでした。もう一度試すか、メールでログインしてください。</p>
 		{:else if passkeyResult === 'none'}
-			<p class="hint" role="status">パスキーでログインを完了できませんでした。もう一度試すか、他の方法でログインしてください。</p>
+			<p class="hint" role="status">パスキーでログインを完了できませんでした。もう一度試すか、ほかの方法でログインしてください。</p>
 		{/if}
 
 		<div class="divider"><span>{data.reauth ? 'パスキーがないとき' : 'はじめての人・パスキーがない人'}</span></div>
@@ -113,7 +113,7 @@
 		{#if form?.sentTo && !other}
 			{#key form}
 				<MailSent email={form.sentTo} action="?/email" onother={() => (other = true)}>
-					{form.sentTo} にリンクを送りました。15分以内に開いてください。届かない場合は迷惑メールをご確認ください。
+					{form.sentTo} にリンクを送りました。15分以内に開いてください。届かない場合は迷惑メールのフォルダも見てください。
 				</MailSent>
 			{/key}
 		{:else}

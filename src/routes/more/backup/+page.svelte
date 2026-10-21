@@ -83,7 +83,7 @@
 	const choices = (existing: boolean): { id: Mode; label: string }[] =>
 		existing
 			? [
-					{ id: 'save', label: '今のを保存してから上書き' },
+					{ id: 'save', label: '今の時間割を保存してから上書き' },
 					{ id: 'replace', label: '上書き' },
 					{ id: 'merge', label: '今の時間割に足す（ない授業だけ）' },
 					{ id: 'skip', label: '戻さない' }

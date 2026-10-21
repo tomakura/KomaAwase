@@ -21,7 +21,7 @@
 
 	{#if data.banned}
 		<div class="actions">
-			<p class="notice" role="status">この招待からは参加できません。招待した人にご確認ください。</p>
+			<p class="notice" role="status">この招待からは参加できません。招待した人に聞いてみてください。</p>
 			<a class="btn" href="/">もどる</a>
 		</div>
 	{:else if data.closed && !data.requested}
