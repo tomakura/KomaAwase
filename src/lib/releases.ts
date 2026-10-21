@@ -8,6 +8,14 @@ export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
 	{
+		pr: 75,
+		date: '2026-10-21',
+		items: [
+			'大学メールアドレスで登録したとき、そのまま在籍確認済みになるように',
+			'はじめの設定のあとに、在籍確認をした場合とあとでする場合の違いを表示'
+		]
+	},
+	{
 		pr: 74,
 		date: '2026-10-21',
 		items: ['iPhone の「学期の区切り」で、日付の箱が右にはみ出るのを修正']
