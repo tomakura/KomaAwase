@@ -7,7 +7,7 @@
 	import '@fontsource/zen-maru-gothic/700.css';
 	import '../app.css';
 	import { afterNavigate, beforeNavigate, onNavigate, refreshAll } from '$app/navigation';
-	import { navigating } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import { SvelteSet } from 'svelte/reactivity';
 	import favicon from '$lib/assets/favicon.svg';
 	import NotifyPrompt from '$lib/components/NotifyPrompt.svelte';
@@ -23,8 +23,11 @@
 	import { forgetOtherAccount } from '$lib/offline';
 	import { pageData } from '$lib/page-data';
 	import { arrived, backLink } from '$lib/back';
+	import { APP_CARD, type ShareCard } from '$lib/share-card';
 
 	let { data, children } = $props();
+	// What shows when this page's link is shared: a page's own card, or the app's
+	const card = $derived((page.data.card as ShareCard | undefined) ?? APP_CARD);
 	// The enrollment prompt's stage once closed; until then it holds back the notification prompt
 	let verifyDismissed = $state(-1);
 
@@ -189,6 +192,11 @@
 <svelte:head>
 	<title>コマあわせ</title>
 	<link rel="icon" href={favicon} />
+	<meta name="description" content={card.description} />
+	<meta property="og:title" content={card.title} />
+	<meta property="og:description" content={card.description} />
+	<meta property="og:image" content={new URL(card.image, page.url.origin).href} />
+	<meta property="og:image:alt" content={card.alt} />
 </svelte:head>
 
 <svelte:window onclickcapture={backLink} />

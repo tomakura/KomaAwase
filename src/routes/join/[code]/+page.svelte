@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import Icon from '$lib/components/Icon.svelte';
 	import Segmented from '$lib/components/Segmented.svelte';
 	import { INVITE_CLOSED, SHARE_CHOICES, SHARE_NOTES, type ShareChoice } from '$lib/sharing';
@@ -16,10 +17,15 @@
 	<div class="group">
 		<span class="group-icon"><Icon name="users" size={40} /></span>
 		<h1>{data.name}</h1>
-		<p class="count">{data.members}人が参加しています</p>
+		{#if !data.guest}<p class="count">{data.members}人が参加しています</p>{/if}
 	</div>
 
-	{#if data.banned}
+	{#if data.guest}
+		<div class="actions">
+			<p class="notice">ログインすると、このグループに参加できます。</p>
+			<a class="btn btn-primary" href="/login?next={encodeURIComponent(page.url.pathname)}">ログインして続ける</a>
+		</div>
+	{:else if data.banned}
 		<div class="actions">
 			<p class="notice" role="status">この招待からは参加できません。招待した人に確認してください。</p>
 			<a class="btn" href="/">戻る</a>

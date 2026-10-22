@@ -3,6 +3,7 @@ import { rememberNext, requireUser } from '$lib/server/auth/next';
 import { findByFriendCode, friendshipBetween, isBlocked, pendingRequestCount, readCode, sendRequest } from '$lib/server/friends';
 import { notifyLater } from '$lib/server/notify';
 import { verifiedIds } from '$lib/server/verify';
+import { friendCard } from '$lib/share-card';
 import type { Actions, PageServerLoad } from './$types';
 
 async function target(db: App.Locals['db'], code: string) {
@@ -12,8 +13,14 @@ async function target(db: App.Locals['db'], code: string) {
 	return person;
 }
 
-// Someone's friend link: who they are, and a button to ask
+// Someone's friend link: who they are, and a button to ask. Signed out (or a link preview's
+// crawler), only their name and a way to sign in.
 export const load: PageServerLoad = async ({ locals, params, url, cookies }) => {
+	if (!locals.user) {
+		const found = await target(locals.db, params.code);
+		const name = found.nickname ?? '';
+		return { guest: true as const, name, card: friendCard(name) };
+	}
 	const me = requireUser(locals, url);
 	// Onboarding first; the home page brings them back here after はじめの設定.
 	if (!me.setupAt) {
@@ -22,7 +29,8 @@ export const load: PageServerLoad = async ({ locals, params, url, cookies }) => 
 	}
 	const found = await target(locals.db, params.code);
 	const person = { ...found, verified: (await verifiedIds(locals.db, [found.id])).has(found.id) };
-	if (person.id === me.id) return { person, state: 'self' as const };
+	const card = friendCard(person.nickname ?? '');
+	if (person.id === me.id) return { guest: false as const, person, card, state: 'self' as const };
 	const [friendship, blocked] = await Promise.all([
 		friendshipBetween(locals.db, me.id, person.id),
 		isBlocked(locals.db, me.id, person.id)
@@ -36,7 +44,7 @@ export const load: PageServerLoad = async ({ locals, params, url, cookies }) => 
 					? ('pending' as const)
 					: ('asked' as const)
 				: ('none' as const);
-	return { person, state };
+	return { guest: false as const, person, card, state };
 };
 
 const MESSAGES = {

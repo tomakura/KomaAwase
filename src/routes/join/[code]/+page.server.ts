@@ -19,6 +19,7 @@ import {
 } from '$lib/server/groups';
 import { INVITE_CLOSED, readShareChoice } from '$lib/sharing';
 import { notifyLater } from '$lib/server/notify';
+import { groupCard } from '$lib/share-card';
 import type { Actions, PageServerLoad } from './$types';
 
 async function invited(db: App.Locals['db'], code: string) {
@@ -29,8 +30,13 @@ async function invited(db: App.Locals['db'], code: string) {
 }
 
 // A group invite: what the group is, and whether to show one's timetable to it. A group that
-// needs approval takes a request instead; someone the owner made leave can't come back.
+// needs approval takes a request instead; someone the owner made leave can't come back. Signed
+// out (or a link preview's crawler), only the group's name and a way to sign in.
 export const load: PageServerLoad = async ({ locals, params, url, cookies }) => {
+	if (!locals.user) {
+		const group = await invited(locals.db, params.code);
+		return { guest: true as const, name: group.name, card: groupCard(group.name) };
+	}
 	const me = requireUser(locals, url);
 	if (!me.setupAt) {
 		rememberNext(cookies, url.pathname);
@@ -43,7 +49,7 @@ export const load: PageServerLoad = async ({ locals, params, url, cookies }) => 
 		isBanned(locals.db, group.id, me.id),
 		requestOf(locals.db, group.id, me.id)
 	]);
-	return { name: group.name, members, approval: group.approval, banned, requested: !!request, closed: inviteClosed(group) };
+	return { guest: false as const, card: groupCard(group.name), name: group.name, members, approval: group.approval, banned, requested: !!request, closed: inviteClosed(group) };
 };
 
 export const actions: Actions = {
