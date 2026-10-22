@@ -7,6 +7,7 @@
 export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
+	{ pr: 78, date: '2026-10-23', items: ['スマホで、友だちを追加の「リンクをコピー」の文字が途中で折り返す不具合を修正'] },
 	{
 		pr: 76,
 		date: '2026-10-21',
