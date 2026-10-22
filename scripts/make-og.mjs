@@ -1,6 +1,9 @@
-// Draws the picture that shows when a link to the app is shared (static/og.png, 1200×630):
-// the mark, the name, the tagline and a small overlapped timetable, in the app's colors.
-//   node scripts/make-og.mjs static/og.png
+// Draws the pictures that show when a link to the app is shared (1200×630): the mark, the name,
+// a tagline and a small overlapped timetable, in the app's colors. One for the app itself, one
+// for a friend link (/add/…) and one for a group invite (/join/…).
+//   node scripts/make-og.mjs top static/og.png
+//   node scripts/make-og.mjs friend static/og-friend.png
+//   node scripts/make-og.mjs group static/og-group.png
 // Needs Playwright (`npm i --no-save playwright`, with its Chromium installed, or CHROME set to
 // a Chrome's path), curl, and a network for the fonts, which are the app's own (Zen Maru Gothic,
 // Zen Kaku Gothic New).
@@ -9,13 +12,15 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const out = resolve(process.argv[2] ?? 'static/og.png');
+const KIND = process.argv[2] ?? 'top';
+const out = resolve(process.argv[3] ?? { top: 'static/og.png', friend: 'static/og-friend.png', group: 'static/og-group.png' }[KIND]);
 
 // The コマを重ねる screen with made-up people and classes: their colors (the app's icon
 // colors), a class in its people's tints with a stripe down the left, free slots as empty frames.
 const ME = { name: '自分', text: '自', color: '#B9502B' };
 const AO = { name: 'あお', text: 'あ', color: '#2F5F99' };
 const HARU = { name: 'はる', text: 'は', color: '#3E7A4E' };
+const MIO = { name: 'みお', text: 'み', color: '#7A4E99' };
 const DAYS = ['月', '火', '水', '木', '金'];
 // [day][period]: title and who, or null when nobody has a class
 const CLASSES = [
@@ -31,21 +36,40 @@ const fill = (who) =>
 	`${bands('bottom', who.map((w) => w.color))} left / 5px 100% no-repeat, ${bands('right', who.map((w) => `color-mix(in srgb, ${w.color} 28%, #FFFDF8)`))}`;
 const icon = (w, size) => `<u class="ic" style="background:${w.color};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.55)}px">${w.text}</u>`;
 
-const chips = [ME, AO, HARU]
+// A friend link shows two people; a group invite, a group's members with the slots all of
+// them have free picked out.
+const PEOPLE = { top: [ME, AO, HARU], friend: [ME, AO], group: [ME, AO, HARU, MIO] }[KIND];
+const keep = (who) => who.filter((w) => PEOPLE.includes(w));
+const GROUP_CLASSES = [
+	[['英語', [ME, AO]], ['ゼミ', [MIO]], ['統計', [HARU]], null],
+	[['体育', [MIO]], ['情報', [ME, AO, HARU]], null, ['体育', [AO]]],
+	[['統計', [ME, HARU]], null, ['英語', [HARU, MIO]], ['ゼミ', [MIO]]],
+	[null, ['体育', [ME]], ['情報', [AO]], ['英語', [MIO]]],
+	[['英語', [HARU]], ['統計', [MIO]], null, ['統計', [ME, AO]]]
+];
+const TABLE = (KIND === 'group' ? GROUP_CLASSES : CLASSES).map((day) =>
+	day.map((c) => (c && keep(c[1]).length ? [c[0], keep(c[1])] : null))
+);
+const chips = PEOPLE
 	.map((w) => `<span class="chip" style="border-color:${w.color};background:color-mix(in srgb, ${w.color} 16%, #FFFDF8)">${icon(w, 34)}${w.name}</span>`)
 	.join('');
 const days = DAYS.map((d) => `<b>${d}</b>`).join('');
 // Row by row: period 1 to 4 across the five days
 const cells = [0, 1, 2, 3]
 	.flatMap((p) =>
-		CLASSES.map((day) => {
+		TABLE.map((day) => {
 			const c = day[p];
-			return c
-				? `<div class="c"><span class="t" style="background:${fill(c[1])}"><span>${c[0]}</span><span class="ppl">${c[1].map((w) => icon(w, 18)).join('')}</span></span></div>`
-				: '<div class="c free"></div>';
+			if (c) return `<div class="c"><span class="t" style="background:${fill(c[1])}"><span>${c[0]}</span><span class="ppl">${c[1].map((w) => icon(w, 18)).join('')}</span></span></div>`;
+			return KIND === 'group' ? '<div class="c free all"><span>みんな<br>空き</span></div>' : '<div class="c free"></div>';
 		})
 	)
 	.join('');
+
+const TEXT = {
+	top: { tag: '友だちと時間割を共有しよう。', sub: '重ねると、みんなが空いているコマが<br>すぐわかる。' },
+	friend: { tag: '友だちになって、時間割を<br>見せあおう。', sub: 'おたがいの授業と空きコマが<br>ひと目でわかる。' },
+	group: { tag: 'グループで<br>空きコマを探そう。', sub: 'メンバーの時間割を重ねて、<br>みんなが空いているコマがわかる。' }
+}[KIND];
 
 const html = `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
@@ -66,6 +90,9 @@ h1 { font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 84
 .grid b { text-align: center; font-size: 18px; font-weight: 500; color: #6B645A; }
 .c { height: 78px; padding: 4px; border: 2px solid #ede7da; border-radius: 12px; background: #ede7da; display: block; }
 .c.free { border-color: #E4DDCF; background: transparent; }
+.c.all { display: flex; align-items: center; justify-content: center; border-color: #D9653B; border-style: dashed; color: #AE4A27; font-size: 15px; font-weight: 700; line-height: 1.25; text-align: center; }
+.tag { line-height: 1.45; }
+.chip { font-size: ${PEOPLE.length > 3 ? 18 : 20}px; padding-right: ${PEOPLE.length > 3 ? 12 : 16}px; }
 .t { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 5px 4px 4px 12px; border-radius: 8px; font-size: 17px; font-weight: 700; line-height: 1.2; }
 .ppl { display: flex; gap: 2px; }
 .ic { flex-shrink: 0; }
@@ -73,8 +100,8 @@ h1 { font-family: 'Zen Maru Gothic', sans-serif; font-weight: 700; font-size: 84
 <div class="text">
 <svg class="mark" width="96" height="96" viewBox="0 0 48 48"><rect x="4" y="8" width="26" height="26" rx="7" fill="#D9653B"/><rect x="18" y="14" width="26" height="26" rx="7" fill="#3569A8" style="mix-blend-mode:multiply"/></svg>
 <h1>コマあわせ</h1>
-<p class="tag">友だちと時間割を共有しよう。</p>
-<p class="sub">重ねると、みんなが空いているコマが<br>すぐわかる。</p>
+<p class="tag">${TEXT.tag}</p>
+<p class="sub">${TEXT.sub}</p>
 </div>
 <div class="card"><div class="chips">${chips}</div><div class="grid">${days}${cells}</div></div>
 </body></html>`;

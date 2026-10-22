@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import UserIcon from '$lib/components/UserIcon.svelte';
 	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 
 	let { data, form } = $props();
-	const name = $derived(data.person.nickname ?? '');
+	const name = $derived(data.guest ? data.name : (data.person.nickname ?? ''));
 </script>
 
 <svelte:head>
@@ -13,14 +14,21 @@
 
 <main>
 	<div class="person">
-		<UserIcon user={data.person} size={88} />
-		<h1>{name}</h1>
-		{#if data.person.university}<p class="university">{data.person.university}</p>{/if}
-		{#if data.person.verified}<VerifiedBadge label />{/if}
+		{#if data.guest}
+			<h1>{name}</h1>
+		{:else}
+			<UserIcon user={data.person} size={88} />
+			<h1>{name}</h1>
+			{#if data.person.university}<p class="university">{data.person.university}</p>{/if}
+			{#if data.person.verified}<VerifiedBadge label />{/if}
+		{/if}
 	</div>
 
 	<div class="actions">
-		{#if data.state === 'self'}
+		{#if data.guest}
+			<p class="text">ログインすると、{name}さんに友だち申請できます。</p>
+			<a class="btn btn-primary" href="/login?next={encodeURIComponent(page.url.pathname)}">ログインして続ける</a>
+		{:else if data.state === 'self'}
 			<p class="text">これはあなたの友だちリンクです。友だちに送ると、相手から申請が届きます。</p>
 			<a class="btn" href="/friends/add">友だちリンクの画面へ</a>
 		{:else if data.state === 'friends'}
