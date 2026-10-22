@@ -94,6 +94,7 @@
 		border: 1px solid var(--line);
 		border-radius: 14px;
 		background: var(--surface);
+		container-type: inline-size;
 	}
 
 	.lead {
@@ -111,16 +112,29 @@
 		overflow-wrap: anywhere;
 	}
 
+	/* One row when the three fit (about 320px); on narrower phones 共有する takes a row of its own */
 	.buttons {
-		display: grid;
-		grid-template-columns: 1.4fr 1fr 0.8fr;
+		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 	}
 
 	.buttons .btn {
+		flex: 1 1 auto;
 		min-height: 46px;
 		padding: 0 8px;
 		font-size: 14px;
+		white-space: nowrap;
+	}
+
+	.buttons .btn-primary {
+		flex-grow: 2;
+	}
+
+	@container (width < 320px) {
+		.buttons .btn-primary {
+			flex-basis: 100%;
+		}
 	}
 
 	.status {
