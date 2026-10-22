@@ -9,13 +9,13 @@
 </script>
 
 <svelte:head>
-	<title>{name}さんと友だちになる · コマあわせ</title>
+	<title>{name ? `${name}さんと友だちになる` : '友だちになる'} · コマあわせ</title>
 </svelte:head>
 
 <main>
 	<div class="person">
 		{#if data.guest}
-			<h1>{name}</h1>
+			{#if name}<h1>{name}</h1>{/if}
 		{:else}
 			<UserIcon user={data.person} size={88} />
 			<h1>{name}</h1>
@@ -26,7 +26,7 @@
 
 	<div class="actions">
 		{#if data.guest}
-			<p class="text">ログインすると、{name}さんに友だち申請できます。</p>
+			<p class="text">{name ? `ログインすると、${name}さんに友だち申請できます。` : 'ログインすると、このリンクを開けます。'}</p>
 			<a class="btn btn-primary" href="/login?next={encodeURIComponent(page.url.pathname)}">ログインして続ける</a>
 		{:else if data.state === 'self'}
 			<p class="text">これはあなたの友だちリンクです。友だちに送ると、相手から申請が届きます。</p>

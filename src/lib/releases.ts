@@ -7,6 +7,7 @@
 export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
+	{ pr: 80, date: '2026-10-23', items: ['使えなくなった招待リンクなどで、名前が表示される不具合を修正'] },
 	{ pr: 79, date: '2026-10-23', items: ['友だちリンクやグループの招待をSNSで送ったときの表示を改善'] },
 	{ pr: 78, date: '2026-10-22', items: ['スマホで、友だちを追加の「リンクをコピー」の文字が途中で折り返す不具合を修正'] },
 	{

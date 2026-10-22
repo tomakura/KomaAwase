@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { rememberNext, requireUser } from '$lib/server/auth/next';
 import { findByFriendCode, friendshipBetween, isBlocked, pendingRequestCount, readCode, sendRequest } from '$lib/server/friends';
+import { suspendedIds } from '$lib/server/moderation';
 import { notifyLater } from '$lib/server/notify';
 import { verifiedIds } from '$lib/server/verify';
 import { friendCard } from '$lib/share-card';
@@ -14,10 +15,11 @@ async function target(db: App.Locals['db'], code: string) {
 }
 
 // Someone's friend link: who they are, and a button to ask. Signed out (or a link preview's
-// crawler), only their name and a way to sign in.
+// crawler), only their name and a way to sign in; not even that for someone suspended.
 export const load: PageServerLoad = async ({ locals, params, url, cookies }) => {
 	if (!locals.user) {
 		const found = await target(locals.db, params.code);
+		if ((await suspendedIds(locals.db, [found.id])).size) return { guest: true as const, name: null };
 		const name = found.nickname ?? '';
 		return { guest: true as const, name, card: friendCard(name) };
 	}
