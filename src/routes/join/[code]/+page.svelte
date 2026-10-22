@@ -10,19 +10,19 @@
 </script>
 
 <svelte:head>
-	<title>「{data.name}」に参加 · コマあわせ</title>
+	<title>{data.name ? `「${data.name}」に参加` : 'グループに参加'} · コマあわせ</title>
 </svelte:head>
 
 <main>
 	<div class="group">
 		<span class="group-icon"><Icon name="users" size={40} /></span>
-		<h1>{data.name}</h1>
+		{#if data.name}<h1>{data.name}</h1>{/if}
 		{#if !data.guest}<p class="count">{data.members}人が参加しています</p>{/if}
 	</div>
 
 	{#if data.guest}
 		<div class="actions">
-			<p class="notice">ログインすると、このグループに参加できます。</p>
+			<p class="notice" role="status">{data.closed ? INVITE_CLOSED[data.closed] : 'ログインすると、このグループに参加できます。'}</p>
 			<a class="btn btn-primary" href="/login?next={encodeURIComponent(page.url.pathname)}">ログインして続ける</a>
 		</div>
 	{:else if data.banned}

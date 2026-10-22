@@ -31,11 +31,14 @@ async function invited(db: App.Locals['db'], code: string) {
 
 // A group invite: what the group is, and whether to show one's timetable to it. A group that
 // needs approval takes a request instead; someone the owner made leave can't come back. Signed
-// out (or a link preview's crawler), only the group's name and a way to sign in.
+// out (or a link preview's crawler), only the group's name and a way to sign in; not even that
+// once the invite is used up or past its date.
 export const load: PageServerLoad = async ({ locals, params, url, cookies }) => {
 	if (!locals.user) {
 		const group = await invited(locals.db, params.code);
-		return { guest: true as const, name: group.name, card: groupCard(group.name) };
+		const closed = inviteClosed(group);
+		if (closed) return { guest: true as const, name: null, closed };
+		return { guest: true as const, name: group.name, closed, card: groupCard(group.name) };
 	}
 	const me = requireUser(locals, url);
 	if (!me.setupAt) {
