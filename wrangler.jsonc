@@ -31,6 +31,12 @@
 	// Lets Cloudflare run the Worker near D1 when it measures that pages come back sooner:
 	// from Tokyo each query waited about 85ms, and a page makes two or three in a row.
 	"placement": { "mode": "smart" },
+	// Logs and traces in the dashboard, every request kept. Written here so a deploy doesn't turn
+	// them back off. The dashboard's issue_detection is left out: wrangler doesn't know it yet.
+	"observability": {
+		"logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true, "persist": true },
+		"traces": { "enabled": true, "head_sampling_rate": 1, "persist": true }
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",
