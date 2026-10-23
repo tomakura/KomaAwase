@@ -70,6 +70,17 @@ WHERE ${START} - r.minutes = ?
 	AND (p.number = m.period OR ${START} - r.minutes >= ${minutesOf('prev.end_time')})`;
 const DUE = `${due(false)}\nUNION ALL${due(true)}\nUNION ALL${MOVED}`;
 
+// Whether a class of someone who asked starts their chosen minutes after now: every row of DUE has one.
+// DUE reads hundreds of rows and runs twice a minute, while this reads about one per period of
+// those people, so most minutes stop here. CROSS JOIN keeps SQLite starting from the few people
+// who asked, instead of every timetable. Parameters: year, now.
+const ANY_DUE = `
+SELECT 1 FROM class_reminders r
+CROSS JOIN timetables t ON t.user_id = r.user_id AND t.year = ? AND t.archived = 0
+CROSS JOIN periods p ON p.timetable_id = t.id
+WHERE ${START} - r.minutes = ?
+LIMIT 1`;
+
 type Row = {
 	lead: number;
 	notify: string | null;
@@ -99,6 +110,8 @@ export async function sendDueReminders(env: PushEnv, scheduledTime: number, send
 	const now = tokyoTime(scheduledTime);
 	const year = academicYear(now.date);
 	const minute = Math.floor(now.minutes);
+	const any = await env.DB.prepare(ANY_DUE).bind(year, minute).all();
+	if (!any.results.length) return 0;
 	const params = [year, now.weekday, minute, now.date, now.date, now.date, now.date];
 	const { results } = await env.DB.prepare(DUE)
 		.bind(...params, ...params, year, now.date, minute)

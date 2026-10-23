@@ -354,9 +354,9 @@ export async function searchSharedCourses(
 	if (opts.q) {
 		match = queryMatch(opts.q);
 	} else if (opts.slot) {
-		match = sql`exists (select 1 from ${sharedCourseSlots}
-			where ${sharedCourseSlots.sharedCourseId} = ${sharedCourses.id}
-			and ${sharedCourseSlots.weekday} = ${opts.slot.weekday}
+		// The slot's courses are found first: as EXISTS, each course read every slot at that time
+		match = sql`${sharedCourses.id} in (select ${sharedCourseSlots.sharedCourseId} from ${sharedCourseSlots}
+			where ${sharedCourseSlots.weekday} = ${opts.slot.weekday}
 			and ${sharedCourseSlots.periodNumber} = ${opts.slot.period})`;
 	} else {
 		return [];

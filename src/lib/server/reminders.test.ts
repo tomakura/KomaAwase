@@ -83,6 +83,16 @@ describe('sendDueReminders', () => {
 		expect((await fire(w, at(12, 30))).count).toBe(1);
 	});
 
+	it('makes only the small lookup in a minute when no class is that long away', async () => {
+		const w = world();
+		const queries: string[] = [];
+		const db = d1(w.db);
+		const env = { DB: { prepare: (sql: string) => (queries.push(sql), db.prepare(sql)) }, VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' };
+		expect(await sendDueReminders(env, at(12, 29), async () => 'sent')).toBe(0);
+		expect(queries).toHaveLength(1);
+		expect(queries[0]).toContain('LIMIT 1');
+	});
+
 	it('sends each chosen time in its own minute', async () => {
 		const w = world({ leads: [10, 30, 120] });
 		const titles = async (t: number) => (await fire(w, t)).sent.map((s) => s.message.title);
