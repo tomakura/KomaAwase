@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import type { PushPart } from './push-queue';
-import { sendDueReminders, type D1Like } from './reminders';
+import { reminderTimes, sendDueReminders, type D1Like } from './reminders';
 
 // The real schema: every migration, in order, on an in-memory SQLite
 function database() {
@@ -81,6 +81,35 @@ describe('sendDueReminders', () => {
 		expect((await fire(w, at(12, 29))).count).toBe(0);
 		expect((await fire(w, at(12, 31))).count).toBe(0);
 		expect((await fire(w, at(12, 30))).count).toBe(1);
+	});
+
+	it('makes only the small lookup in a minute when no class is that long away', async () => {
+		const w = world();
+		const queries: string[] = [];
+		const db = d1(w.db);
+		const env = { DB: { prepare: (sql: string) => (queries.push(sql), db.prepare(sql)) }, VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' };
+		expect(await sendDueReminders(env, at(12, 29), async () => 'sent')).toBe(0);
+		expect(queries).toHaveLength(1);
+		expect(queries[0]).toContain('DISTINCT');
+	});
+
+	it('takes the times kept by the clock, and reads nothing when the minute is not one of them', async () => {
+		const w = world();
+		const queries: string[] = [];
+		const db = d1(w.db);
+		const env = { DB: { prepare: (sql: string) => (queries.push(sql), db.prepare(sql)) }, VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' };
+		const times = async () => new Set([12 * 60 + 30]);
+		expect(await sendDueReminders(env, at(12, 29), async () => 'sent', { times })).toBe(0);
+		expect(queries).toHaveLength(0);
+		expect(await sendDueReminders(env, at(12, 30), async () => 'sent', { times })).toBe(1);
+	});
+
+	it('finds the minutes of each chosen time before each period', async () => {
+		const w = world({ leads: [10, 30] });
+		expect([...(await reminderTimes(d1(w.db), 2026))].sort((a, b) => a - b)).toEqual(
+			[8 * 60 + 10, 8 * 60 + 30, 12 * 60 + 10, 12 * 60 + 30, 13 * 60 + 50, 14 * 60 + 10, 15 * 60 + 30, 15 * 60 + 50]
+		);
+		expect((await reminderTimes(d1(w.db), 2027)).size).toBe(0);
 	});
 
 	it('sends each chosen time in its own minute', async () => {
