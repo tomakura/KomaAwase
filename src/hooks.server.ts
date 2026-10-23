@@ -53,6 +53,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		transformPageChunk: ({ html }) =>
 			html.replace('%koma.theme%', theme).replace('%koma.themeColor%', themeColorTags(theme))
 	});
+	// A form may have changed when someone's class reminders are due (their choices, periods or
+	// timetable), so the clock that sends them looks the times up again (worker/entry.js)
+	const clock = event.platform?.env.CLOCK;
+	if (event.request.method !== 'GET' && event.locals.user && clock) {
+		const forget = async () => clock.get(clock.idFromName('minute')).forget();
+		event.platform!.ctx.waitUntil(forget().catch((e) => console.error('clock forget failed', e)));
+	}
 	// Counted for 運営 → 数字 and /status, never with who or which page
 	if (response.status >= 500 && event.platform) event.platform.ctx.waitUntil(countMetric(d1, METRICS.serverErrors));
 	return secured(response);

@@ -5,6 +5,7 @@ import { DurableObject } from 'cloudflare:workers';
 import sveltekit from '../.svelte-kit/cloudflare/_worker.js';
 import { MINUTE, isEarly, minutesDue, nextAlarm, nextMinute, runEarly, runMinute } from '../src/lib/server/minute-clock.ts';
 import { sendPart } from '../src/lib/server/push-queue.ts';
+import { reminderTimes } from '../src/lib/server/reminders.ts';
 
 // The cron in wrangler.jsonc that runs every minute; the other one is the daily sweep
 const REMINDER_CRON = '* * * * *';
@@ -28,8 +29,32 @@ function internal(env, ctx, path, body) {
  * Wakes the notifications at the start of each minute, and the iPhones' a little before
  * (src/lib/server/minute-clock.ts). One of it, named 'minute'. Its alarm sets the next one
  * before sending, so a failure can't stop it.
+ * It keeps the minutes a class reminder can be due (reminderTimes), so most minutes read nothing
+ * for them. A form sent by someone signed in makes it look them up again (forget, from
+ * src/hooks.server.ts), and so does an hour going by.
  */
 export class MinuteClock extends DurableObject {
+	/** @type {{ year: number, at: number, minutes: Promise<Set<number>> } | undefined} */
+	times;
+
+	forget() {
+		this.times = undefined;
+	}
+
+	/** @param {number} year */
+	reminderTimes = (year) => {
+		const now = Date.now();
+		if (!this.times || this.times.year !== year || now - this.times.at > 60 * MINUTE) {
+			const times = { year, at: now, minutes: reminderTimes(this.env.DB, year) };
+			// A lookup that failed is tried again with the next alarm
+			times.minutes.catch(() => {
+				if (this.times === times) this.times = undefined;
+			});
+			this.times = times;
+		}
+		return this.times.minutes;
+	};
+
 	/** Sets the alarm when there is none, or when it should have gone off a while ago */
 	async ensure() {
 		const at = await this.ctx.storage.getAlarm();
@@ -47,12 +72,12 @@ export class MinuteClock extends DurableObject {
 		for (const minute of minutesDue(last, now)) {
 			const sentEarly = early?.minute === minute ? new Set(early.sent) : undefined;
 			// A minute that failed stays unsent, to be tried with the next alarm
-			if (!(await runMinute(this.env, minute, now, sentEarly))) break;
+			if (!(await runMinute(this.env, minute, now, sentEarly, this.reminderTimes))) break;
 			await this.ctx.storage.put('last', minute);
 		}
 		if (isEarly(now)) {
 			const minute = nextMinute(now);
-			await this.ctx.storage.put('early', { minute, sent: await runEarly(this.env, minute) });
+			await this.ctx.storage.put('early', { minute, sent: await runEarly(this.env, minute, this.reminderTimes) });
 		}
 	}
 }

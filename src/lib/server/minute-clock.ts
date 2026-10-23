@@ -13,7 +13,7 @@
 import { METRICS, countMetric } from './metrics';
 import { sendPlanEve } from './plan-eve';
 import type { DeliverOptions, PushEnv, PushItem } from './push-queue';
-import { sendDueReminders } from './reminders';
+import { sendDueReminders, type ReminderTimes } from './reminders';
 import { sendTaskReminders } from './task-reminders';
 
 export const MINUTE = 60_000;
@@ -43,9 +43,9 @@ export function isApple(endpoint: string) {
 // One notification on one phone, as it reads (one changed since is sent again, in its place)
 const keyOf = (item: PushItem) => JSON.stringify([item.deviceId, item.message]);
 
-async function sendAll(env: PushEnv, minute: number, options: DeliverOptions) {
+async function sendAll(env: PushEnv, minute: number, options: DeliverOptions, times?: ReminderTimes) {
 	const results = await Promise.allSettled([
-		sendDueReminders(env, minute, undefined, options),
+		sendDueReminders(env, minute, undefined, { ...options, times }),
 		sendPlanEve(env, minute, undefined, options),
 		sendTaskReminders(env, minute, undefined, options)
 	]);
@@ -68,18 +68,19 @@ export function minutesDue(last: number | undefined, now: number) {
 /**
  * Sends one minute's notifications, and counts how late that was. Returns false when looking
  * them up failed (D1), so the minute is tried again with the next alarm; sending itself retries
- * through the queue. Never throws. `sentEarly` is what went to iPhones early (runEarly).
+ * through the queue. Never throws. `sentEarly` is what went to iPhones early (runEarly); `times`
+ * are the minutes a class reminder can be due, as the clock keeps them.
  */
-export async function runMinute(env: PushEnv, minute: number, now = Date.now(), sentEarly?: Set<string>) {
+export async function runMinute(env: PushEnv, minute: number, now = Date.now(), sentEarly?: Set<string>, times?: ReminderTimes) {
 	const late = Math.max(0, now - minute);
 	await countMetric(env.DB, METRICS.notifyMinute, 1, late, now);
 	if (late >= 10_000) await countMetric(env.DB, METRICS.notifyLate, 1, 0, now);
-	return sendAll(env, minute, { dropLate: true, pick: sentEarly?.size ? (item) => !sentEarly.has(keyOf(item)) : undefined });
+	return sendAll(env, minute, { dropLate: true, pick: sentEarly?.size ? (item) => !sentEarly.has(keyOf(item)) : undefined }, times);
 }
 
 /** Sends a minute's notifications to the iPhones, before it begins. Returns what it sent. */
-export async function runEarly(env: PushEnv, minute: number) {
+export async function runEarly(env: PushEnv, minute: number, times?: ReminderTimes) {
 	const sent: string[] = [];
-	await sendAll(env, minute, { dropLate: true, pick: (item) => isApple(item.endpoint) && !!sent.push(keyOf(item)) });
+	await sendAll(env, minute, { dropLate: true, pick: (item) => isApple(item.endpoint) && !!sent.push(keyOf(item)) }, times);
 	return sent;
 }

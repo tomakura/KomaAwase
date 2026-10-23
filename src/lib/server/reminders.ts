@@ -8,7 +8,7 @@ import { reminderMessage } from '../reminder';
 import { termIsOn } from '../terms';
 import { academicYear, tokyoTime } from '../time';
 import { sendPush } from './push';
-import { deliver, type DeliverOptions, type PushEnv } from './push-queue';
+import { deliver, type D1Like, type DeliverOptions, type PushEnv } from './push-queue';
 
 export type { D1Like } from './push-queue';
 
@@ -70,16 +70,23 @@ WHERE ${START} - r.minutes = ?
 	AND (p.number = m.period OR ${START} - r.minutes >= ${minutesOf('prev.end_time')})`;
 const DUE = `${due(false)}\nUNION ALL${due(true)}\nUNION ALL${MOVED}`;
 
-// Whether a class of someone who asked starts their chosen minutes after now: every row of DUE has one.
-// DUE reads hundreds of rows and runs twice a minute, while this reads about one per period of
-// those people, so most minutes stop here. CROSS JOIN keeps SQLite starting from the few people
-// who asked, instead of every timetable. Parameters: year, now.
-const ANY_DUE = `
-SELECT 1 FROM class_reminders r
+// The minutes of the day at which some class of someone who asked is that many minutes away:
+// every row of DUE falls in one. DUE reads hundreds of rows and runs twice a minute, while this
+// reads about one per period of those people, so most minutes stop here. CROSS JOIN keeps SQLite
+// starting from the few people who asked, instead of every timetable. Parameter: year.
+const TIMES = `
+SELECT DISTINCT ${START} - r.minutes AS minute FROM class_reminders r
 CROSS JOIN timetables t ON t.user_id = r.user_id AND t.year = ? AND t.archived = 0
-CROSS JOIN periods p ON p.timetable_id = t.id
-WHERE ${START} - r.minutes = ?
-LIMIT 1`;
+CROSS JOIN periods p ON p.timetable_id = t.id`;
+
+/** The minutes of the day (since midnight) at which a class reminder can be due in `year` */
+export async function reminderTimes(db: D1Like, year: number) {
+	const { results } = await db.prepare(TIMES).bind(year).all<{ minute: number }>();
+	return new Set(results.map((r) => r.minute));
+}
+
+/** reminderTimes, as kept by the clock that sends the notifications (MinuteClock) */
+export type ReminderTimes = (year: number) => Promise<Set<number>>;
 
 type Row = {
 	lead: number;
@@ -105,13 +112,17 @@ type Row = {
  * once go through the push queue: src/lib/server/push-queue.ts). Returns how many it sent or
  * queued. A notification not sent by the time the class starts is dropped.
  */
-export async function sendDueReminders(env: PushEnv, scheduledTime: number, send: typeof sendPush = sendPush, options: DeliverOptions = {}) {
+export async function sendDueReminders(
+	env: PushEnv,
+	scheduledTime: number,
+	send: typeof sendPush = sendPush,
+	{ times, ...options }: DeliverOptions & { times?: ReminderTimes } = {}
+) {
 	if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return 0;
 	const now = tokyoTime(scheduledTime);
 	const year = academicYear(now.date);
 	const minute = Math.floor(now.minutes);
-	const any = await env.DB.prepare(ANY_DUE).bind(year, minute).all();
-	if (!any.results.length) return 0;
+	if (!(await (times ?? ((y) => reminderTimes(env.DB, y)))(year)).has(minute)) return 0;
 	const params = [year, now.weekday, minute, now.date, now.date, now.date, now.date];
 	const { results } = await env.DB.prepare(DUE)
 		.bind(...params, ...params, year, now.date, minute)
