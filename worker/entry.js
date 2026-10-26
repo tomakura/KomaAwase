@@ -34,25 +34,25 @@ function internal(env, ctx, path, body) {
  * src/hooks.server.ts), and so does an hour going by.
  */
 export class MinuteClock extends DurableObject {
-	/** @type {{ year: number, at: number, minutes: Promise<Set<number>> } | undefined} */
-	times;
-
-	forget() {
-		this.times = undefined;
+	// Kept in storage, not in memory: an object that waits more than a few seconds between alarms
+	// is put to sleep, and its memory goes with it.
+	async forget() {
+		await this.ctx.storage.put('timesForgot', Date.now());
+		await this.ctx.storage.delete('times');
 	}
 
 	/** @param {number} year */
-	reminderTimes = (year) => {
+	reminderTimes = async (year) => {
 		const now = Date.now();
-		if (!this.times || this.times.year !== year || now - this.times.at > 60 * MINUTE) {
-			const times = { year, at: now, minutes: reminderTimes(this.env.DB, year) };
-			// A lookup that failed is tried again with the next alarm
-			times.minutes.catch(() => {
-				if (this.times === times) this.times = undefined;
-			});
-			this.times = times;
-		}
-		return this.times.minutes;
+		/** @type {{ year: number, at: number, minutes: number[] } | undefined} */
+		const kept = await this.ctx.storage.get('times');
+		if (kept && kept.year === year && now - kept.at <= 60 * MINUTE) return new Set(kept.minutes);
+		const minutes = await reminderTimes(this.env.DB, year);
+		// A form sent while they were being read may have changed them: those are read again next time
+		/** @type {number | undefined} */
+		const forgot = await this.ctx.storage.get('timesForgot');
+		if (!(forgot !== undefined && forgot >= now)) await this.ctx.storage.put('times', { year, at: now, minutes: [...minutes] });
+		return minutes;
 	};
 
 	/** Sets the alarm when there is none, or when it should have gone off a while ago */
