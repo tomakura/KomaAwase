@@ -121,7 +121,8 @@ export default {
 	},
 
 	/**
-	 * Every minute: only makes sure the clock that sends the notifications is running.
+	 * Every minute: makes sure the clock that sends the notifications is running, and once an
+	 * hour puts stuck screenshots back in the queue.
 	 * @param {ScheduledController} controller
 	 * @param {Env} env
 	 * @param {ExecutionContext} ctx
@@ -129,6 +130,8 @@ export default {
 	async scheduled(controller, env, ctx) {
 		if (controller.cron === REMINDER_CRON) {
 			ctx.waitUntil(env.CLOCK.get(env.CLOCK.idFromName('minute')).ensure());
+			// And once an hour, screenshots whose queue message was lost go back in the queue
+			if (new Date(controller.scheduledTime).getUTCMinutes() === 30) ctx.waitUntil(internal(env, ctx, '/internal/hourly', {}));
 		} else {
 			ctx.waitUntil(internal(env, ctx, '/internal/daily', {}));
 		}

@@ -309,16 +309,22 @@ export async function dailySweep(env: Env, db: Db) {
 		db.delete(verifyTokens).where(lt(verifyTokens.expiresAt, now))
 	]);
 
-	const due = await db
-		.update(importJobs)
-		.set({ status: 'queued' })
-		.where(
-			or(
-				and(eq(importJobs.status, 'retry'), lte(importJobs.retryAt, now)),
-				and(inArray(importJobs.status, ['queued', 'processing']), lt(importJobs.createdAt, stuck))
-			)
-		)
-		.returning({ id: importJobs.id });
+	return requeue(env, db, or(and(eq(importJobs.status, 'retry'), lte(importJobs.retryAt, now)), stuckSince(stuck)));
+}
+
+// Waiting or being read for more than an hour: its queue message was lost (out of retries, say)
+const stuckSince = (stuck: Date) => and(inArray(importJobs.status, ['queued', 'processing']), lt(importJobs.createdAt, stuck));
+
+async function requeue(env: Env, db: Db, where: ReturnType<typeof stuckSince>) {
+	const due = await db.update(importJobs).set({ status: 'queued' }).where(where).returning({ id: importJobs.id });
 	for (const job of due) await enqueue(env, undefined, db, job.id, false);
 	return due.length;
+}
+
+/**
+ * Every hour: stuck jobs go back in the queue, so one doesn't wait until the next morning's
+ * sweep (and /status doesn't show the screenshots as stopped all that time).
+ */
+export function requeueStuck(env: Env, db: Db, now = Date.now()) {
+	return requeue(env, db, stuckSince(new Date(now - 60 * 60 * 1000)));
 }
