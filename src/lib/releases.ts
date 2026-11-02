@@ -8,7 +8,7 @@ export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
 	{
-		pr: 85,
+		pr: 86,
 		date: '2026-11-02',
 		items: [
 			'過去の日の欠席を、時限ごとに記録する機能を追加',
