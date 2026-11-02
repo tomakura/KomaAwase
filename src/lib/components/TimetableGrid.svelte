@@ -181,6 +181,7 @@
 		class:live
 		class:offweek={!meets || !!off || !!away}
 		class:dropped={risk === 'over'}
+		class:risky={risk === 'risk'}
 		title={meets ? undefined : '今週はありません'}
 		href={courseHref?.(course.id)}
 		style:--c={courseColor(course.color)}
@@ -203,7 +204,7 @@
 		{#if risk === 'over'}
 			<span class="risk over">上限超え</span>
 		{:else if risk}
-			<span class="risk" title="次に休むと欠席の上限を超えます"><span>落単注意</span></span>
+			<span class="risk" title="次に休むと欠席の上限を超えます">落単注意</span>
 		{/if}
 	</svelte:element>
 {/snippet}
@@ -510,25 +511,30 @@
 		opacity: 0.5;
 	}
 
-	/* Missing the next class passes the absence limit: hazard tape under the room */
-	.risk {
-		flex-shrink: 0;
-		align-self: stretch;
-		display: flex;
-		justify-content: center;
-		padding: 2px;
-		border-radius: 5px;
-		background: repeating-linear-gradient(-45deg, #1c1c1c 0 4px, #f4c20d 4px 8px);
+	/* Missing the next class passes the absence limit: hazard tape around the cell */
+	.course.risky::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		padding: 3px;
+		border-radius: inherit;
+		background: repeating-linear-gradient(-45deg, #1c1c1c 0 5px, #f4c20d 5px 10px);
+		mask:
+			linear-gradient(#000 0 0) content-box exclude,
+			linear-gradient(#000 0 0);
+		pointer-events: none;
 	}
 
-	.risk span {
-		padding: 0 4px;
-		border-radius: 3px;
-		background: #f4c20d;
-		color: #1c1c1c;
+	.risk {
+		flex-shrink: 0;
+		align-self: center;
+		padding: 1px 5px;
+		border-radius: 5px;
+		background: #1c1c1c;
+		color: #f4c20d;
+		box-shadow: inset 0 0 0 1.5px #f4c20d;
 		font-size: 10px;
 		font-weight: 700;
-		line-height: 1.3;
 		white-space: nowrap;
 	}
 
@@ -547,8 +553,11 @@
 		padding: 1px 5px;
 		background: var(--ink);
 		color: var(--surface);
-		font-size: 10px;
-		font-weight: 700;
-		white-space: nowrap;
+		box-shadow: none;
+	}
+
+	/* Inside the tape */
+	.course.risky {
+		padding: 6px 5px;
 	}
 </style>
