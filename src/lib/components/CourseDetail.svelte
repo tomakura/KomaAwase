@@ -218,7 +218,7 @@
 	const absenceLeft = $derived(absenceLimit ? absenceLimit - data.absences.length : null);
 	// Missing the next day the class meets would pass the limit
 	const absenceNext = $derived(
-		absenceRisk(data.absences.length, absenceLimit, periodsOn(course.slots, weekdayOf(nextClassDay)).length)
+		absenceRisk(data.absences.length, absenceLimit, periodsOn(course.slots, weekdayOf(nextClassDay), periodNumbers).length)
 	);
 	let absentOpen = $state(false);
 	let absentDate = $state('');
@@ -239,7 +239,7 @@
 		const away = data.moves.some((m) => m.fromDate === absentDate);
 		const slots = away ? [] : course.slots.filter((s) => meetsInWeek(s.week, term?.startDate, absentDate));
 		const moved = data.moves.filter((m) => m.toDate === absentDate).flatMap((m) => Array.from({ length: m.span }, (_, i) => m.period + i));
-		return [...new Set([...periodsOn(slots, weekdayOf(absentDate)), ...moved])].sort((a, b) => a - b);
+		return [...new Set([...periodsOn(slots, weekdayOf(absentDate), periodNumbers), ...moved])].sort((a, b) => a - b);
 	});
 	const recorded = $derived(new Set(data.absences.filter((a) => a.date === absentDate).map((a) => a.period)));
 	function openAbsent() {

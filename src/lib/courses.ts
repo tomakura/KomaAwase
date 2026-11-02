@@ -157,11 +157,14 @@ export function absenceRisk(count: number, limit: number | null, periods: number
 // An absence recorded for a day, not a period (course_absences.period)
 export const WHOLE_DAY = -1;
 
-/** The periods the class meets on a weekday, in order */
-export function periodsOn(slots: { weekday: number; period: number; span: number }[], weekday: number): number[] {
+/** The periods the class meets on a weekday, in order; `periods` is the timetable's, in order */
+export function periodsOn(slots: { weekday: number; period: number; span: number }[], weekday: number, periods: number[]): number[] {
 	return slots
 		.filter((s) => s.weekday === weekday)
-		.flatMap((s) => Array.from({ length: s.span }, (_, i) => s.period + i))
+		.flatMap((s) => {
+			const start = periods.indexOf(s.period);
+			return start < 0 ? [] : periods.slice(start, start + s.span);
+		})
 		.sort((a, b) => a - b);
 }
 

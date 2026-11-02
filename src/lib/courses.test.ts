@@ -106,7 +106,8 @@ describe('absenceRisk', () => {
 	});
 
 	it('reads the periods of a weekday, double classes as two', () => {
-		expect(periodsOn([{ weekday: 2, period: 3, span: 2 }, { weekday: 2, period: 1, span: 1 }, { weekday: 4, period: 1, span: 1 }], 2)).toEqual([1, 3, 4]);
+		expect(periodsOn([{ weekday: 2, period: 3, span: 2 }, { weekday: 2, period: 1, span: 1 }, { weekday: 4, period: 1, span: 1 }], 2, [1, 2, 3, 4, 5])).toEqual([1, 3, 4]);
+		expect(periodsOn([{ weekday: 2, period: 3, span: 2 }], 2, [1, 3, 5])).toEqual([3, 5]);
 	});
 });
 

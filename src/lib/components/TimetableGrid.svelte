@@ -64,6 +64,7 @@
 		dayHref?: (day: number) => string;
 	} = $props();
 
+	const periodNumbers = $derived(periods.map((p) => p.number));
 	const rowOf = $derived(new Map(periods.map((p, i) => [p.number, i + 2])));
 	const colOf = $derived(new Map(days.map((d, i) => [d, i + 2])));
 	const lastRow = $derived(periods.length + 1);
@@ -132,7 +133,7 @@
 				const live = cancel === clock.date || off || away === clock.date || !meets ? null : session(slot.weekday, row, span);
 				// Only the periods that meet this week count toward missing the day
 				const thisWeek = course.slots.filter((s) => meetsInWeek(s.week, termStart, clock.date));
-				const risk = riskOf(course, periodsOn(thisWeek, slot.weekday).length);
+				const risk = riskOf(course, periodsOn(thisWeek, slot.weekday, periodNumbers).length);
 				return [{ course, slot, row, col, span, live, cancel, maybe, meets, off, away, risk }];
 			}).concat(movedHere(course))
 		)
