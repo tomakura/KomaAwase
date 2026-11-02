@@ -39,7 +39,7 @@ erDiagram
 | `COURSE_FILES` | course_id, storage_key, name, mime, size | 資料。実体はシンレンタルサーバー（`relay/files.php`）に `storage_key` の名前で置く。本人しか見られない |
 | `COURSE_MOVES` | course_id, from_date, to_date, period, span, room | 授業ごとの振替。`from_date` はその授業がない日（休講と同じ扱い）、`to_date` の `period` から `span` コマに1回だけある。本人のもので、友だちや画像の書き出しには出さない |
 | `CALENDAR_ENTRIES` | timetable_id, kind, label, start_date, end_date | 時間割の日程。`kind` は `off`（休みの日。授業を出さず、授業前の通知も送らない）か `exam`（試験期間。印を出すだけ）。1行で数日をまとめられる。祝日は `src/lib/holidays.ts` で計算して入れる（外のサービスには取りに行かない）。大学の日程は `universities.calendar_preset` から、使う人が選んだときだけ写す |
-| `COURSE_ABSENCES` | course_id, date, period | 休んだコマ。1コマ1行で、1行が欠席1回（course_id・date・period で一意）。`period` が 0 の行は日付だけの記録（0033 より前のものと、授業のない日）。本人のもので、共有しない |
+| `COURSE_ABSENCES` | course_id, date, period | 休んだコマ。1コマ1行で、1行が欠席1回（course_id・date・period で一意）。`period` が -1 の行は日付だけの記録（0033 より前のものと、授業のない日。0限があるので 0 ではない）。日付だけの日に時限を記録すると、その行と置き換わる。本人のもので、共有しない |
 | `EVENTS` | user_id, title, date, start_time, end_time, place, memo, course_id, exam, scope, bring | 予定のイベント。`start_time` が null なら終日。`course_id` は授業のイベント（試験など）で、授業を消すと null になり、イベントは残る。課題は `COURSE_NOTES` のままで、予定のタブが両方を並べる。`exam` が試験で、`scope`（範囲）と `bring`（持ち物）を持てる。予定のタブの「試験」で近い順に並ぶ |
 
 同期している授業（`synced`）は、授業名・先生・曜日時限・教室・隔週・授業の形を `SHARED_COURSES` から読む。単位数も共有授業から読む。色・取る学期・メモ・資料・課題・休講・欠席・欠席できる回数は本人のもの。休講は、同期しているほかの人に人数だけ見せる（[運営まわり](#運営まわり)の `CANCELLATION_HIDES`、`src/lib/server/cancellations.ts`）。

@@ -130,7 +130,9 @@
 				const off = offDay(slot.weekday) ? date : null;
 				const away = course.moves?.some((m) => m.fromDate === date) ? date : null;
 				const live = cancel === clock.date || off || away === clock.date || !meets ? null : session(slot.weekday, row, span);
-				const risk = riskOf(course, periodsOn(course.slots, slot.weekday).length);
+				// Only the periods that meet this week count toward missing the day
+				const thisWeek = course.slots.filter((s) => meetsInWeek(s.week, termStart, clock.date));
+				const risk = riskOf(course, periodsOn(thisWeek, slot.weekday).length);
 				return [{ course, slot, row, col, span, live, cancel, maybe, meets, off, away, risk }];
 			}).concat(movedHere(course))
 		)

@@ -439,9 +439,9 @@ export const courseAbsences = sqliteTable(
 			.notNull()
 			.references(() => courses.id, { onDelete: 'cascade' }),
 		date: text('date').notNull(), // YYYY-MM-DD
-		// The period missed; 0 for the whole day (rows from before periods were kept, and days
-		// the class has no slot)
-		period: integer('period').notNull().default(0),
+		// The period missed (0限 is a period); -1 for the whole day (rows from before periods
+		// were kept, and days the class has no slot). WHOLE_DAY in src/lib/courses.ts
+		period: integer('period').notNull().default(-1),
 		createdAt: createdAt()
 	},
 	(t) => [uniqueIndex('course_absences_course_date_period_idx').on(t.courseId, t.date, t.period)]

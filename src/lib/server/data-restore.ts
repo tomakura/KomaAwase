@@ -6,7 +6,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { getTableColumns } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { CALENDAR_LABEL_MAX, CALENDAR_MAX, MOVES_MAX } from '$lib/calendar';
-import { ABSENCE_LIMIT_MAX, CREDITS_MAX, PASSWORD_MAX, isCourseColor, isWeekPattern, readLink, type WeekPattern } from '$lib/courses';
+import { ABSENCE_LIMIT_MAX, CREDITS_MAX, PASSWORD_MAX, WHOLE_DAY, isCourseColor, isWeekPattern, readLink, type WeekPattern } from '$lib/courses';
 import { normalizeTitle } from '$lib/overlay';
 import { STEPS_MAX, STEP_TEXT_MAX, SUBMIT_TO_MAX, type TaskStep } from '$lib/tasks';
 import { academicYear, isDate, tokyoTime } from '$lib/time';
@@ -55,7 +55,7 @@ function absencesOf(v: unknown) {
 	const seen = new Set<string>();
 	return list(v, ABSENCES_MAX).flatMap((a) => {
 		const day = date(isObject(a) ? a.date : a);
-		const period = isObject(a) ? (int(a.period, 0, 20) ?? 0) : 0;
+		const period = isObject(a) ? (int(a.period, 0, 20) ?? WHOLE_DAY) : WHOLE_DAY;
 		if (!day || seen.has(`${day}|${period}`)) return [];
 		seen.add(`${day}|${period}`);
 		return [{ date: day, period }];

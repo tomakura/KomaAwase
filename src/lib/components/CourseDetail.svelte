@@ -16,6 +16,7 @@
 	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
+		WHOLE_DAY,
 		absenceLimitOf,
 		absenceRisk,
 		periodsOn,
@@ -25,6 +26,7 @@
 		courseHref,
 		creditsOf,
 		deliveryLabel,
+		meetsInWeek,
 		periodLabel,
 		timetableHref,
 		weekLabel
@@ -227,11 +229,17 @@
 			.map((n) => addDays(data.today, -n))
 			.find((d) => course.slots.some((s) => s.weekday === weekdayOf(d))) ?? data.today
 	);
-	// The periods of the chosen day: its slots, and a class moved to it
+	// The periods of the chosen day: its slots that meet that week (none when the class was
+	// moved away from it), and a class moved to it
 	const periodsOfDay = $derived.by(() => {
 		if (!absentDate) return [];
+		const term = data.terms.find(
+			(t) => course.termIds.includes(t.id) && (!t.startDate || t.startDate <= absentDate) && (!t.endDate || absentDate <= t.endDate)
+		);
+		const away = data.moves.some((m) => m.fromDate === absentDate);
+		const slots = away ? [] : course.slots.filter((s) => meetsInWeek(s.week, term?.startDate, absentDate));
 		const moved = data.moves.filter((m) => m.toDate === absentDate).flatMap((m) => Array.from({ length: m.span }, (_, i) => m.period + i));
-		return [...new Set([...periodsOn(course.slots, weekdayOf(absentDate)), ...moved])].sort((a, b) => a - b);
+		return [...new Set([...periodsOn(slots, weekdayOf(absentDate)), ...moved])].sort((a, b) => a - b);
 	});
 	const recorded = $derived(new Set(data.absences.filter((a) => a.date === absentDate).map((a) => a.period)));
 	function openAbsent() {
@@ -243,7 +251,7 @@
 		if (!course.onlinePassword) return;
 		toast.show((await copyText(course.onlinePassword)) === 'copied' ? 'パスワードをコピーしました' : 'コピーできませんでした');
 	}
-	const absenceLabel = (a: { date: string; period: number }) => `${withDay(a.date)}${a.period ? ` ${a.period}限` : ''}`;
+	const absenceLabel = (a: { date: string; period: number }) => `${withDay(a.date)}${a.period === WHOLE_DAY ? '' : ` ${a.period}限`}`;
 
 	function dueLabel(due: string) {
 		const days = daysBetween(data.today, due);
@@ -644,7 +652,7 @@
 							<button
 								class="btn btn-primary"
 								type="submit"
-								disabled={!absentDate || (periodsOfDay.length > 0 && !absentPeriods.length) || (!periodsOfDay.length && recorded.has(0))}
+								disabled={!absentDate || (periodsOfDay.length > 0 && !absentPeriods.length) || (!periodsOfDay.length && recorded.has(WHOLE_DAY))}
 							>
 								記録する
 							</button>

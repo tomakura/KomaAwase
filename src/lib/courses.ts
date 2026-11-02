@@ -154,6 +154,9 @@ export function absenceRisk(count: number, limit: number | null, periods: number
 	return count + Math.max(1, periods) > limit ? 'risk' : null;
 }
 
+// An absence recorded for a day, not a period (course_absences.period)
+export const WHOLE_DAY = -1;
+
 /** The periods the class meets on a weekday, in order */
 export function periodsOn(slots: { weekday: number; period: number; span: number }[], weekday: number): number[] {
 	return slots
@@ -171,7 +174,9 @@ export function readLink(value: FormDataEntryValue | null): string | null | 'inv
 	if (text.length > LINK_MAX) return 'invalid';
 	try {
 		const url = new URL(text);
-		return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : 'invalid';
+		// Checked again as saved: letters such as Japanese grow when the address is encoded
+		const ok = (url.protocol === 'https:' || url.protocol === 'http:') && url.href.length <= LINK_MAX;
+		return ok ? url.href : 'invalid';
 	} catch {
 		return 'invalid';
 	}

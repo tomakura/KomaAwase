@@ -9,6 +9,7 @@ import { addEvent, listCourseEvents, parseEvent } from '$lib/server/plans';
 import { deleteEventKept, deleteNoteKept } from '$lib/server/undo';
 import { addNote, addWeeklyTask, deleteNote, orderMemoIds, parseNote, parseRepeat, setStepDone, setTaskDone, updateNote } from '$lib/server/notes';
 import { isDate, tokyoTime } from '$lib/time';
+import { WHOLE_DAY } from '$lib/courses';
 import { sharedAccess } from '$lib/server/verify';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -129,15 +130,24 @@ export const actions: Actions = {
 		const date = String(form.get('date') ?? '') || tokyoTime(Date.now()).date;
 		if (!isDate(date) || date > tokyoTime(Date.now()).date) return fail(400, { message: '欠席した日を確認してください' });
 		const periods = [...new Set(form.getAll('period').map(Number))];
-		if (periods.length > ABSENCE_PERIODS_MAX || periods.some((p) => !Number.isInteger(p) || p < 1 || p > 20)) {
+		if (periods.length > ABSENCE_PERIODS_MAX || periods.some((p) => !Number.isInteger(p) || p < 0 || p > 20)) {
 			return fail(400, { message: '時限を確認してください' });
 		}
 		const { n } = (await event.locals.db.select({ n: count() }).from(courseAbsences).where(eq(courseAbsences.courseId, courseId)).get()) ?? { n: 0 };
 		if (n + Math.max(1, periods.length) > ABSENCES_MAX) return fail(400, { message: '欠席の記録が多すぎます。古いものを消してください' });
-		await event.locals.db
+		const insert = event.locals.db
 			.insert(courseAbsences)
-			.values((periods.length ? periods : [0]).map((period) => ({ courseId, date, period })))
+			.values((periods.length ? periods : [WHOLE_DAY]).map((period) => ({ courseId, date, period })))
 			.onConflictDoNothing();
+		// Periods of a day recorded as a whole take its place, so the day isn't counted twice
+		if (periods.length) {
+			await event.locals.db.batch([
+				event.locals.db
+					.delete(courseAbsences)
+					.where(and(eq(courseAbsences.courseId, courseId), eq(courseAbsences.date, date), eq(courseAbsences.period, WHOLE_DAY))),
+				insert
+			]);
+		} else await insert;
 		return { added: true };
 	},
 	removeAbsence: async (event) => {

@@ -179,7 +179,7 @@ export async function exportData(db: Db, user: { id: string }) {
 						credits: v.credits,
 						absenceLimit: c.absenceLimit,
 						// A day, or the day and the period missed
-						absences: by(absences, c.id).map((a) => (a.period ? { date: a.date, period: a.period } : a.date)),
+						absences: by(absences, c.id).map((a) => (a.period >= 0 ? { date: a.date, period: a.period } : a.date)),
 						attendanceUrl: c.attendanceUrl,
 						onlineUrl: c.onlineUrl,
 						onlinePassword: c.onlinePassword,
