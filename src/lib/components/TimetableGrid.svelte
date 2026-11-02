@@ -181,7 +181,6 @@
 		class:live
 		class:offweek={!meets || !!off || !!away}
 		class:dropped={risk === 'over'}
-		class:risky={risk === 'risk'}
 		title={meets ? undefined : '今週はありません'}
 		href={courseHref?.(course.id)}
 		style:--c={courseColor(course.color)}
@@ -511,31 +510,22 @@
 		opacity: 0.5;
 	}
 
-	/* Missing the next class passes the absence limit: hazard tape around the cell */
-	.course.risky::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		padding: 3px;
-		border-radius: inherit;
-		background: repeating-linear-gradient(-45deg, #1c1c1c 0 5px, #f4c20d 5px 10px);
-		mask:
-			linear-gradient(#000 0 0) content-box exclude,
-			linear-gradient(#000 0 0);
-		pointer-events: none;
-	}
-
+	/* Missing the next class passes the absence limit: a strip of hazard tape under the room,
+	   its words outlined in yellow so they read over the stripes */
 	.risk {
 		flex-shrink: 0;
-		align-self: center;
-		padding: 1px 5px;
+		align-self: stretch;
+		padding: 1px 2px;
 		border-radius: 5px;
-		background: #1c1c1c;
-		color: #f4c20d;
-		box-shadow: inset 0 0 0 1.5px #f4c20d;
+		background: repeating-linear-gradient(-45deg, #1c1c1c 0 5px, #f4c20d 5px 10px);
+		color: #1c1c1c;
 		font-size: 10px;
 		font-weight: 700;
+		line-height: 1.3;
+		text-align: center;
 		white-space: nowrap;
+		-webkit-text-stroke: 3px #f4c20d;
+		paint-order: stroke fill;
 	}
 
 	/* No room above it: at the bottom like the room would be */
@@ -553,11 +543,6 @@
 		padding: 1px 5px;
 		background: var(--ink);
 		color: var(--surface);
-		box-shadow: none;
-	}
-
-	/* Inside the tape */
-	.course.risky {
-		padding: 6px 5px;
+		-webkit-text-stroke: 0;
 	}
 </style>
