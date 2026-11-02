@@ -16,13 +16,15 @@
 		sharedChanged?: boolean;
 		// Single classes held on another day; only the owner's own timetable has them
 		moves?: ClassMove[];
+		// Absences against the limit; only the owner's own timetable has them
+		absences?: { count: number; limit: number | null };
 	};
 </script>
 
 <script lang="ts">
 	import { wrapTitle } from '$lib/wrap-title';
 	import { offOn } from '$lib/calendar';
-	import { DAY_NAMES, courseColor, meetsInWeek } from '$lib/courses';
+	import { DAY_NAMES, absenceRisk, courseColor, meetsInWeek, periodsOn } from '$lib/courses';
 	import { addDays, monthDay, toMinutes, type TokyoTime, weekdayOf } from '$lib/time';
 
 	let {
@@ -99,7 +101,12 @@
 		away?: string | null;
 		moved?: string | null;
 		moveId?: string;
+		// Past the absence limit, or about to be by missing this day
+		risk: 'over' | 'risk' | null;
 	};
+
+	const riskOf = (course: GridCourse, periods: number) =>
+		course.absences ? absenceRisk(course.absences.count, course.absences.limit, periods) : null;
 
 	const cells = $derived(
 		courses.flatMap((course) =>
@@ -123,7 +130,8 @@
 				const off = offDay(slot.weekday) ? date : null;
 				const away = course.moves?.some((m) => m.fromDate === date) ? date : null;
 				const live = cancel === clock.date || off || away === clock.date || !meets ? null : session(slot.weekday, row, span);
-				return [{ course, slot, row, col, span, live, cancel, maybe, meets, off, away }];
+				const risk = riskOf(course, periodsOn(course.slots, slot.weekday).length);
+				return [{ course, slot, row, col, span, live, cancel, maybe, meets, off, away, risk }];
 			}).concat(movedHere(course))
 		)
 	);
@@ -140,7 +148,7 @@
 			const span = Math.min(m.span, lastRow - row + 1);
 			const slot = { weekday, period: m.period, span: m.span, room: m.room };
 			const live = m.toDate === clock.date ? session(weekday, row, span) : null;
-			return [{ course, slot, row, col, span, live, cancel: null, maybe: null, meets: true, moved: m.toDate, moveId: m.id }];
+			return [{ course, slot, row, col, span, live, cancel: null, maybe: null, meets: true, moved: m.toDate, moveId: m.id, risk: riskOf(course, m.span) }];
 		});
 	}
 
@@ -165,13 +173,14 @@
 	const time = (hhmm: string) => hhmm.replace(/^0/, '');
 </script>
 
-{#snippet course({ course, slot, live, cancel, maybe, meets, off, away, moved }: Cell)}
+{#snippet course({ course, slot, live, cancel, maybe, meets, off, away, moved, risk }: Cell)}
 	{@const week = slot.week === 'odd' ? '奇' : slot.week === 'even' ? '偶' : null}
 	<svelte:element
 		this={courseHref ? 'a' : 'div'}
 		class="course"
 		class:live
 		class:offweek={!meets || !!off || !!away}
+		class:dropped={risk === 'over'}
 		title={meets ? undefined : '今週はありません'}
 		href={courseHref?.(course.id)}
 		style:--c={courseColor(course.color)}
@@ -190,6 +199,11 @@
 			<span class="room"><b class="week" aria-label="{week}数週">{week}</b>{slot.room}</span>
 		{:else if slot.room || week}
 			<span class="room">{slot.room ?? `${week}数週`}</span>
+		{/if}
+		{#if risk === 'over'}
+			<span class="risk over">上限超え</span>
+		{:else if risk}
+			<span class="risk" title="次に休むと欠席の上限を超えます"><span>落単注意</span></span>
 		{/if}
 	</svelte:element>
 {/snippet}
@@ -494,5 +508,47 @@
 
 	.course.offweek {
 		opacity: 0.5;
+	}
+
+	/* Missing the next class passes the absence limit: hazard tape under the room */
+	.risk {
+		flex-shrink: 0;
+		align-self: stretch;
+		display: flex;
+		justify-content: center;
+		padding: 2px;
+		border-radius: 5px;
+		background: repeating-linear-gradient(-45deg, #1c1c1c 0 4px, #f4c20d 4px 8px);
+	}
+
+	.risk span {
+		padding: 0 4px;
+		border-radius: 3px;
+		background: #f4c20d;
+		color: #1c1c1c;
+		font-size: 10px;
+		font-weight: 700;
+		line-height: 1.3;
+		white-space: nowrap;
+	}
+
+	/* No room above it: at the bottom like the room would be */
+	.title + .risk {
+		margin-top: auto;
+	}
+
+	/* Past the limit: the class goes dark */
+	.course.dropped {
+		filter: grayscale(0.85) brightness(0.8);
+	}
+
+	.risk.over {
+		align-self: center;
+		padding: 1px 5px;
+		background: var(--ink);
+		color: var(--surface);
+		font-size: 10px;
+		font-weight: 700;
+		white-space: nowrap;
 	}
 </style>

@@ -31,7 +31,7 @@ erDiagram
 | `TIMETABLES` | user_id, university_id, year, name, archived | 年度ごとに1つ（user_id と year で一意）。新しい年度を作ると古いものは `archived` になる。はじめの設定で作るか、年度が変わってはじめて開いたときに、大学のひな形（なければ前の年度の形を1年ずらしたもの）から作る |
 | `TERMS` | timetable_id, name, group_name, start_date, end_date, sort_order | 前期・Q1 など。`group_name` はタブの上に出すまとまり（Q1・Q2 なら前期）。本人が変えられる。変えて消えた学期の授業は、日付が重なる学期（なければ1年の中で同じ位置の学期）に移す |
 | `PERIODS` | timetable_id, number, start_time, end_time | 0限から。変えても授業の `period_number` はそのまま残す |
-| `COURSES` | timetable_id, shared_course_id, sync_mode, title, color, delivery, intensive_from, intensive_to, credits, absence_limit, shared_seen_at | `credits` は単位数（0.5きざみ）で、同期中は共有授業の値を読む。`absence_limit` は欠席できる回数で、本人のもの。どちらも空なら、大学の決まり（`src/lib/courses.ts` の `creditsOf`・`absenceLimitOf`）があればその値を使う。`sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ）。`delivery` は枠のない授業の形（`ondemand` か `intensive`）で、集中講義は期間も持てる。`shared_course_id` は外部キーにしていない（あとから足すとテーブルを作り直すことになるうえ、共有授業は消さないので） |
+| `COURSES` | timetable_id, shared_course_id, sync_mode, title, color, delivery, intensive_from, intensive_to, credits, absence_limit, attendance_url, online_url, online_password, shared_seen_at | `credits` は単位数（0.5きざみ）で、同期中は共有授業の値を読む。`absence_limit` は欠席できる回数で、本人のもの。`attendance_url`（スマホ出席のリンク。入れた授業は始まるときに通知する）と `online_url`・`online_password` も本人のもの。どちらも空なら、大学の決まり（`src/lib/courses.ts` の `creditsOf`・`absenceLimitOf`）があればその値を使う。`sync_mode` は `synced`（みんなと同期）か `personal`（自分だけ）。`delivery` は枠のない授業の形（`ondemand` か `intensive`）で、集中講義は期間も持てる。`shared_course_id` は外部キーにしていない（あとから足すとテーブルを作り直すことになるうえ、共有授業は消さないので） |
 | `COURSE_TERMS` | course_id, term_id | 授業と学期は多対多。「Q1とQ2」「通年」を表せる |
 | `COURSE_SLOTS` | course_id, weekday, period_number, span, week_pattern, room | 週2回なら2行。`span` は連続コマ数、`week_pattern` は毎週（`every`）・奇数週（`odd`）・偶数週（`even`）。週は学期の始まる週を1週目として数える。**教室は枠ごと**。枠が0行の授業はオンデマンド・集中講義 |
 | `COURSE_TEACHERS` | course_id, name, sort_order | 先生は何人でも |
@@ -39,7 +39,7 @@ erDiagram
 | `COURSE_FILES` | course_id, storage_key, name, mime, size | 資料。実体はシンレンタルサーバー（`relay/files.php`）に `storage_key` の名前で置く。本人しか見られない |
 | `COURSE_MOVES` | course_id, from_date, to_date, period, span, room | 授業ごとの振替。`from_date` はその授業がない日（休講と同じ扱い）、`to_date` の `period` から `span` コマに1回だけある。本人のもので、友だちや画像の書き出しには出さない |
 | `CALENDAR_ENTRIES` | timetable_id, kind, label, start_date, end_date | 時間割の日程。`kind` は `off`（休みの日。授業を出さず、授業前の通知も送らない）か `exam`（試験期間。印を出すだけ）。1行で数日をまとめられる。祝日は `src/lib/holidays.ts` で計算して入れる（外のサービスには取りに行かない）。大学の日程は `universities.calendar_preset` から、使う人が選んだときだけ写す |
-| `COURSE_ABSENCES` | course_id, date | 欠席した日。1つの授業で1日1行（course_id と date で一意）。本人のもので、共有しない |
+| `COURSE_ABSENCES` | course_id, date, period | 休んだコマ。1コマ1行で、1行が欠席1回（course_id・date・period で一意）。`period` が 0 の行は日付だけの記録（0033 より前のものと、授業のない日）。本人のもので、共有しない |
 | `EVENTS` | user_id, title, date, start_time, end_time, place, memo, course_id, exam, scope, bring | 予定のイベント。`start_time` が null なら終日。`course_id` は授業のイベント（試験など）で、授業を消すと null になり、イベントは残る。課題は `COURSE_NOTES` のままで、予定のタブが両方を並べる。`exam` が試験で、`scope`（範囲）と `bring`（持ち物）を持てる。予定のタブの「試験」で近い順に並ぶ |
 
 同期している授業（`synced`）は、授業名・先生・曜日時限・教室・隔週・授業の形を `SHARED_COURSES` から読む。単位数も共有授業から読む。色・取る学期・メモ・資料・課題・休講・欠席・欠席できる回数は本人のもの。休講は、同期しているほかの人に人数だけ見せる（[運営まわり](#運営まわり)の `CANCELLATION_HIDES`、`src/lib/server/cancellations.ts`）。

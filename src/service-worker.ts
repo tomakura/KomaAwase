@@ -297,7 +297,7 @@ sw.addEventListener('fetch', (event) => {
 // Notifications (see src/lib/server/push.ts): the message says what to show and which page
 // to open. Opening focuses a window of the app that is already there when it can.
 sw.addEventListener('push', (event) => {
-	let message: { title?: string; body?: string; url?: string; tag?: string; badge?: number } = {};
+	let message: { title?: string; body?: string; url?: string; open?: string; tag?: string; badge?: number } = {};
 	try {
 		message = event.data?.json() ?? {};
 	} catch {
@@ -310,7 +310,7 @@ sw.addEventListener('push', (event) => {
 			body: message.body,
 			tag: message.tag,
 			icon: '/icons/icon-192.png',
-			data: { url: message.url ?? '/' },
+			data: { url: message.url ?? '/', open: message.open },
 			lang: 'ja'
 		})])
 	);
@@ -318,6 +318,12 @@ sw.addEventListener('push', (event) => {
 
 sw.addEventListener('notificationclick', (event) => {
 	event.notification.close();
+	// A link the person saved for attending a class (http or https only) opens as it is
+	const open = linkOf(event.notification.data?.open);
+	if (open) {
+		event.waitUntil(sw.clients.openWindow(open));
+		return;
+	}
 	// Only pages of this app, judged after the address is read (\ counts as / there)
 	let url = new URL('/', sw.location.origin).href;
 	try {
@@ -339,3 +345,13 @@ sw.addEventListener('notificationclick', (event) => {
 		})
 	);
 });
+
+function linkOf(value: unknown) {
+	if (typeof value !== 'string') return null;
+	try {
+		const url = new URL(value);
+		return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+	} catch {
+		return null;
+	}
+}

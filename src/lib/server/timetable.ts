@@ -1,12 +1,13 @@
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, desc, eq, inArray, lt, sql, type SQLWrapper } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lt, sql, type SQLWrapper } from 'drizzle-orm';
 import { MAYBE_MIN } from '$lib/cancellations';
 import { DEFAULT_PERIODS, termTemplate, type PeriodInput, type TermInput } from '$lib/presets';
 import { remapTerm } from '$lib/terms';
 import { academicYear, isDate, tokyoTime } from '$lib/time';
+import { absenceLimitOf } from '$lib/courses';
 import type { KnownTimetable } from './auth/session';
 import type { Db } from './db';
-import { courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
+import { courseAbsences, courseSlots, courseTerms, courses, periods, terms, timetables } from './db/schema';
 import { sharedCancellations } from './cancellations';
 import { calendarQuery, upcomingMoves } from './calendar';
 import { upcomingCancellations } from './notes';
@@ -250,7 +251,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 		.select({ id: courses.sharedCourseId })
 		.from(courses)
 		.where(and(eq(courses.timetableId, timetableId), eq(courses.syncMode, 'synced')));
-	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows, calendarRows, moveRows, sharedRows, sharedSlots, sharedTeachers] = await db.batch([
+	const [termRows, periodRows, courseRows, termLinks, slotRows, cancelRows, calendarRows, moveRows, absenceRows, [owner], sharedRows, sharedSlots, sharedTeachers] = await db.batch([
 		termsQuery(db, timetableId),
 		periodsQuery(db, timetableId),
 		db
@@ -262,6 +263,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 				intensiveFrom: courses.intensiveFrom,
 				intensiveTo: courses.intensiveTo,
 				credits: courses.credits,
+				absenceLimit: courses.absenceLimit,
 				syncMode: courses.syncMode,
 				sharedCourseId: courses.sharedCourseId,
 				// Someone else changed the shared course since its owner last looked (only for them).
@@ -291,8 +293,18 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 		upcomingCancellations(db, timetableId, today),
 		calendarQuery(db, timetableId, today),
 		upcomingMoves(db, timetableId, today),
+		// Absences are private: only when the owner is the one looking
+		db
+			.select({ courseId: courseAbsences.courseId, n: count() })
+			.from(courseAbsences)
+			.innerJoin(courses, eq(courseAbsences.courseId, courses.id))
+			.innerJoin(timetables, eq(courses.timetableId, timetables.id))
+			.where(and(eq(courses.timetableId, timetableId), eq(timetables.userId, viewerId ?? '')))
+			.groupBy(courseAbsences.courseId),
+		db.select({ userId: timetables.userId, universityId: timetables.universityId }).from(timetables).where(eq(timetables.id, timetableId)),
 		...sharedCourseQueries(db, syncedIds)
 	]);
+	const own = !!viewerId && owner?.userId === viewerId;
 	const shared = sharedCoursesFrom(sharedRows, sharedSlots, sharedTeachers);
 	const votes = viewerId
 		? await sharedCancellations(
@@ -308,7 +320,7 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 		periods: periodRows,
 		// Days off and exam periods from today on
 		calendar: calendarRows,
-		courses: courseRows.map(({ syncMode, sharedCourseId, ...c }) => {
+		courses: courseRows.map(({ syncMode, sharedCourseId, absenceLimit, ...c }) => {
 			const synced = syncMode === 'synced' && sharedCourseId ? shared.get(sharedCourseId) : undefined;
 			const values = synced
 				? synced.values
@@ -325,6 +337,12 @@ export async function loadTimetable(db: Db, timetableId: string, today: string, 
 				termIds: termLinks.filter((l) => l.courseId === c.id).map((l) => l.termId),
 				cancels: cancelRows.flatMap((r) => (r.courseId === c.id && r.date ? [r.date] : [])),
 				sharedChanged: !!synced && !!c.changed,
+				absences: own
+					? {
+							count: absenceRows.find((a) => a.courseId === c.id)?.n ?? 0,
+							limit: absenceLimitOf({ credits: values.credits, absenceLimit, slots: values.slots }, owner?.universityId)
+						}
+					: undefined,
 				moves: moveRows.filter((m) => m.courseId === c.id).map(({ courseId: _, ...m }) => m),
 				// Not the ones this person already marked themselves
 				maybeCancels: votes

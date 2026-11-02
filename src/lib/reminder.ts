@@ -49,3 +49,14 @@ export function reminderMessage(c: ClassStart) {
 		tag: `class-${c.slotId}-${c.date}-${c.lead}${c.part > 1 ? `-${c.part}` : ''}`
 	};
 }
+
+/** At the start of a class with a link for attending on a phone: the tap opens the link */
+export function attendanceMessage(c: ClassStart & { attendanceUrl: string }) {
+	return {
+		...reminderMessage({ ...c, lead: 0, part: 1 }),
+		body: 'タップしてスマホ出席',
+		// Opened as it is (see the service worker); `url` stays the course, for older ones
+		open: c.attendanceUrl,
+		tag: `attend-${c.slotId}-${c.date}`
+	};
+}
