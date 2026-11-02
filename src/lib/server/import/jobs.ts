@@ -145,7 +145,13 @@ export async function processImportJob(env: Env, db: Db, jobId: string): Promise
 	const job = await db
 		.update(importJobs)
 		.set({ status: 'processing' })
-		.where(and(eq(importJobs.id, jobId), inArray(importJobs.status, ['queued', 'retry'])))
+		.where(
+			and(
+				eq(importJobs.id, jobId),
+				// A job put off is read only once its time has come, whatever message turns up
+				or(eq(importJobs.status, 'queued'), and(eq(importJobs.status, 'retry'), or(isNull(importJobs.retryAt), lte(importJobs.retryAt, new Date()))))
+			)
+		)
 		.returning()
 		.get();
 	if (!job) {
@@ -321,4 +327,19 @@ export async function dailySweep(env: Env, db: Db) {
 		.returning({ id: importJobs.id });
 	for (const job of due) await enqueue(env, undefined, db, job.id, false);
 	return due.length;
+}
+
+/**
+ * Every hour: a job still waiting after an hour gets its queue message again, so one whose
+ * message was lost doesn't wait for the next morning's sweep (and /status doesn't show the
+ * screenshots as stopped all that time). Only waiting ones, and their state stays as it is: a
+ * second message for a job that still has one is read once (processImportJob claims it).
+ */
+export async function requeueStuck(env: Env, db: Db, now = Date.now()) {
+	const stuck = await db
+		.select({ id: importJobs.id })
+		.from(importJobs)
+		.where(and(eq(importJobs.status, 'queued'), lt(importJobs.createdAt, new Date(now - 60 * 60 * 1000))));
+	for (const job of stuck) await enqueue(env, undefined, db, job.id, false);
+	return stuck.length;
 }

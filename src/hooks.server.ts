@@ -61,6 +61,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.platform!.ctx.waitUntil(forget().catch((e) => console.error('clock forget failed', e)));
 	}
 	// Counted for 運営 → 数字 and /status, never with who or which page
-	if (response.status >= 500 && event.platform) event.platform.ctx.waitUntil(countMetric(d1, METRICS.serverErrors));
+	// Not the status checks' own 503s: they would keep the count up by themselves
+	const statusCheck = event.url.pathname.startsWith('/api/status/');
+	if (response.status >= 500 && !statusCheck && event.platform) event.platform.ctx.waitUntil(countMetric(d1, METRICS.serverErrors));
 	return secured(response);
 };
