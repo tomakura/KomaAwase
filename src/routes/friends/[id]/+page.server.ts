@@ -57,6 +57,8 @@ export const actions: Actions = {
 	},
 	block: async ({ locals, params, url }) => {
 		const me = requireUser(locals, url);
+		// Only someone who is there
+		if (!(await loadPeople(locals.db, [params.id])).length) error(404, 'Not found');
 		await block(locals.db, me.id, params.id);
 		redirect(303, '/friends');
 	},

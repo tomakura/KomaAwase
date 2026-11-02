@@ -66,6 +66,11 @@ export const actions: Actions = {
 		if (!asked && !(await useInvite(locals.db, group.id, group.inviteCode))) {
 			return fail(400, { message: INVITE_CLOSED[inviteClosed(group) ?? 'used'] });
 		}
+		// Joining straight in from a request left from when the group needed approval: the use it
+		// took still counts, but not once the invite is past its date
+		if (asked && !group.approval && inviteClosed(group) === 'expired') {
+			return fail(400, { message: INVITE_CLOSED.expired });
+		}
 		if (group.approval) {
 			await requestToJoin(locals.db, group.id, me.id, share);
 			if (!asked) {

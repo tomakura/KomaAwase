@@ -3,12 +3,14 @@ import { verifyRegistrationResponse, type RegistrationResponseJSON } from '@simp
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { passkeyName } from '$lib/server/auth/passkey-name';
 import { passkeys } from '$lib/server/db/schema';
+import { PASSKEY_REAUTH_MESSAGE, PASSKEY_VERIFY_WINDOW, signedInWithin } from '$lib/server/auth/reauth';
 import { relyingParty, takeChallenge } from '$lib/server/auth/webauthn';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals, cookies, url, request }) => {
 	const user = locals.user;
 	if (!user) error(401);
+	if (!signedInWithin(locals, PASSKEY_VERIFY_WINDOW)) error(403, PASSKEY_REAUTH_MESSAGE);
 
 	const challenge = await takeChallenge(locals.db, cookies);
 	if (!challenge || challenge.userId !== user.id) error(400, 'もう一度やり直してください');

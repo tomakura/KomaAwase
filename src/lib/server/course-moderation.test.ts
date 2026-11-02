@@ -1,7 +1,7 @@
 // The admin taking down an improper shared course, seeing who made it, and the reports
 import { describe, expect, it } from 'vitest';
 import { cancelMarkers } from './cancellations';
-import { saveReport } from './reports';
+import { REPORTS_A_DAY, saveReport } from './reports';
 import {
 	adminSearchShared,
 	loadEdits,
@@ -110,6 +110,23 @@ describe('saveReport', () => {
 		expect(await saveReport(t.db, 'u2', 'shared_course', id, form())).toBeNull();
 		expect(await saveReport(t.db, 'u2', 'shared_course', id, form())).toMatch(/すでに/);
 		expect(await saveReport(t.db, 'u3', 'shared_course', id, form())).toBeNull();
+	});
+
+	it('refuses a target that is not there, oneself, and more than a day allows', async () => {
+		const { t } = await world();
+		const form = () => {
+			const f = new FormData();
+			f.set('reason', 'その他');
+			return f;
+		};
+		expect(await saveReport(t.db, 'u2', 'user', 'nobody', form())).toMatch(/見つかりません/);
+		expect(await saveReport(t.db, 'u2', 'group', 'nothing', form())).toMatch(/見つかりません/);
+		expect(await saveReport(t.db, 'u2', 'user', 'u2', form())).toMatch(/自分/);
+		for (let i = 0; i < REPORTS_A_DAY; i++) {
+			t.run(`INSERT INTO reports (id, reporter_id, target_type, target_id, reason) VALUES (?, 'u2', 'user', ?, 'その他')`, `report-${i}`, `x${i}`);
+		}
+		expect(await saveReport(t.db, 'u2', 'user', 'u3', form())).toMatch(/これ以上/);
+		expect(await saveReport(t.db, 'u3', 'user', 'u2', form())).toBeNull();
 	});
 });
 
