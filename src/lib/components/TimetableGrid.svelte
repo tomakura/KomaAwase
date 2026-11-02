@@ -201,7 +201,7 @@
 			<span class="room">{slot.room ?? `${week}数週`}</span>
 		{/if}
 		{#if risk === 'over'}
-			<span class="risk over">上限超え</span>
+			<span class="risk over" title="欠席の上限を超えています">落単</span>
 		{:else if risk}
 			<span class="risk" title="次に休むと欠席の上限を超えます">落単注意</span>
 		{/if}
