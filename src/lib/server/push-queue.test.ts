@@ -10,13 +10,21 @@ const item = (n: number, expires = 1_000): PushItem => ({
 	expires
 });
 
-// A database that only records what was removed, and a queue that records what was sent
-function setup() {
+// A database that only records what was removed and knows which phones are still signed up
+// (all of them unless told), and a queue that records what was sent
+function setup(subscribed?: string[]) {
 	const removed: unknown[][] = [];
 	const queued: { part: PushPart; delay?: number }[] = [];
 	const env: PushEnv = {
 		DB: {
-			prepare: (sql) => ({ bind: (...ids) => ({ all: async () => ({ results: [] }), run: async () => sql.startsWith('DELETE') && removed.push(ids) }) })
+			prepare: (sql) => ({
+				bind: (...ids) => ({
+					all: async <T>() => ({
+						results: (sql.startsWith('SELECT') ? ids.filter((id) => !subscribed || subscribed.includes(String(id))).map((id) => ({ id })) : []) as T[]
+					}),
+					run: async () => sql.startsWith('DELETE') && removed.push(ids)
+				})
+			})
 		},
 		VAPID_PUBLIC_KEY: 'pub',
 		VAPID_PRIVATE_KEY: 'priv',
@@ -65,6 +73,21 @@ describe('sendPart', () => {
 		const sent: string[] = [];
 		const n = await sendPart(env, { items: [item(1, 500), item(2, 2_000)], attempt: 1 }, 1_000, async (s) => (sent.push(s.endpoint), 'sent'));
 		expect([n, sent]).toEqual([1, ['https://push.example.test/2']]);
+	});
+
+	it('sends nothing to a phone that stopped notifications while it waited', async () => {
+		const { env } = setup(['d2']);
+		const sent: string[] = [];
+		const n = await sendPart(env, { items: [item(1), item(2)], attempt: 1 }, 0, async (s) => (sent.push(s.endpoint), 'sent'));
+		expect([n, sent]).toEqual([1, ['https://push.example.test/2']]);
+	});
+
+	it('sends nothing when the phones cannot be checked, and tries again later', async () => {
+		const { env, queued } = setup();
+		env.DB = { prepare: () => ({ bind: () => ({ all: async () => Promise.reject(new Error('down')), run: async () => undefined }) }) };
+		const sent: string[] = [];
+		const n = await sendPart(env, { items: [item(1)], attempt: 1 }, 0, async (s) => (sent.push(s.endpoint), 'sent'));
+		expect([n, sent, queued.map((q) => q.part.attempt)]).toEqual([0, [], [2]]);
 	});
 
 	it('tries a failed phone three times in all', async () => {

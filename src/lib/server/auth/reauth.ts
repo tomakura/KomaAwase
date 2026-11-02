@@ -4,9 +4,10 @@ import { sessions } from '$lib/server/db/schema';
 
 const MINUTE = 60 * 1000;
 
-// What asks to sign in again first: leaving the app, and the admin pages
+// What asks to sign in again first: leaving the app, adding a passkey, and the admin pages
 export const REAUTH = {
 	delete: { lead: '本人確認のため、もう一度ログインしてください。', back: '/more/account' },
+	passkey: { lead: 'パスキーを追加する前に、もう一度ログインしてください。', back: '/more/passkeys' },
 	admin: { lead: '運営の画面を開く前に、もう一度ログインしてください。', back: '/more' }
 } as const;
 export type Reauth = keyof typeof REAUTH;
@@ -20,6 +21,15 @@ export function signedInWithin(locals: App.Locals, ms: number, now = Date.now())
 	const at = locals.session?.authedAt;
 	return !!at && now - at.getTime() < ms;
 }
+
+/**
+ * Adding a passkey: only within this long of signing in (on はじめの設定, that is right after
+ * signing up), so a session taken from someone can't add a way in of its own that outlasts it.
+ */
+export const PASSKEY_ADD_WINDOW = 10 * MINUTE;
+// The passkey prompt itself can take a while, so the second half allows a little more
+export const PASSKEY_VERIFY_WINDOW = 15 * MINUTE;
+export const PASSKEY_REAUTH_MESSAGE = 'パスキーを追加するには、もう一度ログインしてください';
 
 // A form post comes back to the page, not to the action
 const here = (url: URL) => (url.search.startsWith('?/') ? url.pathname : url.pathname + url.search);

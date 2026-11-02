@@ -1,5 +1,5 @@
 import { error, json } from '@sveltejs/kit';
-import { and, count, eq, ne } from 'drizzle-orm';
+import { and, count, eq, ne, sql } from 'drizzle-orm';
 import { pushSubscriptions } from '$lib/server/db/schema';
 import { pushEnabled } from '$lib/server/notify';
 import { isPushEndpoint } from '$lib/server/push';
@@ -30,12 +30,22 @@ export const POST: RequestHandler = async ({ locals, request, url, platform }) =
 	if ((mine?.n ?? 0) >= DEVICES_MAX) {
 		return json({ message: `通知を受け取れる端末は${DEVICES_MAX}台までです。使っていない端末で通知をオフにしてください` }, { status: 400 });
 	}
-	// The same browser signing in as someone else moves over to them. It stays with this
-	// session, so logging this device out stops it.
+	// The same browser signing in as someone else moves over to them, under a new id so that
+	// notifications queued for the one before (src/lib/server/push-queue.ts) don't reach it. It
+	// stays with this session, so logging this device out stops it.
 	const sessionId = locals.session?.id ?? null;
 	await locals.db
 		.insert(pushSubscriptions)
 		.values({ userId: locals.user.id, endpoint, p256dh, auth, sessionId })
-		.onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { userId: locals.user.id, p256dh, auth, sessionId } });
+		.onConflictDoUpdate({
+			target: pushSubscriptions.endpoint,
+			set: {
+				id: sql`case when ${pushSubscriptions.userId} = excluded.user_id then ${pushSubscriptions.id} else excluded.id end`,
+				userId: locals.user.id,
+				p256dh,
+				auth,
+				sessionId
+			}
+		});
 	return json({ ok: true });
 };

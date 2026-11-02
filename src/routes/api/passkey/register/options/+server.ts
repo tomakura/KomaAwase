@@ -2,12 +2,14 @@ import { error, json } from '@sveltejs/kit';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import { eq } from 'drizzle-orm';
 import { passkeys } from '$lib/server/db/schema';
+import { PASSKEY_ADD_WINDOW, PASSKEY_REAUTH_MESSAGE, signedInWithin } from '$lib/server/auth/reauth';
 import { RP_NAME, relyingParty, saveChallenge } from '$lib/server/auth/webauthn';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ locals, cookies, url }) => {
 	const user = locals.user;
 	if (!user) error(401);
+	if (!signedInWithin(locals, PASSKEY_ADD_WINDOW)) error(403, PASSKEY_REAUTH_MESSAGE);
 
 	const existing = await locals.db
 		.select({ id: passkeys.id, transports: passkeys.transports })

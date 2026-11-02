@@ -3,7 +3,7 @@
 	import { slide } from 'svelte/transition';
 	import { motion } from '$lib/motion';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import Sheet from '$lib/components/Sheet.svelte';
@@ -20,6 +20,12 @@
 
 	async function add() {
 		busy = true;
+		// Whether it asks to sign in again is read anew, since the page may have stayed open a while
+		await invalidateAll();
+		if (data.reauth) {
+			busy = false;
+			return goto(data.reauth);
+		}
 		message = null;
 		const result = await registerPasskey();
 		if (result.ok) await invalidateAll();

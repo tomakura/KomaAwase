@@ -7,6 +7,7 @@
 export type Release = { pr: number; date: string; items: string[] };
 
 export const RELEASES: Release[] = [
+	{ pr: 85, date: '2026-11-02', items: ['パスキーの追加の前に、もう一度ログインする形に変更', '安全性を改善'] },
 	{ pr: 84, date: '2026-11-02', items: ['スクリーンショットの読み取りが、翌朝まで止まったままになる不具合を修正'] },
 	{ pr: 80, date: '2026-10-23', items: ['使えなくなった招待リンクなどで、名前が表示される不具合を修正'] },
 	{ pr: 79, date: '2026-10-23', items: ['友だちリンクやグループの招待をSNSで送ったときの表示を改善'] },

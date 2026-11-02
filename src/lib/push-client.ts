@@ -26,11 +26,26 @@ export async function pushState(waitMs?: number): Promise<PushState> {
 		return isIos() && !isStandalone() ? 'install' : 'unsupported';
 	}
 	if (Notification.permission === 'denied') return 'denied';
+	let sub: PushSubscription | null;
 	try {
-		return (await subscription(waitMs)) ? 'on' : 'off';
+		sub = await subscription(waitMs);
 	} catch {
 		return 'unsupported';
 	}
+	if (!sub) return 'off';
+	// The browser may still hold one the server has let go (this device was logged out, or its
+	// sign-in ran out): that is off until turned on again. Unknown (offline) counts as on.
+	try {
+		const res = await fetch('/api/push/check', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ endpoint: sub.endpoint })
+		});
+		if (res.ok && !((await res.json()) as { registered: boolean }).registered) return 'off';
+	} catch {
+		// As below
+	}
+	return 'on';
 }
 
 function keyBytes(key: string) {

@@ -121,10 +121,36 @@ export async function deliver(env: PushEnv, all: PushItem[], send: typeof sendPu
 	return { sent: first.length, queued };
 }
 
-/** One part from the queue: sent unless it is out of date, its failures queued again a few times */
+/**
+ * The phones still signed up for notifications: one turned off, logged out, or moved to someone
+ * else (it gets a new id then) while its part waited in the queue gets nothing. Throws when that
+ * can't be read.
+ */
+async function stillSubscribed(env: PushEnv, items: PushItem[]) {
+	if (!items.length) return items;
+	const { results } = await env.DB.prepare(`SELECT id FROM push_subscriptions WHERE id IN (${items.map(() => '?').join(', ')})`)
+		.bind(...items.map((item) => item.deviceId))
+		.all<{ id: string }>();
+	const kept = new Set(results.map((r) => r.id));
+	return items.filter((item) => kept.has(item.deviceId));
+}
+
+/**
+ * One part from the queue: sent unless it is out of date or the phone has stopped notifications
+ * since, its failures queued again a few times
+ */
 export async function sendPart(env: PushEnv, part: PushPart, now = Date.now(), send: typeof sendPush = sendPush) {
 	if (!Array.isArray(part?.items)) return 0;
-	const items = part.items.slice(0, SENDS_MAX).filter((item) => now <= item.expires);
+	const fresh = part.items.slice(0, SENDS_MAX).filter((item) => now <= item.expires);
+	let items: PushItem[];
+	try {
+		items = await stillSubscribed(env, fresh);
+	} catch (e) {
+		// Not sent without knowing: tried again a little later, like a failed send
+		console.error('push: checking the phones failed', e);
+		if (part.attempt < ATTEMPTS_MAX) await enqueue(env, fresh, part.attempt + 1, RETRY_SECONDS);
+		return 0;
+	}
 	const failed = await sendNow(env, items, send);
 	if (failed.length && part.attempt < ATTEMPTS_MAX) await enqueue(env, failed, part.attempt + 1, RETRY_SECONDS);
 	else if (failed.length) console.warn(`push: gave up on ${failed.length}`);

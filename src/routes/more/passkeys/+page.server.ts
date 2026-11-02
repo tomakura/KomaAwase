@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { and, count, desc, eq, gt, ne } from 'drizzle-orm';
+import { PASSKEY_ADD_WINDOW, reauthHref, signedInWithin } from '$lib/server/auth/reauth';
 import { endOtherSessions } from '$lib/server/auth/session';
 import { passkeys, sessions } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
@@ -19,7 +20,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(passkeys)
 		.where(eq(passkeys.userId, locals.user.id))
 		.orderBy(desc(passkeys.createdAt));
-	return { passkeys: rows };
+	// Adding one asks to sign in again first, unless that was just now
+	const reauth = signedInWithin(locals, PASSKEY_ADD_WINDOW) ? null : reauthHref('passkey', '/more/passkeys');
+	return { passkeys: rows, reauth };
 };
 
 export const actions: Actions = {
