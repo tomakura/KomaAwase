@@ -125,7 +125,7 @@ describe('saveReport', () => {
 		for (let i = 0; i < REPORTS_A_DAY; i++) {
 			t.run(`INSERT INTO reports (id, reporter_id, target_type, target_id, reason) VALUES (?, 'u2', 'user', ?, 'その他')`, `report-${i}`, `x${i}`);
 		}
-		expect(await saveReport(t.db, 'u2', 'user', 'u3', form())).toMatch(/これ以上/);
+		expect(await saveReport(t.db, 'u2', 'user', 'u3', form())).toMatch(/多すぎ/);
 		expect(await saveReport(t.db, 'u3', 'user', 'u2', form())).toBeNull();
 	});
 });

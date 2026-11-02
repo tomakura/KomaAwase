@@ -82,6 +82,14 @@ describe('sendPart', () => {
 		expect([n, sent]).toEqual([1, ['https://push.example.test/2']]);
 	});
 
+	it('sends nothing when the phones cannot be checked, and tries again later', async () => {
+		const { env, queued } = setup();
+		env.DB = { prepare: () => ({ bind: () => ({ all: async () => Promise.reject(new Error('down')), run: async () => undefined }) }) };
+		const sent: string[] = [];
+		const n = await sendPart(env, { items: [item(1)], attempt: 1 }, 0, async (s) => (sent.push(s.endpoint), 'sent'));
+		expect([n, sent, queued.map((q) => q.part.attempt)]).toEqual([0, [], [2]]);
+	});
+
 	it('tries a failed phone three times in all', async () => {
 		const { env, queued } = setup();
 		const fail = async () => 'failed' as const;

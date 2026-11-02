@@ -50,7 +50,7 @@ export async function saveReport(db: Db, reporterId: string, targetType: ReportT
 			.where(and(eq(reports.reporterId, reporterId), gt(reports.createdAt, new Date(Date.now() - DAY))))
 	]);
 	if (!exists) return '報告する相手が見つかりません';
-	if (sent.n >= REPORTS_A_DAY) return '今日はこれ以上報告できません。明日また送ってください';
+	if (sent.n >= REPORTS_A_DAY) return '報告が多すぎます。しばらくしてから、もう一度送ってください';
 	await db.insert(reports).values({ reporterId, targetType, targetId, reason, detail: detail || null });
 	return null;
 }

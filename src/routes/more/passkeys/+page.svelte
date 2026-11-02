@@ -19,8 +19,13 @@
 	let askOthers = $state(false);
 
 	async function add() {
-		if (data.reauth) return goto(data.reauth);
 		busy = true;
+		// Whether it asks to sign in again is read anew, since the page may have stayed open a while
+		await invalidateAll();
+		if (data.reauth) {
+			busy = false;
+			return goto(data.reauth);
+		}
 		message = null;
 		const result = await registerPasskey();
 		if (result.ok) await invalidateAll();
