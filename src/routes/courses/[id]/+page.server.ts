@@ -147,7 +147,16 @@ export const actions: Actions = {
 					.where(and(eq(courseAbsences.courseId, courseId), eq(courseAbsences.date, date), eq(courseAbsences.period, WHOLE_DAY))),
 				insert
 			]);
-		} else await insert;
+		} else {
+			// A day with periods recorded is already counted
+			const had = await event.locals.db
+				.select({ id: courseAbsences.id })
+				.from(courseAbsences)
+				.where(and(eq(courseAbsences.courseId, courseId), eq(courseAbsences.date, date)))
+				.get();
+			if (had) return fail(400, { message: 'この日はもう記録しています' });
+			await insert;
+		}
 		return { added: true };
 	},
 	removeAbsence: async (event) => {

@@ -50,16 +50,19 @@ const linkOf = (v: unknown) => {
 	const link = typeof v === 'string' ? readLink(v) : null;
 	return link === 'invalid' ? null : link;
 };
-// Days ("2026-04-13", from before periods were kept) or { date, period }, each once
+// Days ("2026-04-13", from before periods were kept) or { date, period }, each once. A day
+// with periods drops its whole-day entry, so it isn't counted twice
 function absencesOf(v: unknown) {
 	const seen = new Set<string>();
-	return list(v, ABSENCES_MAX).flatMap((a) => {
+	const read = list(v, ABSENCES_MAX).flatMap((a) => {
 		const day = date(isObject(a) ? a.date : a);
 		const period = isObject(a) ? (int(a.period, 0, 20) ?? WHOLE_DAY) : WHOLE_DAY;
 		if (!day || seen.has(`${day}|${period}`)) return [];
 		seen.add(`${day}|${period}`);
 		return [{ date: day, period }];
 	});
+	const withPeriods = new Set(read.filter((a) => a.period !== WHOLE_DAY).map((a) => a.date));
+	return read.filter((a) => a.period !== WHOLE_DAY || !withPeriods.has(a.date));
 }
 
 export type BackupFile = { name: string; mime: string; size: number; path: string | null };
