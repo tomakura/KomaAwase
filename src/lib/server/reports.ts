@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, gt } from 'drizzle-orm';
 import type { Db } from './db';
-import { reports } from './db/schema';
+import { groups, reports, sharedCourses, users } from './db/schema';
 
 export const REPORT_REASONS = {
 	user: ['なりすまし', '迷惑な申請', 'いやがらせ', 'その他'],
@@ -11,6 +11,15 @@ export const REPORT_REASONS = {
 export type ReportTarget = keyof typeof REPORT_REASONS;
 
 const DETAIL_MAX = 500;
+// Reports one person can send in a day, so made-up targets can't fill the admin's list
+export const REPORTS_A_DAY = 20;
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Whether what is reported is there at all */
+async function targetExists(db: Db, targetType: ReportTarget, targetId: string) {
+	const table = targetType === 'user' ? users : targetType === 'group' ? groups : sharedCourses;
+	return !!(await db.select({ id: table.id }).from(table).where(eq(table.id, targetId)).get());
+}
 
 /** Saves a report, or returns the message to show. */
 export async function saveReport(db: Db, reporterId: string, targetType: ReportTarget, targetId: string, form: FormData) {
@@ -32,6 +41,16 @@ export async function saveReport(db: Db, reporterId: string, targetType: ReportT
 		)
 		.get();
 	if (open) return 'すでに報告を受け取っています。運営が確認するまでお待ちください';
+	if (targetType === 'user' && targetId === reporterId) return '自分は報告できません';
+	const [exists, [sent]] = await Promise.all([
+		targetExists(db, targetType, targetId),
+		db
+			.select({ n: count() })
+			.from(reports)
+			.where(and(eq(reports.reporterId, reporterId), gt(reports.createdAt, new Date(Date.now() - DAY))))
+	]);
+	if (!exists) return '報告する相手が見つかりません';
+	if (sent.n >= REPORTS_A_DAY) return '報告が多すぎます。しばらくしてから、もう一度送ってください';
 	await db.insert(reports).values({ reporterId, targetType, targetId, reason, detail: detail || null });
 	return null;
 }
