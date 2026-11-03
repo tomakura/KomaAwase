@@ -217,7 +217,11 @@
 	const absenceLimit = $derived(absenceLimitOf(course, data.timetable.universityId));
 	const absenceLeft = $derived(absenceLimit ? absenceLimit - data.absences.length : null);
 	// Missing the next day the class meets would pass the limit
-	const absenceNext = $derived(absenceRisk(data.absences.length, absenceLimit, periodsAt(nextClassDay).length));
+	// (the next day it meets, by week pattern and moves; three weeks covers every other week)
+	const absenceNext = $derived.by(() => {
+		const day = Array.from({ length: 21 }, (_, n) => addDays(data.today, n)).find((d) => periodsAt(d).length);
+		return absenceRisk(data.absences.length, absenceLimit, day ? periodsAt(day).length : 1);
+	});
 	let absentOpen = $state(false);
 	let absentDate = $state('');
 	let absentPeriods = $state<number[]>([]);
