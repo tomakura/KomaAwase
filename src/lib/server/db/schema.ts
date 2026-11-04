@@ -27,6 +27,7 @@ export type NotifySettings = Partial<
 		| 'taskMorning'
 		| 'taskBefore3h'
 		| 'taskBefore1h'
+		| 'attendance'
 		| 'sharedChange'
 		| 'feedbackReply',
 		boolean
@@ -297,6 +298,11 @@ export const courses = sqliteTable(
 		credits: real('credits'),
 		// How many absences the class allows, for the warning; personal
 		absenceLimit: integer('absence_limit'),
+		// Personal links: where to mark attendance on a phone (sent when the class starts), and
+		// the online class with its password
+		attendanceUrl: text('attendance_url'),
+		onlineUrl: text('online_url'),
+		onlinePassword: text('online_password'),
 		// When this person last saw the shared course's changes (synced only); edits by others
 		// after it are shown as changed. Null: since syncing began
 		sharedSeenAt: integer('shared_seen_at', { mode: 'timestamp_ms' }),
@@ -424,7 +430,7 @@ export const calendarEntries = sqliteTable(
 	(t) => [index('calendar_entries_timetable_idx').on(t.timetableId, t.start)]
 );
 
-// The days a class was missed, by date, so a mistake can be taken back. Personal: never shared.
+// The classes missed, one row a period, so a mistake can be taken back. Personal: never shared.
 export const courseAbsences = sqliteTable(
 	'course_absences',
 	{
@@ -433,9 +439,12 @@ export const courseAbsences = sqliteTable(
 			.notNull()
 			.references(() => courses.id, { onDelete: 'cascade' }),
 		date: text('date').notNull(), // YYYY-MM-DD
+		// The period missed (0限 is a period); -1 for the whole day (rows from before periods
+		// were kept, and days the class has no slot). WHOLE_DAY in src/lib/courses.ts
+		period: integer('period').notNull().default(-1),
 		createdAt: createdAt()
 	},
-	(t) => [uniqueIndex('course_absences_course_date_idx').on(t.courseId, t.date)]
+	(t) => [uniqueIndex('course_absences_course_date_period_idx').on(t.courseId, t.date, t.period)]
 );
 
 // One row a day, written by the daily cron: what the graphs in 運営 → 数字 can't work out

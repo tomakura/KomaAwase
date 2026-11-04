@@ -21,6 +21,9 @@
 	type CourseValues = SharedValues & {
 		color: string;
 		absenceLimit?: number | null;
+		attendanceUrl?: string | null;
+		onlineUrl?: string | null;
+		onlinePassword?: string | null;
 		termIds: string[];
 		syncMode: 'synced' | 'personal';
 	};
@@ -81,7 +84,10 @@
 		intensiveFrom: initial.intensiveFrom ?? '',
 		intensiveTo: initial.intensiveTo ?? '',
 		credits: initial.credits ?? ('' as number | ''),
-		absenceLimit: initial.absenceLimit ?? ('' as number | '')
+		absenceLimit: initial.absenceLimit ?? ('' as number | ''),
+		attendanceUrl: initial.attendanceUrl ?? '',
+		onlineUrl: initial.onlineUrl ?? '',
+		onlinePassword: initial.onlinePassword ?? ''
 	});
 
 	const periodNumbers = $derived(periods.map((p) => p.number));
@@ -503,6 +509,23 @@
 				{/if}
 			</div>
 		{/if}
+
+		<div class="group">
+			<span class="label">出席とオンライン（任意・自分だけ）</span>
+			<label class="field">
+				スマホ出席のリンク
+				<input name="attendance_url" type="url" inputmode="url" maxlength="500" placeholder="https://" autocomplete="off" bind:value={v.attendanceUrl} />
+			</label>
+			<span class="note">入れると、授業が始まるときにこのリンクを開く通知が届きます。</span>
+			<label class="field">
+				オンライン授業の URL
+				<input name="online_url" type="url" inputmode="url" maxlength="500" placeholder="https://" autocomplete="off" bind:value={v.onlineUrl} />
+			</label>
+			<label class="field">
+				パスワード
+				<input name="online_password" maxlength="100" autocomplete="off" autocapitalize="off" spellcheck="false" bind:value={v.onlinePassword} />
+			</label>
+		</div>
 	</div>
 </form>
 

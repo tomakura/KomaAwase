@@ -48,7 +48,7 @@ function world(o: Options = {}) {
 	return { db, run };
 }
 
-type Sent = { endpoint: string; message: { title: string; body?: string; url: string; tag?: string } };
+type Sent = { endpoint: string; message: { title: string; body?: string; url: string; open?: string; tag?: string } };
 
 async function fire(w: ReturnType<typeof world>, time: number, result: 'sent' | 'gone' | 'failed' | Error = 'sent') {
 	const sent: Sent[] = [];
@@ -125,6 +125,26 @@ describe('sendDueReminders', () => {
 		w.run(`UPDATE periods SET start_time = '9:40' WHERE id = 'p1'`);
 		w.run(`INSERT INTO course_slots (id, course_id, weekday, period_number, span) VALUES ('s0', 'c1', 2, 1, 1)`);
 		expect((await fire(w, at(9, 30))).sent.map((s) => s.message.body)).toEqual(['9:40開始']);
+	});
+
+	it('sends a class with an attendance link as it starts, opening the link, without any times chosen', async () => {
+		const w = world({ leads: [], span: 2 });
+		w.run(`UPDATE courses SET attendance_url = 'https://attend.example.test/x'`);
+		expect([...(await reminderTimes(d1(w.db), 2026))]).toContain(12 * 60 + 40);
+		const { sent } = await fire(w, at(12, 40));
+		expect(sent.map((s) => s.message)).toEqual([
+			{ title: '3限 サンプル演習 II が始まります', body: 'タップしてスマホ出席', url: '/courses/c1', open: 'https://attend.example.test/x', tag: 'attend-s1-2026-09-29' }
+		]);
+		// Once a class, not again at its second period
+		expect((await fire(w, at(14, 20))).count).toBe(0);
+	});
+
+	it('sends the attendance one in place of the plain one at the start, and none when turned off', async () => {
+		const w = world({ leads: [0] });
+		w.run(`UPDATE courses SET attendance_url = 'https://attend.example.test/x'`);
+		expect((await fire(w, at(12, 40))).sent.map((s) => s.message.body)).toEqual(['タップしてスマホ出席']);
+		w.run(`UPDATE users SET notify = '{"attendance":false}' WHERE id = 'u1'`);
+		expect((await fire(w, at(12, 40))).sent.map((s) => s.message.body)).toEqual(['12:40開始 · E10']);
 	});
 
 	it('sends nothing on another day of the week', async () => {

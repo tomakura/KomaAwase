@@ -92,12 +92,12 @@ export async function exportData(db: Db, user: { id: string }) {
 				.innerJoin(timetables, own(courses))
 				.where(eq(timetables.userId, me)),
 			db
-				.select({ courseId: courseAbsences.courseId, date: courseAbsences.date })
+				.select({ courseId: courseAbsences.courseId, date: courseAbsences.date, period: courseAbsences.period })
 				.from(courseAbsences)
 				.innerJoin(courses, eq(courses.id, courseAbsences.courseId))
 				.innerJoin(timetables, own(courses))
 				.where(eq(timetables.userId, me))
-				.orderBy(asc(courseAbsences.date)),
+				.orderBy(asc(courseAbsences.date), asc(courseAbsences.period)),
 			db.select().from(events).where(eq(events.userId, me)).orderBy(asc(events.date)),
 			listFriendships(db, me),
 			(() => {
@@ -178,7 +178,11 @@ export async function exportData(db: Db, user: { id: string }) {
 						intensiveTo: v.intensiveTo,
 						credits: v.credits,
 						absenceLimit: c.absenceLimit,
-						absences: by(absences, c.id).map((a) => a.date),
+						// A day, or the day and the period missed
+						absences: by(absences, c.id).map((a) => (a.period >= 0 ? { date: a.date, period: a.period } : a.date)),
+						attendanceUrl: c.attendanceUrl,
+						onlineUrl: c.onlineUrl,
+						onlinePassword: c.onlinePassword,
 						terms: termLinks.filter((l) => l.courseId === c.id).map((l) => termName.get(l.termId) ?? ''),
 						slots: v.slots.map((s) => ({ weekday: s.weekday, period: s.period, span: s.span, week: s.week, room: s.room })),
 						teachers: v.teachers,

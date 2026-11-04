@@ -16,13 +16,17 @@
 	import { wrapTitle } from '$lib/wrap-title';
 	import {
 		DAY_NAMES,
+		WHOLE_DAY,
 		absenceLimitOf,
+		absenceRisk,
+		periodsOn,
 		actionHref,
 		classTimeOn,
 		courseColor,
 		courseHref,
 		creditsOf,
 		deliveryLabel,
+		meetsInWeek,
 		periodLabel,
 		timetableHref,
 		weekLabel
@@ -30,6 +34,8 @@
 	import { FILE_ACCEPT, fileBadge, formatBytes, uploadFile } from '$lib/files';
 	import { MEMO_MAX, moveId, orderMemos } from '$lib/notes';
 	import { votesLabel } from '$lib/cancellations';
+	import { copyText } from '$lib/share';
+	import { toast } from '$lib/toast.svelte';
 	import { whenLabel } from '$lib/plans';
 	import { REPEAT_MAX, stepsDone, submitLink, type TaskStep } from '$lib/tasks';
 	import { addDays, daysBetween, monthDay, tokyoTime, weekdayOf } from '$lib/time';
@@ -206,11 +212,49 @@
 		uploading = false;
 	}
 
-	// Absences: recorded by date, one a day
-	const absentToday = $derived(data.absences.some((a) => a.date === data.today));
+	// Absences: one a period missed, on a day chosen (today or before)
 	const credits = $derived(creditsOf(course, data.timetable.universityId));
 	const absenceLimit = $derived(absenceLimitOf(course, data.timetable.universityId));
 	const absenceLeft = $derived(absenceLimit ? absenceLimit - data.absences.length : null);
+	// Missing the next day the class meets would pass the limit
+	// (the next day it meets, by week pattern and moves; three weeks covers every other week)
+	const absenceNext = $derived.by(() => {
+		const day = Array.from({ length: 21 }, (_, n) => addDays(data.today, n)).find((d) => periodsAt(d).length);
+		return absenceRisk(data.absences.length, absenceLimit, day ? periodsAt(day).length : 1);
+	});
+	let absentOpen = $state(false);
+	let absentDate = $state('');
+	let absentPeriods = $state<number[]>([]);
+	// The last day the class met, up to today, as the day first shown
+	const lastClassDay = $derived(
+		[0, 1, 2, 3, 4, 5, 6]
+			.map((n) => addDays(data.today, -n))
+			.find((d) => course.slots.some((s) => s.weekday === weekdayOf(d))) ?? data.today
+	);
+	// The periods of the chosen day: its slots that meet that week (none when the class was
+	// moved away from it), and a class moved to it
+	function periodsAt(day: string) {
+		if (!day) return [];
+		const term = data.terms.find(
+			(t) => course.termIds.includes(t.id) && (!t.startDate || t.startDate <= day) && (!t.endDate || day <= t.endDate)
+		);
+		const away = data.moves.some((m) => m.fromDate === day);
+		const slots = away ? [] : course.slots.filter((s) => meetsInWeek(s.week, term?.startDate, day));
+		const moved = data.moves.filter((m) => m.toDate === day).flatMap((m) => Array.from({ length: m.span }, (_, i) => m.period + i));
+		return [...new Set([...periodsOn(slots, weekdayOf(day), periodNumbers), ...moved])].sort((a, b) => a - b);
+	}
+	const periodsOfDay = $derived(periodsAt(absentDate));
+	const recorded = $derived(new Set(data.absences.filter((a) => a.date === absentDate).map((a) => a.period)));
+	function openAbsent() {
+		absentOpen = !absentOpen;
+		absentDate = lastClassDay;
+		absentPeriods = [];
+	}
+	async function copyPassword() {
+		if (!course.onlinePassword) return;
+		toast.show((await copyText(course.onlinePassword)) === 'copied' ? 'パスワードをコピーしました' : 'コピーできませんでした');
+	}
+	const absenceLabel = (a: { date: string; period: number }) => `${withDay(a.date)}${a.period === WHOLE_DAY ? '' : ` ${a.period}限`}`;
 
 	function dueLabel(due: string) {
 		const days = daysBetween(data.today, due);
@@ -364,6 +408,22 @@
 			{#if course.teachers.length}
 				<span class="teachers">{course.teachers.join('・')}</span>
 			{/if}
+			{#if course.attendanceUrl || course.onlineUrl}
+				<div class="links">
+					{#if course.attendanceUrl}
+						<a class="btn btn-primary" href={course.attendanceUrl} target="_blank" rel="noopener noreferrer">出席する</a>
+					{/if}
+					{#if course.onlineUrl}
+						<a class="btn" href={course.onlineUrl} target="_blank" rel="noopener noreferrer">オンラインで参加</a>
+					{/if}
+				</div>
+				{#if course.onlineUrl && course.onlinePassword}
+					<div class="password">
+						<span>パスワード <b>{course.onlinePassword}</b></span>
+						<button class="absent quiet" type="button" onclick={copyPassword}>コピー</button>
+					</div>
+				{/if}
+			{/if}
 			{#if course.syncMode === 'synced' && data.shared}
 				<span class="source">
 					{#if data.shared.source === 'syllabus'}<span class="tag-syllabus">シラバス</span>{/if}
@@ -468,7 +528,7 @@
 			onchange={(e) => upload(e.currentTarget.files)}
 		/>
 		{#each uploadErrors as message, i (i)}<p class="error block" role="alert">{message}</p>{/each}
-		{#if form?.message && !adding && !form.editing}<p class="error block" role="alert">{form.message}</p>{/if}
+		{#if form?.message && !adding && !form.editing && !absentOpen}<p class="error block" role="alert">{form.message}</p>{/if}
 
 		{#if adding}
 			<form
@@ -554,20 +614,58 @@
 						<span class="main">{data.absences.length}回{absenceLimit ? `（${absenceLimit}回まで）` : ''}</span>
 						{#if absenceLeft !== null && absenceLeft < 0}
 							<span class="sub warn">上限を超えています</span>
-						{:else if absenceLeft === 0}
-							<span class="sub warn">上限に達しています</span>
-						{:else if absenceLeft === 1}
-							<span class="sub warn">あと1回で上限です</span>
+						{:else if absenceNext === 'risk'}
+							<span class="sub warn">次の授業を休むと上限を超えます</span>
 						{/if}
 					</span>
-					<form method="POST" action={actionHref('absent', data.termParam)} use:enhance>
-						<button class="absent" type="submit" disabled={absentToday}>{absentToday ? '今日は記録済み' : '欠席した'}</button>
-					</form>
+					<button class="absent" type="button" aria-expanded={absentOpen} onclick={openAbsent}>欠席を記録</button>
 				</div>
+				{#if absentOpen}
+					<form
+						transition:slide={motion()}
+						class="add-form inline"
+						method="POST"
+						action={actionHref('absent', data.termParam)}
+						use:enhance={() =>
+							async ({ result, update }) => {
+								await settle(update);
+								if (result.type === 'success') absentOpen = false;
+							}}
+					>
+						<label class="field">休んだ日<input type="date" name="date" max={data.today} required bind:value={absentDate} onchange={() => (absentPeriods = [])} /></label>
+						{#if periodsOfDay.length}
+							<div class="absent-periods" role="group" aria-label="休んだ時限">
+								{#each periodsOfDay as p (p)}
+									<label class="period-check">
+										{#if recorded.has(p)}
+											<input type="checkbox" checked disabled />
+										{:else}
+											<input type="checkbox" name="period" value={p} bind:group={absentPeriods} />
+										{/if}
+										{p}限{#if recorded.has(p)}<span class="sub">記録済み</span>{/if}
+									</label>
+								{/each}
+							</div>
+						{:else if absentDate}
+							<span class="sub">この日は授業がありません。日付だけ記録します</span>
+						{/if}
+						{#if form?.message && absentOpen}<p class="error" role="alert">{form.message}</p>{/if}
+						<div class="form-actions">
+							<button class="btn" type="button" onclick={() => (absentOpen = false)}>やめる</button>
+							<button
+								class="btn btn-primary"
+								type="submit"
+								disabled={!absentDate || (periodsOfDay.length > 0 && !absentPeriods.length) || (!periodsOfDay.length && recorded.has(WHOLE_DAY))}
+							>
+								記録する
+							</button>
+						</div>
+					</form>
+				{/if}
 				{#each data.absences as a (a.id)}
 					<div transition:slide={motion()} class="item">
-						<span class="text"><span class="main">{withDay(a.date)}</span></span>
-						{@render removeButton(a.id, `${withDay(a.date)}の欠席`, 'removeAbsence')}
+						<span class="text"><span class="main">{absenceLabel(a)}</span></span>
+						{@render removeButton(a.id, `${absenceLabel(a)}の欠席`, 'removeAbsence')}
 					</div>
 				{/each}
 			</section>
@@ -1040,6 +1138,62 @@
 	.teachers {
 		font-size: 13px;
 		color: var(--ink-soft);
+	}
+
+	.links {
+		display: grid;
+		grid-auto-flow: column;
+		grid-auto-columns: minmax(0, 1fr);
+		gap: 8px;
+	}
+
+	.links .btn {
+		min-height: 44px;
+		padding: 0 12px;
+		font-size: 14px;
+	}
+
+	.password {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 13px;
+		color: var(--ink-soft);
+	}
+
+	.password b {
+		margin-left: 4px;
+		color: var(--ink);
+		font-family: ui-monospace, monospace;
+		user-select: all;
+		overflow-wrap: anywhere;
+	}
+
+	.absent-periods {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 16px;
+	}
+
+	.period-check {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 40px;
+		font-size: 14px;
+	}
+
+	.period-check input {
+		width: 20px;
+		height: 20px;
+		margin: 0;
+		accent-color: var(--ink);
+	}
+
+	.period-check .sub {
+		font-size: 12px;
+		color: var(--ink-sub);
 	}
 
 	.shared-link {

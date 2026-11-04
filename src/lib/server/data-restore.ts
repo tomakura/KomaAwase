@@ -6,7 +6,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { getTableColumns } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { CALENDAR_LABEL_MAX, CALENDAR_MAX, MOVES_MAX } from '$lib/calendar';
-import { ABSENCE_LIMIT_MAX, CREDITS_MAX, isCourseColor, isWeekPattern, type WeekPattern } from '$lib/courses';
+import { ABSENCE_LIMIT_MAX, CREDITS_MAX, PASSWORD_MAX, WHOLE_DAY, isCourseColor, isWeekPattern, readLink, type WeekPattern } from '$lib/courses';
 import { normalizeTitle } from '$lib/overlay';
 import { STEPS_MAX, STEP_TEXT_MAX, SUBMIT_TO_MAX, type TaskStep } from '$lib/tasks';
 import { academicYear, isDate, tokyoTime } from '$lib/time';
@@ -46,6 +46,24 @@ const textOrNull = (v: unknown, max: number) => text(v, max) || null;
 const date = (v: unknown) => (typeof v === 'string' && isDate(v) ? v : null);
 const time = (v: unknown) => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null);
 const int = (v: unknown, min: number, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : null);
+const linkOf = (v: unknown) => {
+	const link = typeof v === 'string' ? readLink(v) : null;
+	return link === 'invalid' ? null : link;
+};
+// Days ("2026-04-13", from before periods were kept) or { date, period }, each once. A day
+// with periods drops its whole-day entry, so it isn't counted twice
+function absencesOf(v: unknown) {
+	const seen = new Set<string>();
+	const read = list(v, ABSENCES_MAX).flatMap((a) => {
+		const day = date(isObject(a) ? a.date : a);
+		const period = isObject(a) ? (int(a.period, 0, 20) ?? WHOLE_DAY) : WHOLE_DAY;
+		if (!day || seen.has(`${day}|${period}`)) return [];
+		seen.add(`${day}|${period}`);
+		return [{ date: day, period }];
+	});
+	const withPeriods = new Set(read.filter((a) => a.period !== WHOLE_DAY).map((a) => a.date));
+	return read.filter((a) => a.period !== WHOLE_DAY || !withPeriods.has(a.date));
+}
 
 export type BackupFile = { name: string; mime: string; size: number; path: string | null };
 type Slot = { weekday: number; period: number; span: number; week: WeekPattern; room: string | null };
@@ -70,7 +88,10 @@ export type BackupCourse = {
 	intensiveTo: string | null;
 	credits: number | null;
 	absenceLimit: number | null;
-	absences: string[];
+	absences: { date: string; period: number }[];
+	attendanceUrl: string | null;
+	onlineUrl: string | null;
+	onlinePassword: string | null;
 	terms: string[];
 	slots: Slot[];
 	teachers: string[];
@@ -158,7 +179,10 @@ function readCourse(v: unknown, periodNumbers: number[]): BackupCourse | null {
 		intensiveTo: slots.length ? null : date(v.intensiveTo),
 		credits,
 		absenceLimit: int(v.absenceLimit, 1, ABSENCE_LIMIT_MAX),
-		absences: [...new Set(list(v.absences, ABSENCES_MAX).flatMap((d) => date(d) ?? []))],
+		absences: absencesOf(v.absences),
+		attendanceUrl: linkOf(v.attendanceUrl),
+		onlineUrl: linkOf(v.onlineUrl),
+		onlinePassword: textOrNull(v.onlinePassword, PASSWORD_MAX),
 		terms: list(v.terms, 12).map((t) => text(t, 30)),
 		slots,
 		teachers: [...new Set(list(v.teachers, 10).map((t) => text(t, 30)).filter(Boolean))],
@@ -391,6 +415,9 @@ export async function restoreBackup(
 				intensiveTo: c.intensiveTo,
 				credits: c.credits,
 				absenceLimit: c.absenceLimit,
+				attendanceUrl: c.attendanceUrl,
+				onlineUrl: c.onlineUrl,
+				onlinePassword: c.onlinePassword,
 				syncMode: linked ? 'synced' : 'personal',
 				sharedCourseId: linked
 			});
@@ -405,7 +432,7 @@ export async function restoreBackup(
 					.filter((m) => periodNumbers.includes(m.period) && periodNumbers.includes(m.period + m.span - 1))
 					.map((m) => ({ courseId: id, fromDate: m.from, toDate: m.to, period: m.period, span: m.span, room: m.room }))
 			);
-			rows.absences.push(...c.absences.map((d) => ({ courseId: id, date: d })));
+			rows.absences.push(...c.absences.map((a) => ({ courseId: id, ...a })));
 			uploads.push(...c.files.flatMap((f) => (f.path ? [{ courseId: id, name: f.name, mime: f.mime, path: f.path }] : [])));
 		}
 		statements.push(

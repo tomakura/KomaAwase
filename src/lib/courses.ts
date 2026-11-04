@@ -143,6 +143,48 @@ export function absenceLimitOf(
 }
 export const ABSENCE_LIMIT_MAX = 99;
 
+/**
+ * Where the absences stand against the limit, for a day the class meets `periods` periods:
+ * 'over' past the limit, 'risk' when missing that day would take it past, else null.
+ * Each period missed is one absence.
+ */
+export function absenceRisk(count: number, limit: number | null, periods: number): 'over' | 'risk' | null {
+	if (!limit) return null;
+	if (count > limit) return 'over';
+	return count + Math.max(1, periods) > limit ? 'risk' : null;
+}
+
+// An absence recorded for a day, not a period (course_absences.period)
+export const WHOLE_DAY = -1;
+
+/** The periods the class meets on a weekday, in order; `periods` is the timetable's, in order */
+export function periodsOn(slots: { weekday: number; period: number; span: number }[], weekday: number, periods: number[]): number[] {
+	return slots
+		.filter((s) => s.weekday === weekday)
+		.flatMap((s) => {
+			const start = periods.indexOf(s.period);
+			return start < 0 ? [] : periods.slice(start, start + s.span);
+		})
+		.sort((a, b) => a - b);
+}
+
+// A link typed for attending or joining a class: http(s) only, so a tap never runs anything
+export const LINK_MAX = 500;
+export const PASSWORD_MAX = 100;
+export function readLink(value: FormDataEntryValue | null): string | null | 'invalid' {
+	const text = String(value ?? '').trim();
+	if (!text) return null;
+	if (text.length > LINK_MAX) return 'invalid';
+	try {
+		const url = new URL(text);
+		// Checked again as saved: letters such as Japanese grow when the address is encoded
+		const ok = (url.protocol === 'https:' || url.protocol === 'http:') && url.href.length <= LINK_MAX;
+		return ok ? url.href : 'invalid';
+	} catch {
+		return 'invalid';
+	}
+}
+
 // An empty field is no value; a number in steps of `step` up to `max` is one; anything else is invalid
 export function readNumber(value: FormDataEntryValue | null, max: number, step: number): number | null | 'invalid' {
 	const text = String(value ?? '').trim();

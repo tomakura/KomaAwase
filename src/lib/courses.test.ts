@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absenceLimitOf, classTimeOn, creditsOf, daysLabel, meetsInWeek, periodLabel, readNumber } from './courses';
+import { absenceLimitOf, absenceRisk, classTimeOn, creditsOf, daysLabel, meetsInWeek, periodLabel, periodsOn, readLink, readNumber } from './courses';
 
 describe('meetsInWeek', () => {
 	// Q3 starts on Thursday 2026-09-24: its first week is Monday 9/21 to Sunday 9/27.
@@ -92,5 +92,30 @@ describe('classTimeOn', () => {
 		expect(classTimeOn('2026-10-01', [{ weekday: 3, period: 1, span: 1 }], periods)).toBeNull();
 		expect(classTimeOn('2026-09-30', [{ weekday: 3, period: 5, span: 1 }], periods)).toBeNull();
 		expect(classTimeOn('', [{ weekday: 3, period: 1, span: 1 }], periods)).toBeNull();
+	});
+});
+
+describe('absenceRisk', () => {
+	it('warns when missing the day would pass the limit, counting each period', () => {
+		expect(absenceRisk(2, 3, 1)).toBeNull();
+		expect(absenceRisk(3, 3, 1)).toBe('risk');
+		expect(absenceRisk(2, 3, 2)).toBe('risk');
+		expect(absenceRisk(1, 3, 2)).toBeNull();
+		expect(absenceRisk(4, 3, 1)).toBe('over');
+		expect(absenceRisk(9, null, 1)).toBeNull();
+	});
+
+	it('reads the periods of a weekday, double classes as two', () => {
+		expect(periodsOn([{ weekday: 2, period: 3, span: 2 }, { weekday: 2, period: 1, span: 1 }, { weekday: 4, period: 1, span: 1 }], 2, [1, 2, 3, 4, 5])).toEqual([1, 3, 4]);
+		expect(periodsOn([{ weekday: 2, period: 3, span: 2 }], 2, [1, 3, 5])).toEqual([3, 5]);
+	});
+});
+
+describe('readLink', () => {
+	it('takes http and https links only', () => {
+		expect(readLink('')).toBeNull();
+		expect(readLink(' https://example.test/a ')).toBe('https://example.test/a');
+		expect(readLink('javascript:alert(1)')).toBe('invalid');
+		expect(readLink('example.test')).toBe('invalid');
 	});
 });

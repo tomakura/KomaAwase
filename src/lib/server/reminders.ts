@@ -3,8 +3,8 @@
 // what starts in the minutes people chose, and almost every minute that finds nothing.
 // Relative imports only, because the Worker's entry file (worker/entry.js) reaches it directly.
 import { meetsInWeek, type WeekPattern } from '../courses';
-import { isQuiet } from '../notify';
-import { reminderMessage } from '../reminder';
+import { isQuiet, wants } from '../notify';
+import { attendanceMessage, reminderMessage } from '../reminder';
 import { termIsOn } from '../terms';
 import { academicYear, tokyoTime } from '../time';
 import { sendPush } from './push';
@@ -17,6 +17,11 @@ const minutesOf = (column: string) => `(CAST(substr(${column}, 1, instr(${column
 	+ CAST(substr(${column}, instr(${column}, ':') + 1) AS INTEGER))`;
 const START = minutesOf('p.start_time');
 
+// Who wants a notification how long before a class: the times they chose (att 0), and, as a
+// start (0 minutes before), everyone with a class that has a link for attending on a phone (att 1)
+const ASKED = `(SELECT user_id, minutes, 0 AS att FROM class_reminders
+UNION ALL SELECT DISTINCT t.user_id, 0, 1 FROM courses c JOIN timetables t ON t.id = c.timetable_id WHERE c.attendance_url IS NOT NULL)`;
+
 // Every phone of every person who wants a notification `minutes` before a class that starts
 // now + `minutes`, today (this year's timetable, that weekday, not cancelled, moved away or a
 // day off in the timetable's calendar). A
@@ -26,10 +31,10 @@ const START = minutesOf('p.start_time');
 // it (its title and slots, as the timetable shows them); any other from the person's own rows.
 // Parameters: year, weekday, now, date (four times), then the same again for the synced courses.
 const due = (synced: boolean) => `
-SELECT r.minutes AS lead, u.notify AS notify, ps.id AS deviceId, ps.endpoint, ps.p256dh, ps.auth,
+SELECT r.minutes AS lead, r.att AS att, c.attendance_url AS attendanceUrl, u.notify AS notify, ps.id AS deviceId, ps.endpoint, ps.p256dh, ps.auth,
 	c.id AS courseId, ${synced ? 'sc.title' : 'c.title'} AS title, s.id AS slotId, s.room, s.week_pattern AS week,
 	p.number AS period, p.number - s.period_number + 1 AS part, p.start_time AS start, tm.start_date AS termStart, tm.end_date AS termEnd
-FROM class_reminders r
+FROM ${ASKED} r
 JOIN timetables t ON t.user_id = r.user_id AND t.year = ? AND t.archived = 0
 ${
 	synced
@@ -48,17 +53,18 @@ JOIN push_subscriptions ps ON ps.user_id = r.user_id
 JOIN users u ON u.id = r.user_id
 WHERE ${START} - r.minutes = ?
 	AND (p.number = s.period_number OR ${START} - r.minutes >= ${minutesOf('prev.end_time')})
+	AND (r.att = 0 OR (c.attendance_url IS NOT NULL AND p.number = s.period_number))
 	AND NOT EXISTS (SELECT 1 FROM course_notes n WHERE n.course_id = c.id AND n.kind = 'cancel' AND n.date = ?)
 	AND NOT EXISTS (SELECT 1 FROM calendar_entries ce WHERE ce.timetable_id = t.id AND ce.kind = 'off' AND ce.start_date <= ? AND ce.end_date >= ?)
 	AND NOT EXISTS (SELECT 1 FROM course_moves mv WHERE mv.course_id = c.id AND mv.from_date = ?)`;
 
 // A class moved to today (course_moves), in the period it moved to. Parameters: year, date, now.
 const MOVED = `
-SELECT r.minutes AS lead, u.notify AS notify, ps.id AS deviceId, ps.endpoint, ps.p256dh, ps.auth,
+SELECT r.minutes AS lead, r.att AS att, c.attendance_url AS attendanceUrl, u.notify AS notify, ps.id AS deviceId, ps.endpoint, ps.p256dh, ps.auth,
 	c.id AS courseId, coalesce((SELECT sc.title FROM shared_courses sc WHERE c.sync_mode = 'synced' AND sc.id = c.shared_course_id), c.title) AS title,
 	m.id AS slotId, m.room, 'every' AS week, p.number AS period, p.number - m.period + 1 AS part, p.start_time AS start,
 	NULL AS termStart, NULL AS termEnd
-FROM class_reminders r
+FROM ${ASKED} r
 JOIN timetables t ON t.user_id = r.user_id AND t.year = ? AND t.archived = 0
 JOIN courses c ON c.timetable_id = t.id
 JOIN course_moves m ON m.course_id = c.id AND m.to_date = ?
@@ -67,7 +73,8 @@ LEFT JOIN periods prev ON prev.timetable_id = t.id AND prev.number = p.number - 
 JOIN push_subscriptions ps ON ps.user_id = r.user_id
 JOIN users u ON u.id = r.user_id
 WHERE ${START} - r.minutes = ?
-	AND (p.number = m.period OR ${START} - r.minutes >= ${minutesOf('prev.end_time')})`;
+	AND (p.number = m.period OR ${START} - r.minutes >= ${minutesOf('prev.end_time')})
+	AND (r.att = 0 OR (c.attendance_url IS NOT NULL AND p.number = m.period))`;
 const DUE = `${due(false)}\nUNION ALL${due(true)}\nUNION ALL${MOVED}`;
 
 // The minutes of the day at which some class of someone who asked is that many minutes away:
@@ -75,7 +82,7 @@ const DUE = `${due(false)}\nUNION ALL${due(true)}\nUNION ALL${MOVED}`;
 // reads about one per period of those people, so most minutes stop here. CROSS JOIN keeps SQLite
 // starting from the few people who asked, instead of every timetable. Parameter: year.
 const TIMES = `
-SELECT DISTINCT ${START} - r.minutes AS minute FROM class_reminders r
+SELECT DISTINCT ${START} - r.minutes AS minute FROM ${ASKED} r
 CROSS JOIN timetables t ON t.user_id = r.user_id AND t.year = ? AND t.archived = 0
 CROSS JOIN periods p ON p.timetable_id = t.id`;
 
@@ -90,6 +97,8 @@ export type ReminderTimes = (year: number) => Promise<Set<number>>;
 
 type Row = {
 	lead: number;
+	att: number;
+	attendanceUrl: string | null;
 	notify: string | null;
 	deviceId: string;
 	endpoint: string;
@@ -129,10 +138,13 @@ export async function sendDueReminders(
 		.all<Row>();
 
 	// A class in two terms that are both on would be found twice
+	// The attendance one goes in place of a plain one at the start, not with it
 	const seen = new Set<string>();
-	const due = results.filter((r) => {
+	const due = results.toSorted((a, b) => b.att - a.att).filter((r) => {
 		if (!termIsOn({ startDate: r.termStart, endDate: r.termEnd }, now.date) || !meetsInWeek(r.week, r.termStart, now.date)) return false;
-		if (r.notify && isQuiet(JSON.parse(r.notify).quiet, minute)) return false;
+		const settings = r.notify ? JSON.parse(r.notify) : null;
+		if (settings && isQuiet(settings.quiet, minute)) return false;
+		if (r.att && !wants(settings, 'attendance')) return false;
 		const key = `${r.deviceId}|${r.slotId}|${r.period}|${r.lead}`;
 		return !seen.has(key) && !!seen.add(key);
 	});
@@ -143,7 +155,9 @@ export async function sendDueReminders(
 		endpoint: r.endpoint,
 		p256dh: r.p256dh,
 		auth: r.auth,
-		message: reminderMessage({ ...r, room: r.room, date: now.date }),
+		message: r.att && r.attendanceUrl
+			? attendanceMessage({ ...r, room: r.room, date: now.date, attendanceUrl: r.attendanceUrl })
+			: reminderMessage({ ...r, room: r.room, date: now.date }),
 		// Not after the class has started
 		expires: scheduledTime + (r.lead + 1) * 60_000
 	}));

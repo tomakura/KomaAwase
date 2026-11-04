@@ -13,6 +13,7 @@ export const NOTIFY_KINDS = [
 	{ id: 'taskMorning', label: '締切の日の朝8時に、今日の課題を知らせる', off: true },
 	{ id: 'taskBefore3h', label: '締切の3時間前に知らせる', off: true },
 	{ id: 'taskBefore1h', label: '締切の1時間前に知らせる', off: true },
+	{ id: 'attendance', label: 'スマホ出席のリンクを入れた授業が始まるとき' },
 	{ id: 'sharedChange', label: '同期している授業の内容が変わったとき' },
 	{ id: 'feedbackReply', label: '送った要望に運営から返事が来たとき' }
 ] as const;

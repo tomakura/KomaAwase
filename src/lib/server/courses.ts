@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { and, asc, count, desc, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { ABSENCE_LIMIT_MAX, COURSE_COLORS, CREDITS_MAX, isCourseColor, readNumber, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
+import { ABSENCE_LIMIT_MAX, COURSE_COLORS, CREDITS_MAX, PASSWORD_MAX, isCourseColor, readLink, readNumber, isWeekPattern, type Delivery, type WeekPattern } from '$lib/courses';
 import { isDate } from '$lib/time';
 import { cleanRoom, cleanText } from '$lib/text';
 import type { Db } from './db';
@@ -34,10 +34,14 @@ export type CourseInput = {
 	intensiveTo: string | null;
 	credits: number | null; // shared by everyone syncing the course
 	absenceLimit: number | null; // personal
+	// Personal too; left as they are when the form has no such fields (imports, linking)
+	links?: CourseLinks;
 	syncMode: 'synced' | 'personal';
 	sharedCourseId: string | null; // the shared course it came from, if any
 	sharedVersion: number | null; // the version of it the form showed
 };
+
+export type CourseLinks = { attendanceUrl: string | null; onlineUrl: string | null; onlinePassword: string | null };
 
 // What a submitted course is checked against
 export type Shape = { termIds: string[]; periods: number[] };
@@ -69,6 +73,8 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 	const absenceLimit = readNumber(form.get('absence_limit'), ABSENCE_LIMIT_MAX, 1);
 	if (credits === 'invalid') return { message: `単位数は0〜${CREDITS_MAX}で、0.5単位きざみで入れてください` };
 	if (absenceLimit === 'invalid') return { message: `欠席の上限は1〜${ABSENCE_LIMIT_MAX}回で入れてください` };
+	const links = form.has('attendance_url') ? parseLinks(form) : undefined;
+	if (typeof links === 'string') return { message: links };
 
 	const version = Number(form.get('shared_version'));
 	const sync = {
@@ -85,7 +91,7 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 			return { message: '集中講義の期間を確認してください' };
 		}
 		return {
-			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to, credits, absenceLimit, ...sync }
+			input: { title, teachers, color, termIds, slots: [], delivery, intensiveFrom: from, intensiveTo: to, credits, absenceLimit, links, ...sync }
 		};
 	}
 
@@ -95,8 +101,19 @@ export function parseCourseForm(form: FormData, shape: Shape): { input: CourseIn
 		return { message: '曜日・時限を1つ以上入れるか、「曜日・時限がない」にチェックしてください' };
 	}
 	return {
-		input: { title, teachers, color, termIds, slots, delivery: null, intensiveFrom: null, intensiveTo: null, credits, absenceLimit, ...sync }
+		input: { title, teachers, color, termIds, slots, delivery: null, intensiveFrom: null, intensiveTo: null, credits, absenceLimit, links, ...sync }
 	};
+}
+
+function parseLinks(form: FormData): CourseLinks | string {
+	const attendanceUrl = readLink(form.get('attendance_url'));
+	if (attendanceUrl === 'invalid') return 'スマホ出席のリンクは https:// から始まる URL で入れてください';
+	const onlineUrl = readLink(form.get('online_url'));
+	if (onlineUrl === 'invalid') return 'オンラインの URL は https:// から始まる URL で入れてください';
+	// As typed, apart from the ends: a password is never normalized
+	const onlinePassword = String(form.get('online_password') ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim() || null;
+	if (onlinePassword && length(onlinePassword) > PASSWORD_MAX) return `パスワードは${PASSWORD_MAX}文字までです`;
+	return { attendanceUrl, onlineUrl, onlinePassword };
 }
 
 // Slots arrive as JSON, one per field. They must fit in the timetable and not overlap.
@@ -246,6 +263,7 @@ export async function prepareCourse(
 		intensiveTo: input.intensiveTo,
 		credits: input.credits,
 		absenceLimit: input.absenceLimit,
+		...input.links,
 		syncMode,
 		sharedCourseId,
 		// What the form showed is what they have seen of the shared course
@@ -402,10 +420,10 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 				.where(eq(courseTeachers.courseId, courseId))
 				.orderBy(asc(courseTeachers.sortOrder)),
 			db
-				.select({ id: courseAbsences.id, date: courseAbsences.date })
+				.select({ id: courseAbsences.id, date: courseAbsences.date, period: courseAbsences.period })
 				.from(courseAbsences)
 				.where(eq(courseAbsences.courseId, courseId))
-				.orderBy(desc(courseAbsences.date)),
+				.orderBy(desc(courseAbsences.date), asc(courseAbsences.period)),
 			courseMovesQuery(db, courseId)
 		]);
 	if (!course || !timetable) return null;
@@ -430,6 +448,9 @@ export async function loadCourse(db: Db, userId: string, courseId: string) {
 			...values,
 			color: course.color,
 			absenceLimit: course.absenceLimit,
+			attendanceUrl: course.attendanceUrl,
+			onlineUrl: course.onlineUrl,
+			onlinePassword: course.onlinePassword,
 			termIds: termLinks.map((l) => l.termId),
 			syncMode: course.syncMode
 		},
