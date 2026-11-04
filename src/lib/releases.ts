@@ -9,7 +9,7 @@ export type Release = { pr: number; date: string; items: string[] };
 export const RELEASES: Release[] = [
 	{
 		pr: 86,
-		date: '2026-11-03',
+		date: '2026-11-04',
 		items: [
 			'過去の日の欠席を、時限ごとに記録する機能を追加',
 			'欠席の上限を超えそうな授業・超えた授業を時間割に表示する機能を追加',
